@@ -1,0 +1,129 @@
+<h1>Usuarios</h1>
+
+<div class="toolbar">
+  <input
+    class="search-input"
+    type="text"
+    placeholder="Buscar por nombre o correo…"
+    (input)="buscar($any($event.target).value)"
+  />
+  @if (authService.tienePermiso('usuarios.crear')) {
+    <button class="btn btn-primary" (click)="abrirCrear()">+ Nuevo usuario</button>
+  }
+</div>
+
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>Nombre</th>
+        <th>Correo</th>
+        <th>Sucursal</th>
+        <th>Roles</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (usuario of usuarios(); track usuario.id) {
+        <tr>
+          <td>{{ usuario.name }}</td>
+          <td>{{ usuario.email }}</td>
+          <td>{{ usuario.sucursal?.nombre || 'Todas' }}</td>
+          <td>
+            @for (rol of usuario.roles; track rol.id) {
+              <span class="badge badge-primary">{{ rol.name }}</span>
+            }
+          </td>
+          <td class="acciones">
+            @if (authService.tienePermiso('usuarios.editar')) {
+              <button class="btn btn-secondary" (click)="abrirEditar(usuario)">Editar</button>
+            }
+            @if (authService.tienePermiso('usuarios.eliminar')) {
+              <button class="btn btn-danger" (click)="eliminar(usuario)">Eliminar</button>
+            }
+          </td>
+        </tr>
+      }
+      @empty {
+        <tr>
+          <td colspan="5">
+            <div class="empty-state">
+              @if (cargando()) {
+                Cargando usuarios…
+              } @else {
+                No hay usuarios registrados todavía.
+              }
+            </div>
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+
+  <div class="pagination">
+    <button class="btn btn-secondary" (click)="cambiarPagina(-1)" [disabled]="pagina() <= 1">Anterior</button>
+    <span>Página {{ pagina() }} de {{ totalPaginas() }}</span>
+    <button class="btn btn-secondary" (click)="cambiarPagina(1)" [disabled]="pagina() >= totalPaginas()">Siguiente</button>
+  </div>
+</div>
+
+@if (modalAbierto()) {
+  <div class="modal-backdrop" (click)="cerrarModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>{{ usuarioEditando() ? 'Editar usuario' : 'Nuevo usuario' }}</h2>
+        <button class="btn btn-secondary" (click)="cerrarModal()">✕</button>
+      </div>
+
+      @if (error()) {
+        <div class="alert alert-error">{{ error() }}</div>
+      }
+
+      <form [formGroup]="formulario" (ngSubmit)="guardar()">
+        <div class="form-field">
+          <label for="name">Nombre</label>
+          <input id="name" type="text" formControlName="name" />
+        </div>
+        <div class="form-field">
+          <label for="email">Correo electrónico</label>
+          <input id="email" type="email" formControlName="email" />
+        </div>
+        <div class="form-field">
+          <label for="password">
+            {{ usuarioEditando() ? 'Nueva contraseña (opcional)' : 'Contraseña' }}
+          </label>
+          <input id="password" type="password" formControlName="password" />
+        </div>
+        <div class="form-field">
+          <label for="sucursal_id">Sucursal</label>
+          <select id="sucursal_id" formControlName="sucursal_id">
+            <option [ngValue]="null">Todas (puede cambiar)</option>
+            @for (s of sucursales(); track s.id) {
+              <option [ngValue]="s.id">{{ s.nombre }}</option>
+            }
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Roles</label>
+          <div class="checkbox-list">
+            @for (rol of roles(); track rol.id) {
+              <label class="checkbox-item">
+                <input
+                  type="checkbox"
+                  [checked]="rolSeleccionado(rol.name)"
+                  (change)="alternarRol(rol.name, $any($event.target).checked)"
+                />
+                {{ rol.name }}
+              </label>
+            }
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" (click)="cerrarModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+}

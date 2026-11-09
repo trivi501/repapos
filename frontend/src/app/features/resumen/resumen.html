@@ -1,0 +1,53 @@
+<div class="encabezado"><h1>Resumen por locatario</h1></div>
+
+<div class="card tabla-scroll">
+  <table>
+    <thead>
+      <tr>
+        <th>Locatario</th><th>Teléfonos</th><th>En taller</th><th>Listos</th><th>No quedaron</th>
+        <th class="der">Total</th><th class="der">Pagado</th><th class="der">Debe</th><th class="der">A favor</th>
+        <th>Cuenta (entregados que debe)</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (f of filas(); track f.locatario.id) {
+        <tr>
+          <td><a [routerLink]="['/telefonos']" [queryParams]="{ locatario: f.locatario.id }"><strong>{{ f.locatario.nombre }}</strong></a></td>
+          <td>{{ f.telefonos }}</td>
+          <td>{{ f.en_taller }}</td>
+          <td>{{ f.listos }}</td>
+          <td>{{ f.no_quedaron }}</td>
+          <td class="der">{{ f.total | dinero }}</td>
+          <td class="der">{{ f.pagado | dinero }}</td>
+          <td class="der" [class.debe]="f.debe > 0">{{ f.debe | dinero }}</td>
+          <td class="der" [class.a-favor]="f.a_favor > 0">{{ f.a_favor | dinero }}</td>
+          <td>
+            @if (f.cuenta_url) {
+              <a class="btn btn-whatsapp btn-sm" [href]="f.cuenta_url" target="_blank" rel="noopener">Enviar cuenta ({{ f.entregados_deben }})</a>
+              @if (!f.locatario.whatsapp) {
+                <small class="tenue"> sin número</small>
+              }
+            } @else {
+              <span class="tenue">—</span>
+            }
+          </td>
+        </tr>
+      } @empty {
+        <tr><td colspan="10"><div class="empty-state">{{ cargando() ? 'Cargando…' : 'Todavía no hay movimientos de locatarios.' }}</div></td></tr>
+      }
+    </tbody>
+    @if (filas().length) {
+      <tfoot>
+        <tr>
+          <th colspan="5">Totales</th>
+          <th class="der">{{ suma('total') | dinero }}</th>
+          <th class="der">{{ suma('pagado') | dinero }}</th>
+          <th class="der">{{ suma('debe') | dinero }}</th>
+          <th class="der">{{ suma('a_favor') | dinero }}</th>
+          <th></th>
+        </tr>
+      </tfoot>
+    }
+  </table>
+</div>
+<p class="ayuda">"Enviar cuenta" abre WhatsApp con la lista de teléfonos ya entregados que debe y el total (descontando su saldo a favor, si tiene). Solo presionas Enviar.</p>

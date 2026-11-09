@@ -1,0 +1,94 @@
+<div class="venta">
+  <header class="venta-hero">
+    <div class="venta-ancho venta-nav">
+      <a routerLink="/" class="venta-marca" aria-label="RepaPOS, inicio"><app-logo fondo="oscuro" tamano="md" [eslogan]="true" /></a>
+      <nav class="venta-enlaces">
+        <a href="#precio" (click)="irA($event, 'precio')">Precio</a>
+        <a routerLink="/consulta">Consultar reparación</a>
+        <a routerLink="/login">Entrar</a>
+        <a class="btn btn-primary" routerLink="/registro">Prueba gratis</a>
+      </nav>
+    </div>
+    <div class="venta-ancho venta-portada">
+      <div>
+        <h1>El sistema para tu taller de celulares</h1>
+        <p class="venta-sub">Controla los equipos que recibes, avisa por WhatsApp cuando están listos y lleva tus cobros y tu corte de caja sin hojas ni cuadernos.</p>
+        <div class="acciones-fila">
+          <a class="btn btn-primary btn-grande" routerLink="/registro">Probar gratis {{ p()?.dias_prueba }} días</a>
+          <a class="btn btn-secondary btn-grande" href="#funciones" (click)="irA($event, 'funciones')">Ver qué incluye</a>
+        </div>
+        <p class="venta-nota">Sin tarjeta. Sin instalar nada. Desde la PC o el celular.</p>
+      </div>
+      <div class="card venta-muestra" aria-hidden="true">
+        <div class="linea-monto"><b>Equipos de hoy</b><b class="debe">Por cobrar: $2,450.00</b></div>
+        <table>
+          @for (m of muestra; track m[0]) {
+            <tr>
+              <td><strong>{{ m[0] }}</strong></td>
+              <td class="tenue">{{ m[1] }}</td>
+              <td><app-estatus [valor]="m[2]" /></td>
+              <td class="der"><app-estatus [valor]="m[3]" /></td>
+            </tr>
+          }
+        </table>
+        <div class="alert alert-success sin-margen-abajo">¿Avisar a OSMIN que su MOTO G60 ya está listo?</div>
+      </div>
+    </div>
+  </header>
+
+  <section id="funciones" class="venta-ancho venta-seccion">
+    <h2>Todo lo que necesita tu taller</h2>
+    <p class="venta-centro tenue">Hecho por un taller, para talleres.</p>
+    <div class="venta-funciones">
+      @for (f of funciones; track f[1]) {
+        <div class="card contenido">
+          <div class="venta-icono" aria-hidden="true">{{ f[0] }}</div>
+          <h3>{{ f[1] }}</h3>
+          <p class="ayuda">{{ f[2] }}</p>
+        </div>
+      }
+    </div>
+  </section>
+
+  <section id="precio" class="venta-franja">
+    <div class="venta-ancho venta-seccion">
+      <h2>Precio sencillo</h2>
+      <p class="venta-centro tenue">Empieza gratis. Pagas solo si te sirve.</p>
+      <div class="venta-precios">
+        <div class="card contenido">
+          <h3>Mensual</h3>
+          <p><span class="muy-grande">{{ p()?.precio_mensual | dinero }}</span> <span class="tenue">{{ p()?.moneda }} / mes</span></p>
+          <ul class="venta-lista"><li>✓ Todas las funciones</li><li>✓ Usuarios ilimitados</li><li>✓ Respaldo diario</li><li>✓ Soporte por WhatsApp</li></ul>
+          <a class="btn btn-primary bloque" routerLink="/registro">Probar gratis {{ p()?.dias_prueba }} días</a>
+        </div>
+        <div class="card contenido destacado">
+          <span class="badge badge-warning">Ahorra 2 meses</span>
+          <h3>Anual</h3>
+          <p><span class="muy-grande">{{ p()?.precio_anual | dinero }}</span> <span class="tenue">{{ p()?.moneda }} / año</span></p>
+          <ul class="venta-lista"><li>✓ Todo lo del plan mensual</li><li>✓ Un solo pago al año</li><li>✓ Precio congelado por 12 meses</li></ul>
+          <a class="btn btn-primary bloque" routerLink="/registro">Probar gratis {{ p()?.dias_prueba }} días</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="venta-preguntas venta-seccion">
+    <h2>Preguntas frecuentes</h2>
+    @for (q of preguntas; track q[0]) {
+      <details class="card contenido">
+        <summary>{{ q[0] }}</summary>
+        <p class="ayuda">{{ q[1] }}</p>
+      </details>
+    }
+    <div class="venta-centro"><a class="btn btn-primary btn-grande" routerLink="/registro">Crear mi cuenta gratis</a></div>
+  </section>
+
+  <footer class="venta-pie">
+    <div class="venta-ancho linea-monto">
+      <span>© {{ anio }} {{ p()?.producto }}</span>
+      @if (p()?.whatsapp) {
+        <a [href]="contacto()" target="_blank" rel="noopener">Contacto por WhatsApp</a>
+      }
+    </div>
+  </footer>
+</div>

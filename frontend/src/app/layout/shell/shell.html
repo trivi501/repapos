@@ -1,0 +1,90 @@
+<div class="shell">
+  <aside class="sidebar" [class.abierta]="menuAbierto()">
+    <a class="sidebar-brand" [routerLink]="inicio()" [title]="taller()?.nombre">
+      @if (taller()?.logo_url; as logo) {
+        <img class="sidebar-logo-img" [src]="logo" alt="" />
+      } @else {
+        <app-logo fondo="oscuro" tamano="sm" />
+      }
+      <span class="sidebar-nombre">{{ taller()?.nombre }}</span>
+    </a>
+
+    <nav class="sidebar-nav" (click)="menuAbierto.set(false)">
+      @for (grupo of menu(); track grupo.titulo) {
+        @if (grupo.titulo) {
+          <div class="sidebar-grupo">{{ grupo.titulo }}</div>
+        }
+        @for (item of grupo.items; track item.ruta) {
+          <a [routerLink]="item.ruta" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: item.ruta === '/ventas' }" class="sidebar-link">
+            <span class="sidebar-icon" aria-hidden="true">{{ item.icono }}</span>
+            {{ item.etiqueta }}
+          </a>
+        }
+      }
+    </nav>
+  </aside>
+
+  <div class="shell-content">
+    <header class="topbar no-imprimir">
+      <button class="btn btn-secondary boton-menu" (click)="menuAbierto.set(!menuAbierto())" aria-label="Abrir menú">☰</button>
+      <div class="topbar-user">
+        @if (auth.sucursalesElegibles().length) {
+          <label class="selector-sucursal">
+            <span aria-hidden="true">📍</span>
+            <span class="sr-only">Sucursal en la que trabajas</span>
+            <select [value]="auth.sucursalActual()?.id" (change)="auth.cambiarSucursal(+$any($event.target).value)">
+              @for (s of auth.sucursalesElegibles(); track s.id) {
+                <option [value]="s.id" [selected]="s.id === auth.sucursalActual()?.id">{{ s.nombre }}</option>
+              }
+            </select>
+          </label>
+        } @else if (auth.sucursalActual(); as s) {
+          <span class="sucursal-fija">📍 {{ s.nombre }}</span>
+        }
+        <div class="topbar-user-info">
+          <a routerLink="/perfil" title="Mi perfil y contraseña"><strong>{{ usuario()?.name }}</strong></a>
+          <span>{{ usuario()?.roles?.join(', ') }}</span>
+        </div>
+        @if (auth.tienePermiso('respaldo.descargar')) {
+          <button class="btn btn-secondary" (click)="respaldo()" title="Descargar respaldo de los datos de tu taller">Respaldo</button>
+        }
+        <button
+          class="btn btn-secondary"
+          (click)="temaService.alternar()"
+          [attr.aria-label]="temaService.tema() === 'oscuro' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'"
+          [title]="temaService.tema() === 'oscuro' ? 'Tema claro' : 'Tema oscuro'"
+        >
+          {{ temaService.tema() === 'oscuro' ? '☀️ Claro' : '🌙 Oscuro' }}
+        </button>
+        <button class="btn btn-secondary" (click)="cerrarSesion()">Salir</button>
+      </div>
+    </header>
+
+    <main class="page">
+      @if (avisos.exito(); as msg) {
+        <div class="alert alert-success aviso-cerrable no-imprimir" role="status">
+          <span>{{ msg }}</span>
+          <button class="cerrar" (click)="avisos.limpiar()" aria-label="Cerrar aviso">✕</button>
+        </div>
+      }
+      @if (avisos.error(); as msg) {
+        <div class="alert alert-error aviso-cerrable no-imprimir" role="alert">
+          <span>{{ msg }}</span>
+          <button class="cerrar" (click)="avisos.limpiar()" aria-label="Cerrar aviso">✕</button>
+        </div>
+      }
+      @if (avisos.whatsapp(); as w) {
+        <div class="alert alert-success aviso-cerrable no-imprimir">
+          <span>
+            {{ w.texto }}
+            @if (w.sin_numero) {
+              <small>(no tiene número guardado: elegirás el contacto en WhatsApp)</small>
+            }
+          </span>
+          <a class="btn btn-whatsapp" [href]="w.url" target="_blank" rel="noopener" (click)="avisos.limpiar()">Avisar por WhatsApp</a>
+        </div>
+      }
+      <router-outlet />
+    </main>
+  </div>
+</div>

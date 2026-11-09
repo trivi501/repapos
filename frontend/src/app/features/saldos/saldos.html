@@ -1,0 +1,103 @@
+<div class="encabezado">
+  <h1>Saldos a favor de locatarios</h1>
+  <span class="barra-resumen compacta">Total en saldos a favor: {{ datos()?.total | dinero }}</span>
+</div>
+
+@if (auth.tienePermiso('saldos.gestionar')) {
+  <form class="card filtros" (ngSubmit)="depositar()">
+    <div class="form-field">
+      <label for="dep_loc">Locatario</label>
+      <input id="dep_loc" name="locatario" list="lista-loc" autocomplete="off" required [(ngModel)]="deposito.locatario" />
+      <datalist id="lista-loc">
+        @for (n of datos()?.locatarios; track n) {
+          <option [value]="n"></option>
+        }
+      </datalist>
+    </div>
+    <div class="form-field">
+      <label for="dep_monto">Monto que deja $</label>
+      <input id="dep_monto" name="monto" type="number" step="0.01" min="0.01" required [(ngModel)]="deposito.monto" />
+    </div>
+    <div class="form-field">
+      <label for="dep_nota">Nota (opcional)</label>
+      <input id="dep_nota" name="nota" [(ngModel)]="deposito.nota" />
+    </div>
+    <button class="btn btn-primary" type="submit">+ Registrar depósito</button>
+    <p class="ayuda ancho-total">El depósito entra a la caja de hoy. Cuando lo uses para pagar sus teléfonos, ya no vuelve a contar como dinero en caja.</p>
+  </form>
+}
+
+<div class="rejilla-2-3">
+  <div class="card tabla-scroll">
+    <div class="titulo-tarjeta">
+      <h2>Locatarios</h2>
+      <button class="enlace" (click)="alternarTodos()">{{ todos() ? 'Ver solo los que tienen saldo' : 'Ver todos' }}</button>
+    </div>
+    <table>
+      <thead><tr><th>Locatario</th><th class="der">A favor</th></tr></thead>
+      <tbody>
+        @for (l of datos()?.lista; track l.id) {
+          <tr [class.fila-activa]="datos()?.elegido?.id === l.id">
+            <td><button class="enlace" (click)="elegir(l.id)">{{ l.nombre }}</button></td>
+            <td class="der" [class.a-favor]="l.a_favor > 0">{{ l.a_favor | dinero }}</td>
+          </tr>
+        } @empty {
+          <tr><td colspan="2"><div class="empty-state">Nadie tiene saldo a favor.</div></td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <div class="pila">
+    @if (datos()?.elegido; as e) {
+      <div class="card contenido">
+        <div class="titulo-tarjeta sin-borde">
+          <h2>{{ e.nombre }}</h2>
+          <div>A favor: <b class="a-favor">{{ e.a_favor | dinero }}</b> &nbsp; Debe: <b class="debe">{{ e.deuda | dinero }}</b></div>
+        </div>
+        <div class="acciones-fila">
+          @if (auth.tienePermiso('saldos.gestionar')) {
+            @if (e.plan.length) {
+              <button class="btn btn-primary" (click)="aplicar(e)">Usar para pagar sus deudas ({{ sumaPlan(e) | dinero }})</button>
+            }
+            @if (e.a_favor > 0) {
+              <span class="grupo-en-linea">
+                <input type="number" step="0.01" min="0.01" aria-label="Monto a devolver" [max]="e.a_favor" [(ngModel)]="montoDevolver" />
+                <button class="btn btn-secondary" (click)="devolver(e)">Devolver dinero</button>
+              </span>
+            }
+          }
+          @if (e.whatsapp) {
+            <a class="btn btn-whatsapp" [href]="e.whatsapp" target="_blank" rel="noopener">Avisar por WhatsApp</a>
+          }
+        </div>
+      </div>
+
+      <div class="card tabla-scroll">
+        <div class="titulo-tarjeta"><h2>Movimientos</h2></div>
+        <table>
+          <thead><tr><th>Fecha</th><th>Tipo</th><th>Concepto</th><th class="der">Monto</th><th></th></tr></thead>
+          <tbody>
+            @for (m of e.movimientos; track m.id) {
+              <tr>
+                <td class="sin-salto">{{ m.fecha | fecha: true }}</td>
+                <td><app-estatus [valor]="m.tipo" /></td>
+                <td>{{ m.concepto }}</td>
+                <td class="der" [class.a-favor]="+m.monto >= 0" [class.debe]="+m.monto < 0">{{ m.monto | dinero }}</td>
+                <td>
+                  @if (auth.tienePermiso('saldos.gestionar')) {
+                    <button class="btn btn-danger btn-sm" (click)="eliminar(m, e.id)">Eliminar</button>
+                  }
+                </td>
+              </tr>
+            } @empty {
+              <tr><td colspan="5"><div class="empty-state">Sin movimientos.</div></td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <div class="card contenido tenue">Elige un locatario de la lista para ver sus movimientos.</div>
+    }
+  </div>
+</div>

@@ -1,0 +1,54 @@
+<p class="instruccion">
+  {{ deshabilitado() ? 'Patrón registrado:' : 'Arrastra el ratón o desliza el dedo uniendo los puntos del patrón del cliente:' }}
+</p>
+
+<div
+  #lienzo
+  class="lienzo"
+  [class.trazando]="trazando()"
+  [class.deshabilitado]="deshabilitado()"
+  tabindex="0"
+  role="group"
+  aria-label="Patrón de desbloqueo 3x3. También puedes usar las teclas 1 a 9; Retroceso borra el último punto y Escape limpia."
+  (pointerdown)="iniciar($event)"
+  (pointermove)="mover($event)"
+  (pointerup)="terminar($event)"
+  (pointercancel)="terminar($event)"
+  (keydown)="teclado($event)"
+  (blur)="tocado()"
+>
+  <svg viewBox="0 0 300 300" aria-hidden="true">
+    @if (secuencia().length > 1) {
+      <polyline class="trazo" [attr.points]="puntosTrazo()" />
+    }
+    @if (trazando() && puntero(); as p) {
+      @if (secuencia().length) {
+        <line
+          class="trazo trazo-guia"
+          [attr.x1]="coordenada(ultimo()).x"
+          [attr.y1]="coordenada(ultimo()).y"
+          [attr.x2]="p.x"
+          [attr.y2]="p.y"
+        />
+      }
+    }
+    @for (punto of puntos; track punto.n) {
+      <g [class.activo]="secuencia().includes(punto.n)">
+        <circle class="halo" [attr.cx]="punto.x" [attr.cy]="punto.y" r="22" />
+        <circle class="nucleo" [attr.cx]="punto.x" [attr.cy]="punto.y" r="7" />
+        @if (secuencia().includes(punto.n)) {
+          <text class="orden" [attr.x]="punto.x + 20" [attr.y]="punto.y - 16">{{ secuencia().indexOf(punto.n) + 1 }}</text>
+        }
+      </g>
+    }
+  </svg>
+</div>
+
+<div class="pie">
+  <code class="resultado" aria-live="polite">
+    {{ secuencia().length ? secuencia().join(' → ') : '(Sin trazar)' }}
+  </code>
+  @if (secuencia().length && !deshabilitado()) {
+    <button type="button" class="limpiar" (click)="limpiar()">Limpiar</button>
+  }
+</div>

@@ -1,0 +1,96 @@
+<div class="encabezado"><h1>Configuración: taller y WhatsApp</h1></div>
+
+@if (cargado()) {
+  <form class="rejilla-2 alinear-arriba" (ngSubmit)="guardar()">
+    <div class="card contenido">
+      @if (auth.tienePermiso('taller.editar')) {
+        <div class="form-field">
+          <label for="nombre_taller">Nombre de tu taller</label>
+          <input id="nombre_taller" name="nombre_taller" maxlength="120" [(ngModel)]="nombreTaller" />
+          <span class="ayuda">Aparece en el menú y en los mensajes donde pongas {{ '{' }}taller{{ '}' }}.</span>
+        </div>
+        <div class="form-field">
+          <span class="etiqueta-campo">Logo de tu taller</span>
+          <div class="fila-logo">
+            @if (logoUrl() && !quitarLogo) {
+              <img class="logo-vista" [src]="logoUrl()" alt="Logo actual" />
+            } @else {
+              <div class="logo-vista vacio">Sin logo</div>
+            }
+            <div>
+              <input type="file" name="logo" aria-label="Elegir logo" accept="image/png,image/jpeg,image/webp" (change)="alElegirLogo($event)" />
+              @if (logoUrl()) {
+                <label class="check-linea"><input type="checkbox" name="quitar_logo" [(ngModel)]="quitarLogo" /> Quitar logo</label>
+              }
+            </div>
+          </div>
+          <span class="ayuda">PNG, JPG o WEBP, máximo 1 MB. Sale en el menú, en el comprobante impreso y en la página donde el cliente consulta su orden.</span>
+        </div>
+      }
+      <div class="form-field campo-corto">
+        <label for="lada">Lada del país</label>
+        <input id="lada" name="lada" [(ngModel)]="lada" />
+        <span class="ayuda">52 = México. Se antepone a los números de 10 dígitos.</span>
+      </div>
+      <div class="form-field">
+        <label for="mensaje_listo">Mensaje cuando está LISTO</label>
+        <textarea id="mensaje_listo" name="mensaje_listo" rows="6" [(ngModel)]="mensajeListo"></textarea>
+      </div>
+      <div class="form-field">
+        <label for="mensaje_no_quedo">Mensaje cuando NO QUEDÓ</label>
+        <textarea id="mensaje_no_quedo" name="mensaje_no_quedo" rows="5" [(ngModel)]="mensajeNoQuedo"></textarea>
+      </div>
+      <p class="ayuda">
+        Puedes usar: <code>{{ llaves('locatario') }}</code> <code>{{ llaves('modelo') }}</code> <code>{{ llaves('trabajo') }}</code>
+        <code>{{ llaves('total') }}</code> <code>{{ llaves('saldo') }}</code> <code>{{ llaves('taller') }}</code>
+        ({{ llaves('saldo') }} solo aparece si debe algo). <code>*texto*</code> = negritas en WhatsApp.
+        Los emojis no se envían: WhatsApp para Windows los cambia por símbolos raros.
+      </p>
+      @if (puedeEditar) {
+        <button class="btn btn-primary" type="submit">Guardar</button>
+      }
+    </div>
+
+    <div class="card tabla-scroll">
+      <div class="titulo-tarjeta"><h2>WhatsApp de cada locatario</h2></div>
+      <table>
+        <thead><tr><th>Locatario</th><th>WhatsApp</th></tr></thead>
+        <tbody>
+          @for (l of locatarios(); track l.id) {
+            <tr>
+              <td>{{ l.nombre }}</td>
+              <td><input inputmode="tel" placeholder="10 dígitos" [name]="'wa' + l.id" [attr.aria-label]="'WhatsApp de ' + l.nombre" [(ngModel)]="l.whatsapp" /></td>
+            </tr>
+          } @empty {
+            <tr><td colspan="2"><div class="empty-state">Todavía no hay locatarios.</div></td></tr>
+          }
+        </tbody>
+      </table>
+      @if (puedeEditar) {
+        <div class="contenido"><button class="btn btn-primary" type="submit">Guardar</button></div>
+      }
+    </div>
+
+    <div class="card contenido ocupa-todo">
+      <h2>Clientes finales: mensajes y comprobante</h2>
+      <p class="ayuda">
+        En los mensajes puedes usar: <code>{{ llaves('cliente') }}</code> <code>{{ llaves('equipo') }}</code> <code>{{ llaves('folio') }}</code>
+        <code>{{ llaves('estatus') }}</code> <code>{{ llaves('saldo') }}</code> <code>{{ llaves('enlace') }}</code> (para que consulte su orden) <code>{{ llaves('taller') }}</code>.
+        En el ticket además: <code>{{ llaves('fecha') }}</code> <code>{{ llaves('falla') }}</code> <code>{{ llaves('revision') }}</code>
+        <code>{{ llaves('total') }}</code> <code>{{ llaves('anticipo') }}</code> <code>{{ llaves('resta') }}</code> <code>{{ llaves('sucursal') }}</code>.
+        Si dejas un texto vacío, regresa al de fábrica.
+      </p>
+      <div class="rejilla-2">
+        @for (t of textos(); track t.clave) {
+          <div class="form-field" [class.ocupa-todo]="t.clave === 'terminos_orden'">
+            <label [for]="t.clave">{{ t.titulo }}</label>
+            <textarea [id]="t.clave" [name]="t.clave" [rows]="t.renglones" [(ngModel)]="t.valor"></textarea>
+          </div>
+        }
+      </div>
+      @if (puedeEditar) {
+        <button class="btn btn-primary" type="submit">Guardar</button>
+      }
+    </div>
+  </form>
+}

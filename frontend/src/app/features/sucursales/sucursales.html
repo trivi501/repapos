@@ -1,0 +1,42 @@
+<div class="encabezado"><h1>Sucursales</h1></div>
+
+@if (auth.tienePermiso('sucursales.crear')) {
+  <form class="card filtros" (ngSubmit)="crear()">
+    <div class="form-field"><label for="s_nombre">Nombre</label><input id="s_nombre" name="nombre" required placeholder="Plaza Tecno" [(ngModel)]="nueva.nombre" /></div>
+    <div class="form-field crece"><label for="s_dir">Dirección</label><input id="s_dir" name="direccion" [(ngModel)]="nueva.direccion" /></div>
+    <div class="form-field"><label for="s_tel">Teléfono</label><input id="s_tel" name="telefono" [(ngModel)]="nueva.telefono" /></div>
+    <button class="btn btn-primary" type="submit">+ Agregar sucursal</button>
+  </form>
+}
+
+<div class="card tabla-scroll">
+  <table>
+    <thead><tr><th>#</th><th>Nombre, dirección y teléfono (salen en el comprobante)</th><th></th></tr></thead>
+    <tbody>
+      @for (s of sucursales(); track s.id) {
+        <tr>
+          <td class="tenue">{{ s.id }}</td>
+          <td>
+            <div class="grupo-en-linea envuelve">
+              <input placeholder="Nombre" [attr.aria-label]="'Nombre de la sucursal ' + s.id" [(ngModel)]="s.nombre" />
+              <input class="crece" placeholder="Dirección" [attr.aria-label]="'Dirección de ' + s.nombre" [(ngModel)]="s.direccion" />
+              <input placeholder="Teléfono" [attr.aria-label]="'Teléfono de ' + s.nombre" [(ngModel)]="s.telefono" />
+              @if (auth.tienePermiso('sucursales.editar')) {
+                <button class="btn btn-secondary btn-sm" (click)="guardar(s)">Guardar</button>
+              }
+            </div>
+          </td>
+          <td>
+            @if (auth.tienePermiso('sucursales.eliminar')) {
+              <button class="btn btn-danger btn-sm" (click)="eliminar(s)">Eliminar</button>
+            }
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>
+<p class="ayuda">
+  Teléfonos de locatarios, órdenes de clientes, caja, cortes e inventario son de cada sucursal. Locatarios, clientes y el catálogo de productos se comparten.
+  En <a routerLink="/usuarios">Usuarios</a> puedes fijar a cada empleado en su sucursal.
+</p>

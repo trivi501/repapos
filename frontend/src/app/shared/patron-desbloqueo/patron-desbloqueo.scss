@@ -1,0 +1,105 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.instruccion {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.lienzo {
+  width: 240px;
+  max-width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid var(--tint-primary);
+  border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+  border-radius: 12px;
+  background: var(--color-surface);
+  touch-action: none;
+  user-select: none;
+  cursor: crosshair;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 3px;
+  }
+
+  &.deshabilitado {
+    cursor: default;
+  }
+
+  svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+}
+
+.halo {
+  fill: var(--color-surface-2);
+  stroke: var(--color-border);
+  stroke-width: 2;
+  transition: fill 0.12s ease, stroke 0.12s ease;
+}
+
+.nucleo {
+  fill: var(--color-text-muted);
+  transition: fill 0.12s ease;
+}
+
+.activo {
+  .halo {
+    fill: var(--tint-primary);
+    stroke: var(--color-accent);
+  }
+
+  .nucleo {
+    fill: var(--color-accent);
+  }
+}
+
+.trazo {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.85;
+}
+
+.trazo-guia {
+  opacity: 0.4;
+}
+
+.orden {
+  font-size: 13px;
+  font-weight: 700;
+  fill: var(--color-accent);
+}
+
+.pie {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 1.75rem;
+}
+
+.resultado {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.limpiar {
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.75rem;
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  cursor: pointer;
+}

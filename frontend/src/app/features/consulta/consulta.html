@@ -1,0 +1,96 @@
+<main class="consulta">
+  <div class="card tarjeta">
+    <header class="encabezado">
+      <app-logo tamano="md" />
+      <h1>Consulta tu reparación</h1>
+      <p>Ingresa el folio de tu ticket. Con los últimos 4 dígitos de tu teléfono verás el detalle completo.</p>
+    </header>
+
+    <form [formGroup]="formulario" (ngSubmit)="consultar()">
+      <div class="campos">
+        <div class="form-field">
+          <label for="folio">Folio</label>
+          <input id="folio" formControlName="folio" placeholder="REP-261022-XXXX" autocomplete="off" />
+        </div>
+        <div class="form-field">
+          <label for="telefono">Últimos 4 dígitos del teléfono (opcional)</label>
+          <input id="telefono" formControlName="telefono" inputmode="numeric" maxlength="4" placeholder="1234" autocomplete="off" />
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary bloque" [disabled]="cargando()">
+        {{ cargando() ? 'Consultando…' : 'Consultar' }}
+      </button>
+    </form>
+
+    @if (error()) {
+      <div class="alert alert-error resultado">{{ error() }}</div>
+    }
+
+    @if (resultado(); as r) {
+      <section class="resultado" aria-live="polite">
+        <div class="fila-estado">
+          <div>
+            <span class="etiqueta">Folio</span>
+            <strong>{{ r.folio }}</strong>
+          </div>
+          <span class="badge" [class]="claseEstado(r.estado)">{{ etiquetaEstado(r.estado) }}</span>
+        </div>
+
+        @if (!r.verificado) {
+          <p class="nota">Para ver el detalle de tu equipo, ingresa los últimos 4 dígitos del teléfono registrado.</p>
+        } @else {
+          @if (r.equipo) {
+            <div class="dato"><span class="etiqueta">Equipo</span>{{ r.equipo }}</div>
+          }
+          @if (r.motivo) {
+            <div class="dato"><span class="etiqueta">Motivo de ingreso</span>{{ r.motivo }}</div>
+          }
+          @if (r.fechas; as f) {
+            <div class="dato">
+              <span class="etiqueta">Fechas</span>
+              Recibido: {{ fecha(f.recepcion) }}
+              @if (f.estimado_listo) {
+                <br />Estimado listo: {{ fecha(f.estimado_listo) }}
+              }
+              @if (f.entrega) {
+                <br />Entregado: {{ fecha(f.entrega) }}
+              }
+            </div>
+          }
+          @if (r.diagnostico || r.solucion || r.notas_cliente) {
+            <div class="dato">
+              <span class="etiqueta">Diagnóstico y solución</span>
+              @if (r.diagnostico) {
+                <p>{{ r.diagnostico }}</p>
+              }
+              @if (r.solucion) {
+                <p>{{ r.solucion }}</p>
+              }
+              @if (r.notas_cliente) {
+                <p class="nota">{{ r.notas_cliente }}</p>
+              }
+            </div>
+          }
+          @if (r.costos; as c) {
+            <div class="dato costos">
+              <span class="etiqueta">Costos</span>
+              <div><span>Total</span><span>$ {{ c.total.toFixed(2) }}</span></div>
+              <div><span>Abonado</span><span>$ {{ c.anticipo.toFixed(2) }}</span></div>
+              <div class="saldo"><span>Saldo</span><span>$ {{ c.saldo.toFixed(2) }}</span></div>
+            </div>
+          }
+          @for (grupo of gruposFotos(r); track grupo.titulo) {
+            <div class="dato">
+              <span class="etiqueta">{{ grupo.titulo }}</span>
+              <div class="galeria">
+                @for (url of grupo.urls; track url) {
+                  <a [href]="url" target="_blank" rel="noopener"><img [src]="url" [alt]="grupo.titulo" loading="lazy" /></a>
+                }
+              </div>
+            </div>
+          }
+        }
+      </section>
+    }
+  </div>
+</main>

@@ -1,0 +1,568 @@
+<nav class="breadcrumb">
+  <a routerLink="/reparaciones">Reparaciones</a>
+  <span>›</span>
+  <span>{{ esEdicion() ? 'Editar' : 'Crear' }}</span>
+</nav>
+<h1 class="titulo">{{ esEdicion() ? 'Editar reparación' : 'Crear reparación' }}</h1>
+
+@if (errores().length) {
+  <div class="alert alert-error">
+    @for (error of errores(); track error) {
+      <div>{{ error }}</div>
+    }
+  </div>
+}
+
+<form class="layout" [formGroup]="formulario" (ngSubmit)="guardar()">
+  <div class="columna-principal">
+    <!-- 01 Datos del cliente -->
+    <section class="card seccion">
+      <header class="seccion-header">
+        <h2><span class="num">01</span> Datos del cliente</h2>
+      </header>
+      <div class="seccion-body">
+        @if (esEdicion()) {
+          <p class="resumen"><strong>{{ resumenEdicion()?.cliente }}</strong></p>
+        } @else {
+          <div class="segmentado">
+            <button type="button" [class.activo]="modoCliente() === 'registrado'" (click)="cambiarModoCliente('registrado')">
+              👤 Cliente registrado
+            </button>
+            @if (authService.tienePermiso('clientes.crear')) {
+              <button type="button" [class.activo]="modoCliente() === 'nuevo'" (click)="cambiarModoCliente('nuevo')">
+                ➕ Registrar nuevo cliente
+              </button>
+            }
+          </div>
+
+          @if (modoCliente() === 'registrado') {
+            <div class="form-field">
+              <label for="cliente_id">Cliente <span class="req">*</span></label>
+              <select id="cliente_id" formControlName="cliente_id">
+                <option [ngValue]="null">Seleccione una opción</option>
+                @for (cliente of clientes(); track cliente.id) {
+                  <option [ngValue]="cliente.id">{{ cliente.nombre }} {{ cliente.apellido }} — {{ cliente.telefono }}</option>
+                }
+              </select>
+            </div>
+          } @else {
+            <div class="grid-2" formGroupName="cliente_nuevo">
+              <div class="form-field">
+                <label for="cn_nombre">Nombre <span class="req">*</span></label>
+                <input id="cn_nombre" formControlName="nombre" />
+              </div>
+              <div class="form-field">
+                <label for="cn_apellido">Apellido</label>
+                <input id="cn_apellido" formControlName="apellido" />
+              </div>
+              <div class="form-field">
+                <label for="cn_telefono">Teléfono <span class="req">*</span></label>
+                <input id="cn_telefono" formControlName="telefono" inputmode="tel" placeholder="10 dígitos" />
+              </div>
+              <div class="form-field">
+                <label for="cn_telefono2">Otro teléfono</label>
+                <input id="cn_telefono2" formControlName="telefono2" inputmode="tel" />
+              </div>
+              <div class="form-field">
+                <label for="cn_email">Correo</label>
+                <input id="cn_email" type="email" formControlName="email" />
+              </div>
+            </div>
+          }
+        }
+      </div>
+    </section>
+
+    <!-- 02 Identificación del dispositivo -->
+    <section class="card seccion">
+      <header class="seccion-header">
+        <h2><span class="num">02</span> Identificación del dispositivo</h2>
+      </header>
+      <div class="seccion-body">
+        @if (esEdicion()) {
+          <p class="resumen"><strong>{{ resumenEdicion()?.equipo }}</strong> · IMEI: {{ resumenEdicion()?.imei }}</p>
+        } @else {
+          <div class="segmentado">
+            <button
+              type="button"
+              [class.activo]="modoEquipo() === 'previo'"
+              [disabled]="modoCliente() === 'nuevo'"
+              (click)="cambiarModoEquipo('previo')"
+            >
+              📱 Equipo previo del cliente
+            </button>
+            @if (authService.tienePermiso('equipos.crear')) {
+              <button type="button" [class.activo]="modoEquipo() === 'nuevo'" (click)="cambiarModoEquipo('nuevo')">
+                ➕ Nuevo dispositivo / manual
+              </button>
+            }
+          </div>
+
+          @if (modoEquipo() === 'previo') {
+            <div class="form-field">
+              <label for="equipo_id">Seleccionar equipo del cliente <span class="req">*</span></label>
+              <select id="equipo_id" formControlName="equipo_id">
+                <option [ngValue]="null">
+                  {{ formulario.controls.cliente_id.value ? 'Seleccione una opción' : 'Primero seleccione un cliente' }}
+                </option>
+                @for (equipo of equiposCliente(); track equipo.id) {
+                  <option [ngValue]="equipo.id">{{ equipo.marca }} {{ equipo.modelo }}{{ equipo.imei ? ' — ' + equipo.imei : '' }}</option>
+                }
+              </select>
+            </div>
+          } @else {
+            <div class="grid-3" formGroupName="equipo_nuevo">
+              <div class="form-field">
+                <label for="en_tipo">Tipo</label>
+                <select id="en_tipo" formControlName="tipo">
+                  @for (tipo of tiposEquipo; track tipo) {
+                    <option [value]="tipo">{{ tipo }}</option>
+                  }
+                </select>
+              </div>
+              <div class="form-field">
+                <label for="en_marca">Marca <span class="req">*</span></label>
+                <input id="en_marca" formControlName="marca" />
+              </div>
+              <div class="form-field">
+                <label for="en_modelo">Modelo <span class="req">*</span></label>
+                <input id="en_modelo" formControlName="modelo" />
+              </div>
+              <div class="form-field">
+                <label for="en_imei">IMEI / Serie</label>
+                <input id="en_imei" formControlName="imei" />
+              </div>
+              <div class="form-field">
+                <label for="en_color">Color</label>
+                <input id="en_color" formControlName="color" />
+              </div>
+              <div class="form-field">
+                <label for="en_accesorios">Accesorios</label>
+                <input id="en_accesorios" formControlName="accesorios" placeholder="Cargador, funda…" />
+              </div>
+            </div>
+          }
+        }
+      </div>
+    </section>
+
+    <!-- 03 Estado de bloqueo -->
+    <section class="card seccion">
+      <button
+        type="button"
+        class="seccion-header plegable"
+        [attr.aria-expanded]="bloqueoAbierto()"
+        (click)="bloqueoAbierto.set(!bloqueoAbierto())"
+      >
+        <span>
+          <span class="h2"><span class="num">03</span> Estado de bloqueo</span>
+          <span class="sub">Patrón táctil 3x3, PIN numérico o clave para desbloquear el dispositivo</span>
+        </span>
+        <span class="chevron" [class.abierto]="bloqueoAbierto()">⌄</span>
+      </button>
+      @if (bloqueoAbierto()) {
+        <div class="seccion-body">
+          <div class="bloqueos-cuenta">
+            @for (bloqueo of bloqueosCuenta; track bloqueo.clave) {
+              <label class="switch">
+                <input
+                  type="checkbox"
+                  role="switch"
+                  [checked]="formulario.controls.bloqueos.value?.includes(bloqueo.clave)"
+                  (change)="alternarBloqueo(bloqueo.clave, $any($event.target).checked)"
+                />
+                <span class="switch-pista"></span>
+                {{ bloqueo.etiqueta }}
+              </label>
+            }
+          </div>
+
+          <p class="etiqueta-bloque">PIN / patrón</p>
+          <div class="panel-desbloqueo">
+            <div class="panel-desbloqueo-header">
+              <div class="panel-desbloqueo-titulo">
+                <span class="icono-candado" aria-hidden="true">🔒</span>
+                <div>
+                  <strong>Método de desbloqueo del dispositivo</strong>
+                  <span class="sub">Trazar patrón, PIN o contraseña para pruebas técnicas</span>
+                </div>
+              </div>
+              <div class="segmentado sin-margen-inferior" role="tablist" aria-label="Método de desbloqueo">
+                @for (metodo of metodosDesbloqueo; track metodo.valor) {
+                  <button
+                    type="button"
+                    role="tab"
+                    [attr.aria-selected]="formulario.controls.bloqueo_tipo.value === metodo.valor"
+                    [class.activo]="formulario.controls.bloqueo_tipo.value === metodo.valor"
+                    (click)="cambiarMetodo(metodo.valor)"
+                  >
+                    <span aria-hidden="true">{{ metodo.icono }}</span> {{ metodo.etiqueta }}
+                  </button>
+                }
+              </div>
+            </div>
+
+            <div class="panel-desbloqueo-body">
+              @switch (formulario.controls.bloqueo_tipo.value) {
+                @case ('patron') {
+                  <app-patron-desbloqueo formControlName="bloqueo_valor" />
+                  <div class="form-field campo-centrado pin-adicional">
+                    <label for="bloqueo_pin_extra">PIN / contraseña adicional (opcional)</label>
+                    <input id="bloqueo_pin_extra" formControlName="bloqueo_pin" maxlength="100" autocomplete="off" />
+                  </div>
+                }
+                @case ('pin') {
+                  <div class="form-field campo-centrado">
+                    <label for="bloqueo_pin">PIN numérico del cliente</label>
+                    <input
+                      id="bloqueo_pin"
+                      class="input-codigo"
+                      formControlName="bloqueo_valor"
+                      inputmode="numeric"
+                      pattern="[0-9]*"
+                      maxlength="16"
+                      autocomplete="off"
+                      placeholder="••••"
+                    />
+                  </div>
+                }
+                @case ('clave') {
+                  <div class="form-field campo-centrado">
+                    <label for="bloqueo_clave">Contraseña del cliente</label>
+                    <input id="bloqueo_clave" formControlName="bloqueo_valor" maxlength="100" autocomplete="off" />
+                  </div>
+                }
+                @default {
+                  <p class="sin-bloqueo">El dispositivo no tiene PIN, patrón ni contraseña.</p>
+                }
+              }
+            </div>
+          </div>
+        </div>
+      }
+    </section>
+
+    <!-- 04 Motivo de ingreso y falla -->
+    <section class="card seccion">
+      <header class="seccion-header">
+        <h2><span class="num">04</span> Motivo de ingreso y falla</h2>
+      </header>
+      <div class="seccion-body">
+        <div class="form-field">
+          <label for="tipo_servicio">Tipo de servicio <span class="req">*</span></label>
+          <select id="tipo_servicio" formControlName="tipo_servicio">
+            <option value="reparacion">Reparación</option>
+            <option value="diagnostico">Diagnóstico</option>
+            <option value="garantia">Garantía</option>
+            <option value="mantenimiento">Mantenimiento</option>
+          </select>
+        </div>
+
+        <p class="etiqueta-mini">Fallas comunes</p>
+        <div class="fallas">
+          @for (falla of fallasComunes; track falla.texto) {
+            <button type="button" class="falla" (click)="agregarFalla(falla.texto)">
+              <span class="falla-icono">{{ falla.icono }}</span>
+              {{ falla.texto }}
+            </button>
+          }
+        </div>
+
+        <div class="form-field">
+          <label for="falla_reportada">Problema reportado <span class="req">*</span></label>
+          <textarea
+            id="falla_reportada"
+            rows="3"
+            formControlName="falla_reportada"
+            placeholder="Describe la falla o motivo de recepción que reporta el cliente…"
+          ></textarea>
+        </div>
+        <div class="form-field">
+          <label for="observaciones">Observación</label>
+          <textarea id="observaciones" rows="2" formControlName="observaciones" placeholder="Rayones, detalles que ya traía…"></textarea>
+        </div>
+
+        @if (esEdicion()) {
+          <div class="grid-2">
+            <div class="form-field">
+              <label for="diagnostico">Diagnóstico</label>
+              <textarea id="diagnostico" rows="2" formControlName="diagnostico"></textarea>
+            </div>
+            <div class="form-field">
+              <label for="solucion">Solución aplicada</label>
+              <textarea id="solucion" rows="2" formControlName="solucion"></textarea>
+            </div>
+          </div>
+        }
+      </div>
+    </section>
+
+    <!-- 05 Estado físico -->
+    <section class="card seccion">
+      <button
+        type="button"
+        class="seccion-header plegable"
+        [attr.aria-expanded]="fisicoAbierto()"
+        (click)="fisicoAbierto.set(!fisicoAbierto())"
+      >
+        <span>
+          <span class="h2"><span class="num">05</span> Estado físico</span>
+          <span class="sub">Estado físico al momento de la recepción</span>
+        </span>
+        <span class="chevron" [class.abierto]="fisicoAbierto()">⌄</span>
+      </button>
+      @if (fisicoAbierto()) {
+        <div class="seccion-body revision">
+          <p class="etiqueta-mini">Revisión al recibir</p>
+          <div class="revision-grid">
+            @for (r of revisionCampos; track r.clave) {
+              <div class="revision-punto" role="group" [attr.aria-label]="r.texto">
+                <span>{{ r.texto }}</span>
+                <div class="niveles">
+                  <button type="button" class="nivel nivel-bueno" [class.seleccionado]="revision()[r.clave] === 'si'" [attr.aria-pressed]="revision()[r.clave] === 'si'" (click)="fijarRevision(r.clave, 'si')">Sí</button>
+                  <button type="button" class="nivel nivel-roto" [class.seleccionado]="revision()[r.clave] === 'no'" [attr.aria-pressed]="revision()[r.clave] === 'no'" (click)="fijarRevision(r.clave, 'no')">No</button>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+        <div class="seccion-body fisico-grid">
+          @for (componente of componentesFisicos; track componente.clave) {
+            <div>
+              <p class="fisico-label">{{ componente.etiqueta }}</p>
+              <div class="niveles" role="radiogroup" [attr.aria-label]="componente.etiqueta">
+                @for (nivel of nivelesFisicos; track nivel.valor) {
+                  <button
+                    type="button"
+                    role="radio"
+                    [attr.aria-checked]="estadoFisico()[componente.clave] === nivel.valor"
+                    [class]="'nivel nivel-' + nivel.valor"
+                    [class.seleccionado]="estadoFisico()[componente.clave] === nivel.valor"
+                    (click)="fijarEstadoFisico(componente.clave, nivel.valor)"
+                  >
+                    {{ nivel.etiqueta }}
+                  </button>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </section>
+
+    <!-- 06 Notas -->
+    <section class="card seccion">
+      <button type="button" class="seccion-header plegable" [attr.aria-expanded]="notasAbierto()" (click)="notasAbierto.set(!notasAbierto())">
+        <span class="h2"><span class="num">06</span> Notas</span>
+        <span class="chevron" [class.abierto]="notasAbierto()">⌄</span>
+      </button>
+      @if (notasAbierto()) {
+        <div class="seccion-body grid-2">
+          <div class="form-field sin-margen">
+            <label for="notas_cliente">Notas para el cliente</label>
+            <textarea id="notas_cliente" rows="3" formControlName="notas_cliente" placeholder="Notas visibles para el cliente…"></textarea>
+          </div>
+          <div class="form-field sin-margen">
+            <label for="notas">Notas internas</label>
+            <textarea id="notas" rows="3" formControlName="notas" placeholder="Notas privadas del equipo de técnicos…"></textarea>
+          </div>
+        </div>
+      }
+    </section>
+
+    <!-- 07 Fotografías del dispositivo -->
+    <section class="card seccion">
+      <button type="button" class="seccion-header plegable" [attr.aria-expanded]="fotosAbierto()" (click)="fotosAbierto.set(!fotosAbierto())">
+        <span>
+          <span class="h2"><span class="num">07</span> Fotografías del dispositivo</span>
+          <span class="sub">Evidencia fotográfica del ingreso, proceso y egreso (Compresión automática activa)</span>
+        </span>
+        <span class="chevron" [class.abierto]="fotosAbierto()">⌄</span>
+      </button>
+      @if (fotosAbierto()) {
+        <div class="seccion-body grid-zonas">
+          @for (zona of zonasFotos; track zona.categoria) {
+            <app-zona-fotos
+              [titulo]="zona.titulo"
+              [descripcion]="zona.descripcion"
+              [categoria]="zona.categoria"
+              [lote]="lote()"
+              [fotos]="fotosPorCategoria()[zona.categoria]"
+              (agregadas)="agregarFotos($event)"
+              (eliminada)="quitarFoto($event)"
+            />
+          }
+        </div>
+      }
+    </section>
+
+    <!-- 08 Lo que ve el cliente en su consulta -->
+    <section class="card seccion">
+      <button
+        type="button"
+        class="seccion-header plegable"
+        [attr.aria-expanded]="visibilidadAbierto()"
+        (click)="visibilidadAbierto.set(!visibilidadAbierto())"
+      >
+        <span>
+          <span class="h2"><span class="num">08</span> Lo que ve el cliente en su consulta</span>
+          <span class="sub">
+            Cuando el cliente consulta su folio en tu página. El estado y el folio se ven siempre; el resto, solo si
+            confirma los últimos 4 dígitos de su teléfono.
+          </span>
+        </span>
+        <span class="chevron" [class.abierto]="visibilidadAbierto()">⌄</span>
+      </button>
+      @if (visibilidadAbierto()) {
+        <div class="seccion-body">
+          <label class="switch">
+            <input type="checkbox" role="switch" formControlName="visible_cliente" />
+            <span class="switch-pista"></span>
+            Mostrar al cliente la información de la reparación
+          </label>
+
+          <fieldset class="visibilidad" [disabled]="!formulario.controls.visible_cliente.value">
+            <legend class="etiqueta-bloque">Qué puede ver</legend>
+            <div class="visibilidad-opciones">
+              @for (seccion of seccionesVisibles; track seccion.clave) {
+                <label class="opcion-check" [class.marcada]="formulario.controls.visibilidad.value?.includes(seccion.clave)">
+                  <input
+                    type="checkbox"
+                    [checked]="formulario.controls.visibilidad.value?.includes(seccion.clave)"
+                    (change)="alternarVisibilidad(seccion.clave, $any($event.target).checked)"
+                  />
+                  {{ seccion.etiqueta }}
+                </label>
+              }
+            </div>
+            <div class="visibilidad-acciones">
+              <button type="button" class="enlace-accion" (click)="marcarVisibilidad(true)">Marcar todo</button>
+              <button type="button" class="enlace-accion neutro" (click)="marcarVisibilidad(false)">Quitar todo</button>
+            </div>
+          </fieldset>
+          <p class="sub">El cliente consulta en <a href="/consulta" target="_blank" rel="noopener">/consulta</a> con su folio.</p>
+        </div>
+      }
+    </section>
+  </div>
+
+  <aside class="columna-lateral">
+    <!-- Control de la orden -->
+    <section class="card seccion">
+      <header class="seccion-header"><h2 class="marcador">Control de la orden</h2></header>
+      <div class="seccion-body">
+        <div class="form-field">
+          <label for="numero_orden">Número de ticket <span class="req">*</span></label>
+          <input id="numero_orden" formControlName="numero_orden" [readonly]="esEdicion()" />
+        </div>
+        @if (esEdicion()) {
+          <div class="form-field">
+            <label for="estado">Estado</label>
+            <select id="estado" formControlName="estado">
+              @for (estado of estados; track estado.valor) {
+                <option [value]="estado.valor">{{ estado.etiqueta }}</option>
+              }
+            </select>
+          </div>
+        }
+        <div class="form-field">
+          <label for="tecnico_id">Técnico</label>
+          <select id="tecnico_id" formControlName="tecnico_id">
+            <option [ngValue]="null">Seleccione una opción</option>
+            @for (tecnico of tecnicos(); track tecnico.id) {
+              <option [ngValue]="tecnico.id">{{ tecnico.name }}</option>
+            }
+          </select>
+        </div>
+        <div class="form-field">
+          <label for="sucursal_id">Sucursal <span class="req">*</span></label>
+          <select id="sucursal_id" formControlName="sucursal_id">
+            @for (sucursal of sucursales(); track sucursal.id) {
+              <option [ngValue]="sucursal.id">{{ sucursal.nombre }}</option>
+            }
+          </select>
+        </div>
+        <div class="form-field sin-margen">
+          <label for="estimado_listo_at">Estimado listo el</label>
+          <input id="estimado_listo_at" type="datetime-local" formControlName="estimado_listo_at" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Presupuesto y anticipo -->
+    <section class="card seccion">
+      <header class="seccion-header"><h2 class="marcador">Presupuesto y anticipo inicial</h2></header>
+      <div class="seccion-body">
+        <div class="form-field">
+          <label for="costo_estimado">Costo estimado</label>
+          <div class="input-moneda">
+            <span>$</span>
+            <input id="costo_estimado" type="number" min="0" step="0.01" formControlName="costo_estimado" />
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="form-field">
+            <label for="anticipo">{{ esEdicion() ? 'Ya pagado' : 'Anticipo (pago inicial)' }}</label>
+            <div class="input-moneda">
+              <span>$</span>
+              <input id="anticipo" type="number" min="0" step="0.01" formControlName="anticipo" [readonly]="esEdicion()" />
+            </div>
+            @if (esEdicion()) {
+              <span class="sub">Los abonos se registran en la ficha de la orden, para que entren a la caja.</span>
+            }
+          </div>
+          <div class="form-field">
+            <label for="metodo_pago">Método de pago</label>
+            <select id="metodo_pago" formControlName="metodo_pago">
+              <option value="efectivo">Efectivo</option>
+              <option value="tarjeta">Tarjeta</option>
+              <option value="transferencia">Transferencia</option>
+            </select>
+          </div>
+        </div>
+        @if (esEdicion()) {
+          <div class="form-field">
+            <label for="costo_final">Costo final</label>
+            <div class="input-moneda">
+              <span>$</span>
+              <input id="costo_final" type="number" min="0" step="0.01" formControlName="costo_final" />
+            </div>
+          </div>
+        }
+        <p class="etiqueta-campo">Saldo restante (cálculo)</p>
+        <div class="saldo"><span>$</span>{{ saldo().toFixed(2) }}</div>
+
+        <!-- Comprobante -->
+        <div class="ticket" aria-label="Vista previa del comprobante">
+          <p class="ticket-titulo">SISTEMA TALLER</p>
+          <p class="ticket-centro">COMPROBANTE DE INGRESO (VISTA PREVIA)</p>
+          <p class="ticket-centro"><strong>FOLIO: #{{ comprobante().folio }}</strong></p>
+          <p class="ticket-centro">{{ comprobante().fecha.toLocaleString('es') }}</p>
+          <hr />
+          <div class="ticket-fila"><span>CLIENTE:</span><span>{{ comprobante().cliente }}</span></div>
+          <div class="ticket-fila"><span>TELÉFONO:</span><span>{{ comprobante().telefono }}</span></div>
+          <div class="ticket-fila"><span>EQUIPO:</span><span>{{ comprobante().equipo }}</span></div>
+          <div class="ticket-fila"><span>IMEI/SN:</span><span>{{ comprobante().imei }}</span></div>
+          <hr />
+          <p><strong>FALLA DECLARADA:</strong></p>
+          <p class="ticket-falla">{{ comprobante().falla }}</p>
+          <hr />
+          <div class="ticket-fila"><span>COSTO ESTIMADO:</span><span>$ {{ comprobante().costo.toFixed(2) }}</span></div>
+          <div class="ticket-fila"><span>ANTICIPO RECIBIDO:</span><span>$ {{ comprobante().anticipo.toFixed(2) }}</span></div>
+          <hr />
+          <div class="ticket-fila ticket-total"><span>SALDO RESTANTE:</span><span>$ {{ saldo().toFixed(2) }}</span></div>
+        </div>
+      </div>
+    </section>
+  </aside>
+
+  <div class="barra-acciones">
+    <button type="submit" class="btn btn-primary" [disabled]="guardando()">
+      {{ esEdicion() ? 'Guardar cambios' : 'Crear' }}
+    </button>
+    @if (!esEdicion()) {
+      <button type="button" class="btn btn-secondary" [disabled]="guardando()" (click)="guardar(true)">Crear y crear otro</button>
+    }
+    <button type="button" class="btn btn-secondary" (click)="cancelar()">Cancelar</button>
+  </div>
+</form>

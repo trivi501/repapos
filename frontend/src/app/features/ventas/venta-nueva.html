@@ -1,0 +1,127 @@
+<div class="encabezado">
+  <h1>Nueva venta <small class="tenue">· sucursal {{ auth.sucursalActual()?.nombre }}</small></h1>
+  <a class="btn btn-secondary" routerLink="/ventas">Ventas del día</a>
+</div>
+
+<div class="rejilla-venta">
+  <div class="pila">
+    <div class="card contenido filas-centro">
+      <div class="form-field sin-margen">
+        <span class="etiqueta-campo">Venta a</span>
+        <div class="segmentado" role="radiogroup" aria-label="A quién se le vende">
+          <button type="button" role="radio" [attr.aria-checked]="tipo() === 'CLIENTE'" [class.activo]="tipo() === 'CLIENTE'" (click)="cambiarTipo('CLIENTE')">Cliente final</button>
+          <button type="button" role="radio" [attr.aria-checked]="tipo() === 'LOCATARIO'" [class.activo]="tipo() === 'LOCATARIO'" (click)="cambiarTipo('LOCATARIO')">Locatario</button>
+        </div>
+      </div>
+      @if (tipo() === 'LOCATARIO') {
+        <div class="form-field sin-margen crece">
+          <label for="locatario">¿Cuál locatario?</label>
+          <input id="locatario" list="lista-locatarios" autocomplete="off" placeholder="Escribe o elige" [(ngModel)]="locatario" />
+          <datalist id="lista-locatarios">
+            @for (l of locatarios(); track l) {
+              <option [value]="l"></option>
+            }
+          </datalist>
+        </div>
+      }
+      <p class="ayuda ancho-total">{{ tipo() === 'LOCATARIO' ? 'Se usa el precio de locatario de cada producto.' : 'Se usa el precio al cliente final (público).' }}</p>
+    </div>
+
+    <div class="card contenido buscador">
+      <div class="form-field sin-margen">
+        <label for="buscar">Buscar producto (nombre o código)</label>
+        <input #caja id="buscar" autocomplete="off" placeholder="Escribe o escanea el código y presiona Enter"
+               [ngModel]="buscar()" (ngModelChange)="buscar.set($event)" (keydown.enter)="$event.preventDefault(); agregarPrimero()" />
+      </div>
+      @if (resultados().length) {
+        <div class="resultados">
+          @for (p of resultados(); track p.id) {
+            <button type="button" class="menu-item entre" (click)="agregar(p)">
+              <span><strong>{{ p.nombre }}</strong> <small class="tenue">{{ p.codigo }}</small></span>
+              <span class="sin-salto">{{ precioDe(p) | dinero }} · <span [class.debe]="p.existencia <= 0">hay {{ p.existencia }}</span></span>
+            </button>
+          }
+        </div>
+      }
+      @if (catalogoVacio()) {
+        <p class="ayuda">Todavía no hay productos. Agrégalos en <a routerLink="/inventario/nuevo">Inventario</a>.</p>
+      }
+    </div>
+
+    <div class="card tabla-scroll">
+      <table>
+        <thead><tr><th>Producto</th><th>Cantidad</th><th>Precio</th><th class="der">Importe</th><th></th></tr></thead>
+        <tbody>
+          @for (l of carrito(); track l.producto_id) {
+            <tr>
+              <td>
+                <strong>{{ l.nombre }}</strong>
+                @if (excede(l)) {
+                  <div class="debe"><small>No alcanza: hay {{ existencia(l.producto_id) }}</small></div>
+                }
+              </td>
+              <td><input class="input-corto" type="number" min="1" [attr.aria-label]="'Cantidad de ' + l.nombre" [(ngModel)]="l.cantidad" /></td>
+              <td><input class="input-corto" type="number" min="0" step="0.01" [attr.aria-label]="'Precio de ' + l.nombre" [(ngModel)]="l.precio" /></td>
+              <td class="der"><strong>{{ l.cantidad * l.precio | dinero }}</strong></td>
+              <td><button class="icono-btn" (click)="quitar(l)" title="Quitar" [attr.aria-label]="'Quitar ' + l.nombre">🗑️</button></td>
+            </tr>
+          } @empty {
+            <tr><td colspan="5"><div class="empty-state">Busca un producto para agregarlo.</div></td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="pila">
+    <div class="card contenido cobro">
+      <div class="linea-monto"><span>Subtotal</span><b>{{ subtotal() | dinero }}</b></div>
+      <div class="linea-monto">
+        <label for="descuento">Descuento $</label>
+        <input id="descuento" class="input-corto der" type="number" min="0" step="0.01" [(ngModel)]="descuento" (focus)="$any($event.target).select()" />
+      </div>
+      <div class="linea-monto total"><span>Total</span><b>{{ total() | dinero }}</b></div>
+
+      <div class="form-field">
+        <span class="etiqueta-campo">Forma de pago</span>
+        <div class="opciones-pago">
+          @for (f of formas(); track f.valor) {
+            <button type="button" [class.activo]="metodo === f.valor" [attr.aria-pressed]="metodo === f.valor" (click)="metodo = f.valor">{{ f.texto }}</button>
+          }
+        </div>
+        @if (metodo === 'CRÉDITO') {
+          <span class="ayuda">No entra dinero ahora: se suma a lo que debe el locatario y después registras sus abonos.</span>
+        }
+      </div>
+
+      @if (metodo === 'EFECTIVO') {
+        <div class="form-field">
+          <label for="recibido">Pagó con $</label>
+          <input id="recibido" type="number" min="0" step="0.01" placeholder="Opcional" [(ngModel)]="recibido" />
+        </div>
+        <div class="linea-monto"><span>Cambio</span><b class="a-favor">{{ cambio() | dinero }}</b></div>
+        @if (falta()) {
+          <p class="debe">El efectivo no alcanza.</p>
+        }
+      }
+
+      <button class="btn btn-primary bloque" [disabled]="!puedeCobrar() || guardando()" (click)="cobrar()">
+        {{ metodo === 'CRÉDITO' ? 'Vender a crédito ' : 'Cobrar ' }}{{ total() | dinero }}
+      </button>
+    </div>
+
+    @if (tipo() === 'CLIENTE') {
+      <div class="card contenido">
+        <p class="etiqueta-campo">Cliente (opcional, para mandarle el ticket por WhatsApp)</p>
+        <div class="form-field">
+          <label class="sr-only" for="c_nombre">Nombre del cliente</label>
+          <input id="c_nombre" placeholder="Nombre" [(ngModel)]="clienteNombre" />
+        </div>
+        <div class="form-field sin-margen">
+          <label class="sr-only" for="c_tel">WhatsApp del cliente</label>
+          <input id="c_tel" inputmode="tel" placeholder="WhatsApp (10 dígitos)" [(ngModel)]="clienteTelefono" />
+        </div>
+      </div>
+    }
+  </div>
+</div>

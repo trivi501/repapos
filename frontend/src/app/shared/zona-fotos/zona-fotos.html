@@ -1,0 +1,66 @@
+<h3 class="titulo">{{ titulo() }}</h3>
+
+@if (editable()) {
+  <button type="button" class="btn-qr" (click)="abrirQr()">
+    <span aria-hidden="true">⌗</span> Cámara QR
+  </button>
+
+  <div
+    class="soltar"
+    [class.arrastrando]="arrastrando()"
+    (dragover)="alArrastrar($event)"
+    (dragleave)="arrastrando.set(false)"
+    (drop)="alSoltar($event)"
+  >
+    Arrastra y suelta tus archivos o
+    <button type="button" class="examinar" (click)="selector.click()">Examina</button>
+    <input #selector type="file" accept="image/*" multiple hidden (change)="alElegir($event)" />
+  </div>
+}
+
+@if (subiendo() > 0) {
+  <p class="aviso" role="status">Subiendo {{ subiendo() }} {{ subiendo() === 1 ? 'foto' : 'fotos' }}…</p>
+}
+@if (error()) {
+  <p class="aviso aviso-error" role="alert">{{ error() }}</p>
+}
+
+@if (fotos().length) {
+  <div class="miniaturas">
+    @for (foto of fotos(); track foto.id) {
+      <figure>
+        <a [href]="foto.url" target="_blank" rel="noopener">
+          <img [src]="foto.url" [alt]="titulo() + ': ' + (foto.nombre_original || 'foto')" loading="lazy" />
+        </a>
+        @if (editable()) {
+          <button type="button" class="quitar" (click)="eliminar(foto)" [attr.aria-label]="'Eliminar ' + (foto.nombre_original || 'foto')">×</button>
+        }
+      </figure>
+    }
+  </div>
+}
+
+<p class="descripcion">{{ descripcion() }}</p>
+
+@if (qrAbierto()) {
+  <div class="modal-backdrop" (click)="cerrarQr()">
+    <div class="modal modal-qr" role="dialog" aria-modal="true" [attr.aria-label]="'Subir ' + titulo() + ' desde el celular'" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>{{ titulo() }} desde el celular</h2>
+        <button type="button" class="btn btn-secondary" (click)="cerrarQr()">✕</button>
+      </div>
+
+      @if (qrDataUrl(); as qr) {
+        <p class="qr-instruccion">Escanea el código con la cámara del celular y toma las fotos. Aparecerán aquí automáticamente.</p>
+        <img class="qr" [src]="qr" alt="Código QR para subir fotos desde el celular" width="240" height="240" />
+        <p class="qr-url"><code>{{ enlace() }}</code></p>
+        <p class="qr-nota">El enlace vence en 30 minutos. El celular debe estar en la misma red que este equipo.</p>
+        <p class="qr-recibidas" aria-live="polite">
+          {{ recibidasQr() ? '✓ ' + recibidasQr() + (recibidasQr() === 1 ? ' foto recibida' : ' fotos recibidas') : 'Esperando fotos…' }}
+        </p>
+      } @else {
+        <p class="qr-instruccion">Generando código…</p>
+      }
+    </div>
+  </div>
+}

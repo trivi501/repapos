@@ -1,0 +1,103 @@
+<div class="encabezado">
+  <h1>Inventario <small class="tenue">· sucursal {{ auth.sucursalActual()?.nombre }}</small></h1>
+  @if (auth.tienePermiso('inventario.crear')) {
+    <a class="btn btn-primary" routerLink="/inventario/nuevo">+ Producto</a>
+  }
+</div>
+
+<div class="card filtros">
+  <div class="form-field">
+    <label for="q">Buscar</label>
+    <input id="q" type="search" placeholder="Nombre o código" [(ngModel)]="filtros.q" (keyup.enter)="cargar()" />
+  </div>
+  <div class="form-field">
+    <label for="cat">Categoría</label>
+    <select id="cat" [(ngModel)]="filtros.categoria" (ngModelChange)="cargar()">
+      <option value="">Todas</option>
+      @for (c of datos()?.categorias; track c) {
+        <option [value]="c">{{ c }}</option>
+      }
+    </select>
+  </div>
+  <label class="check-linea"><input type="checkbox" [(ngModel)]="filtros.bajos" (ngModelChange)="cargar()" /> Solo existencia baja</label>
+  <button class="btn btn-secondary" (click)="cargar()">Filtrar</button>
+</div>
+
+@if (datos(); as d) {
+  <div class="barra-resumen">
+    <span>Productos: {{ d.productos.length }}</span>
+    <span>Valor del inventario (a costo): {{ d.valor | dinero }}</span>
+    @if (d.bajos) {
+      <span class="resaltado">⚠ {{ d.bajos }} con existencia baja</span>
+    }
+  </div>
+
+  <div class="card tabla-scroll">
+    <table>
+      <thead>
+        <tr><th>Código</th><th>Producto</th><th>Categoría</th><th class="der">Costo</th><th class="der">Precio cliente</th><th class="der">Precio locatario</th><th class="der">Existencia</th><th class="der">Mínimo</th><th>Acciones</th></tr>
+      </thead>
+      <tbody>
+        @for (p of d.productos; track p.id) {
+          <tr (contextmenu)="abrirMenu($event, p)" [class.fila-activa]="menu()?.p?.id === p.id">
+            <td class="tenue">{{ p.codigo }}</td>
+            <td><strong>{{ p.nombre }}</strong></td>
+            <td>{{ p.categoria }}</td>
+            <td class="der">{{ p.costo | dinero }}</td>
+            <td class="der">{{ p.precio | dinero }}</td>
+            <td class="der" [class.tenue]="p.precio_locatario === null">{{ p.precio_locatario !== null ? (p.precio_locatario | dinero) : 'igual' }}</td>
+            <td class="der" [class.debe]="p.hay <= p.minimo && p.minimo > 0"><strong>{{ p.hay }}</strong></td>
+            <td class="der tenue">{{ p.minimo }}</td>
+            <td class="sin-salto">
+              <div class="iconos">
+                @if (auth.tienePermiso('inventario.editar')) {
+                  <a class="icono-btn" [routerLink]="['/inventario', p.id, 'editar']" title="Editar" aria-label="Editar">✏️</a>
+                }
+                <button class="icono-btn" (click)="abrirMenu($event, p)" title="Movimientos" aria-label="Movimientos">⋮</button>
+              </div>
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="9"><div class="empty-state">Todavía no hay productos. Agrega el primero con "+ Producto".</div></td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <p class="ayuda">Clic derecho sobre un producto para vender, dar entrada, ajustar o traspasar. Las ventas entran a la caja del día.</p>
+}
+
+@if (menu(); as m) {
+  <div class="menu-fondo" (click)="menu.set(null)" (contextmenu)="$event.preventDefault(); menu.set(null)"></div>
+  <div class="menu-flotante ancho" role="menu" [style.top.px]="m.y" [style.left.px]="m.x">
+    <div class="menu-titulo">{{ m.p.nombre }} · hay {{ m.p.hay }}</div>
+    @if (auth.tienePermiso('inventario.movimiento')) {
+      <div class="menu-linea">
+        <input class="corto" type="number" min="1" aria-label="Piezas a vender" title="Piezas" [(ngModel)]="venta.piezas" />
+        <input type="number" step="0.01" min="0" aria-label="Total cobrado" title="Total cobrado" [(ngModel)]="venta.importe" />
+        <button class="btn btn-primary btn-sm" (click)="mover(m.p, 'venta', venta)">Vender</button>
+      </div>
+      <div class="menu-linea envuelve">
+        <input class="corto" type="number" min="1" aria-label="Piezas que entran" title="Piezas" [(ngModel)]="entrada.piezas" />
+        <input type="number" step="0.01" min="0" placeholder="Costo total" aria-label="Costo total de la compra" [(ngModel)]="entrada.importe" />
+        <button class="btn btn-secondary btn-sm" (click)="mover(m.p, 'entrada', entrada)">Entrada</button>
+        <label class="check-linea"><input type="checkbox" [(ngModel)]="entrada.de_caja" /> Se pagó con dinero de la caja</label>
+      </div>
+      <div class="menu-linea">
+        <input class="corto" type="number" min="0" aria-label="Piezas contadas" title="Piezas contadas" [(ngModel)]="ajuste.piezas" />
+        <button class="btn btn-secondary btn-sm" (click)="mover(m.p, 'ajuste', ajuste)">Ajustar a lo contado</button>
+      </div>
+      @if (datos()?.sucursales?.length) {
+        <div class="menu-linea">
+          <input class="corto" type="number" min="1" aria-label="Piezas a traspasar" [(ngModel)]="traspaso.piezas" />
+          <select aria-label="Sucursal destino" [(ngModel)]="traspaso.destino">
+            @for (s of datos()?.sucursales; track s.id) {
+              <option [ngValue]="s.id">{{ s.nombre }}</option>
+            }
+          </select>
+          <button class="btn btn-secondary btn-sm" (click)="mover(m.p, 'traspaso', traspaso)">Traspasar</button>
+        </div>
+      }
+    }
+    <a class="menu-item" [routerLink]="['/inventario', m.p.id, 'kardex']">Ver movimientos (kárdex)</a>
+  </div>
+}

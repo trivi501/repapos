@@ -1,0 +1,4 @@
+# Estos archivos se usan en Linux: con CRLF los scripts no corren.
+*.sh text eol=lf
+deploy/nginx.conf.plantilla text eol=lf
+deploy/env.produccion text eol=lf

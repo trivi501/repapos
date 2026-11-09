@@ -1,0 +1,60 @@
+# Plantilla: instalar.sh cambia __SERVIDORES__ por el dominio y la copia a /etc/nginx/sites-available/repapos.
+# El sitio es uno solo: Angular en la raíz y Laravel en /api, así no hace falta CORS.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name __SERVIDORES__;
+
+    root /var/www/repapos/frontend;
+    index index.html;
+    charset utf-8;
+
+    # cada foto pesa hasta 10 MB (FotoOrdenController)
+    client_max_body_size 64M;
+
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # API de Laravel
+    location ^~ /api/ {
+        include fastcgi_params;
+        fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME /var/www/repapos/backend/public/index.php;
+        fastcgi_param SCRIPT_NAME /index.php;
+        fastcgi_param DOCUMENT_ROOT /var/www/repapos/backend/public;
+        fastcgi_hide_header X-Powered-By;
+        fastcgi_read_timeout 120s;
+    }
+
+    # Fotos de las reparaciones. Solo se entregan como archivos, nunca se ejecutan.
+    location ^~ /storage/ {
+        alias /var/www/repapos/backend/storage/app/public/;
+        expires 7d;
+        add_header X-Content-Type-Options "nosniff" always;
+    }
+
+    # Los archivos de Angular llevan un hash en el nombre: se pueden guardar mucho tiempo.
+    location ~* \.(?:js|css)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        add_header X-Content-Type-Options "nosniff" always;
+        try_files $uri =404;
+    }
+
+    # Cualquier otra ruta la resuelve Angular. index.html no se guarda para que las actualizaciones se vean al momento.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location = /index.html {
+        add_header Cache-Control "no-cache";
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "SAMEORIGIN" always;
+    }
+
+    # Nada de archivos ocultos (.env, .git...), salvo el que usa certbot.
+    location ~ /\.(?!well-known) {
+        deny all;
+    }
+}

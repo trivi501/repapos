@@ -1,0 +1,95 @@
+@if (d(); as r) {
+  <div class="recibo">
+    <div class="botones no-imprimir">
+      <button class="btn btn-primary" (click)="imprimir()">Imprimir</button>
+      <a class="btn btn-secondary" [routerLink]="['/reparaciones', r.orden.id]">← Regresar a la orden</a>
+    </div>
+
+    <div class="cabecera">
+      @if (r.taller.logo_url) {
+        <img class="logo" [src]="r.taller.logo_url" alt="" />
+      }
+      <div class="crece">
+        <div class="nombre">{{ r.taller.nombre }}</div>
+        @if (r.orden.sucursal?.direccion) {
+          <div>{{ r.orden.sucursal?.direccion }}</div>
+        }
+        @if (r.orden.sucursal?.telefono || r.taller.whatsapp) {
+          <div>Tel. {{ r.orden.sucursal?.telefono || r.taller.whatsapp }}</div>
+        }
+        <small>Sucursal {{ r.orden.sucursal?.nombre }}</small>
+      </div>
+      <div class="derecha">
+        <small>ORDEN DE PEDIDO</small>
+        <div class="folio">N° {{ folio(r.orden.folio) }}</div>
+        <small>Recepción: {{ r.orden.fecha_recepcion || r.orden.created_at | fecha: true }}</small>
+        @if (r.orden.fecha_entrega_estimada) {
+          <br /><small>Promesa: {{ r.orden.fecha_entrega_estimada | fecha }}</small>
+        }
+      </div>
+    </div>
+
+    <table>
+      <tr><td colspan="2"><span class="etq">NOMBRE</span> ({{ r.aviso }})<div class="valor">{{ r.orden.cliente?.nombre }} {{ r.orden.cliente?.apellido }}</div></td></tr>
+      <tr>
+        <td><span class="etq">TELÉFONO</span><div class="valor">{{ r.orden.cliente?.telefono }}{{ r.orden.cliente?.telefono2 ? ' / ' + r.orden.cliente?.telefono2 : '' }}</div></td>
+        <td>
+          <span class="etq">EQUIPO</span>
+          <div class="valor">{{ r.orden.equipo?.marca }} {{ r.orden.equipo?.modelo }} {{ r.orden.equipo?.color }}</div>
+          @if (r.orden.equipo?.imei) {
+            <small>IMEI {{ r.orden.equipo?.imei }}</small>
+          }
+        </td>
+      </tr>
+    </table>
+
+    <table class="revision">
+      @for (fila of filasRevision(r); track $index) {
+        <tr>
+          @for (c of fila; track c.clave) {
+            <td>
+              <span class="etq">{{ c.texto }}</span>
+              <div>SÍ {{ c.valor === 'si' ? '☒' : '☐' }} &nbsp; NO {{ c.valor === 'no' ? '☒' : '☐' }}</div>
+            </td>
+          }
+        </tr>
+      }
+    </table>
+
+    <table>
+      <tr><td><span class="etq">FALLA</span><div class="valor">{{ r.orden.falla_reportada }}</div></td></tr>
+      <tr><td><span class="etq">OBSERVACIÓN</span><div>{{ r.orden.observaciones || '&nbsp;' }}</div></td></tr>
+      <tr><td><small>Password: {{ r.orden.tiene_password ? 'registrado en el sistema (por seguridad no se imprime)' : 'no proporcionado' }}</small></td></tr>
+    </table>
+
+    <div class="pie">
+      <div class="clausulas">
+        <div class="rojo"><b>CLÁUSULAS</b> <small>¡IMPORTANTE LEER!</small></div>
+        <ul>
+          @for (t of terminos(r); track t) {
+            <li>{{ t }}</li>
+          }
+        </ul>
+      </div>
+      <div class="montos">
+        <table>
+          <tr><td><b>TOTAL</b></td><td class="der">{{ r.orden.total | dinero }}</td></tr>
+          <tr><td><b>ANTICIPO</b></td><td class="der">{{ r.orden.pagado | dinero }}</td></tr>
+          <tr><td><b>RESTA</b></td><td class="der"><b>{{ r.orden.saldo | dinero }}</b></td></tr>
+        </table>
+        <div class="firma">ACEPTO TÉRMINOS Y CONDICIONES</div>
+        <div class="firma">FIRMA DE ENTREGA{{ r.orden.fecha_entrega_real ? ' · ' + (r.orden.fecha_entrega_real | fecha: true) : '' }}</div>
+      </div>
+    </div>
+
+    <div class="qr-fila">
+      @if (qr()) {
+        <img class="qr" [src]="qr()" alt="Código QR de la orden" />
+      }
+      <div>
+        <b>Escanea el código para ver el estatus de tu reparación</b>
+        <div class="enlace-qr">{{ r.enlace }}</div>
+      </div>
+    </div>
+  </div>
+}

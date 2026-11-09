@@ -1,0 +1,178 @@
+@if (o(); as x) {
+  <div class="encabezado">
+    <h1>Orden N° {{ x.folio }} <app-estatus [valor]="x.estado_texto" /></h1>
+    <div class="acciones-fila">
+      <a class="btn btn-secondary" [routerLink]="['/reparaciones', x.id, 'recibo']" target="_blank">Imprimir comprobante</a>
+      <button class="btn btn-secondary" (click)="api.abrirPdf('ordenes/' + x.id + '/pdf')">PDF</button>
+      <a class="btn btn-whatsapp" [href]="x.enlaces.whatsapp_ticket" target="_blank" rel="noopener">Ticket por WhatsApp</a>
+      <a class="btn btn-whatsapp" [href]="x.enlaces.whatsapp_estatus" target="_blank" rel="noopener">Avisar estatus</a>
+      @if (auth.tieneAlgunPermiso(['ordenes.editar', 'ordenes.cambiar_estado'])) {
+        <a class="btn btn-secondary" [routerLink]="['/reparaciones', x.id, 'editar']">Editar</a>
+      }
+      <a class="btn btn-secondary" routerLink="/reparaciones">← Lista</a>
+    </div>
+  </div>
+
+  <div class="rejilla-venta">
+    <div class="pila">
+      <div class="card contenido rejilla-2">
+        <div>
+          <span class="etiqueta-campo">Cliente</span>
+          <div class="grande"><strong>{{ nombreCliente(x) }}</strong></div>
+          <div>{{ x.cliente?.telefono }} @if (x.cliente?.telefono2) { · {{ x.cliente?.telefono2 }} }</div>
+        </div>
+        <div>
+          <span class="etiqueta-campo">Equipo</span>
+          <div class="grande"><strong>{{ x.equipo?.marca }} {{ x.equipo?.modelo }} {{ x.equipo?.color }}</strong></div>
+          @if (x.equipo?.imei) {
+            <div>IMEI: {{ x.equipo?.imei }}</div>
+          }
+        </div>
+        <div>
+          <span class="etiqueta-campo">Recibido</span>
+          <div>{{ x.fecha_recepcion || x.created_at | fecha: true }}</div>
+        </div>
+        <div>
+          <span class="etiqueta-campo">Promesa / entrega</span>
+          <div>
+            {{ (x.estimado_listo_at | fecha: true) || '—' }}
+            @if (x.fecha_entrega_real) {
+              · entregado {{ x.fecha_entrega_real | fecha: true }}
+            }
+          </div>
+        </div>
+      </div>
+
+      <div class="card contenido">
+        <h2>Revisión al recibir</h2>
+        <div class="revision-vista">
+          @for (r of revision; track r.clave) {
+            <div>
+              <span>{{ r.texto }}</span>
+              <b [class.a-favor]="x.revision?.[r.clave] === 'si'" [class.debe]="x.revision?.[r.clave] === 'no'">
+                {{ x.revision?.[r.clave] === 'si' ? 'Sí' : x.revision?.[r.clave] === 'no' ? 'No' : '—' }}
+              </b>
+            </div>
+          }
+        </div>
+        <div class="rejilla-2 separado">
+          <div><span class="etiqueta-campo">Falla</span><div class="texto-renglones">{{ x.falla_reportada }}</div></div>
+          <div><span class="etiqueta-campo">Observación</span><div class="texto-renglones">{{ x.observaciones || '—' }}</div></div>
+          @if (x.diagnostico) {
+            <div><span class="etiqueta-campo">Diagnóstico</span><div class="texto-renglones">{{ x.diagnostico }}</div></div>
+          }
+          @if (x.solucion) {
+            <div><span class="etiqueta-campo">Solución</span><div class="texto-renglones">{{ x.solucion }}</div></div>
+          }
+          @if (x.notas) {
+            <div><span class="etiqueta-campo">Notas internas</span><div class="texto-renglones">{{ x.notas }}</div></div>
+          }
+          @if (x.notas_cliente) {
+            <div><span class="etiqueta-campo">Notas para el cliente</span><div class="texto-renglones">{{ x.notas_cliente }}</div></div>
+          }
+        </div>
+      </div>
+
+      @if (x.fotos?.length) {
+        <div class="card contenido">
+          <h2>Fotografías</h2>
+          <div class="galeria-publica">
+            @for (f of x.fotos; track f.id) {
+              <a [href]="f.url" target="_blank" rel="noopener"><img [src]="f.url" [alt]="'Foto ' + f.categoria" loading="lazy" /></a>
+            }
+          </div>
+        </div>
+      }
+
+      <div class="card tabla-scroll">
+        <div class="titulo-tarjeta"><h2>Cobros</h2></div>
+        <table>
+          <thead><tr><th>Fecha</th><th>Concepto</th><th>Forma</th><th class="der">Monto</th></tr></thead>
+          <tbody>
+            @for (p of x.pagos; track p.id) {
+              <tr>
+                <td>{{ p.fecha | fecha: true }}</td>
+                <td>{{ p.concepto }}</td>
+                <td>{{ metodoTexto(p.metodo) }}</td>
+                <td class="der" [class.debe]="+p.monto < 0">{{ p.monto | dinero }}</td>
+              </tr>
+            } @empty {
+              <tr><td colspan="4"><div class="empty-state">Sin cobros</div></td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      @if (auth.tienePermiso('ordenes.eliminar')) {
+        <div class="card contenido zona-peligro">
+          <h2>Eliminar esta orden</h2>
+          @if (cobrosTotal(x) !== 0) {
+            <p>Tiene {{ cobrosTotal(x) | dinero }} cobrados en la caja. ¿Qué hago con ellos?</p>
+            <label class="check-linea"><input type="radio" name="cobros" value="quitar" [(ngModel)]="destinoCobros" /> Fue un error de captura: quitarlos de la caja</label>
+            <label class="check-linea"><input type="radio" name="cobros" value="conservar" [(ngModel)]="destinoCobros" /> El dinero sí se cobró: dejarlos</label>
+          }
+          <button class="btn btn-danger separado" (click)="eliminar(x)" [disabled]="cobrosTotal(x) !== 0 && !destinoCobros">Eliminar</button>
+        </div>
+      }
+    </div>
+
+    <div class="pila">
+      <div class="card contenido">
+        <div class="linea-monto"><span>Total</span><b>{{ x.total | dinero }}</b></div>
+        <div class="linea-monto"><span>Anticipo / pagado</span><b>{{ x.pagado | dinero }}</b></div>
+        <div class="linea-monto total"><span>Resta</span><b [class.debe]="x.saldo > 0" [class.a-favor]="x.saldo <= 0">{{ x.saldo | dinero }}</b></div>
+        @if (auth.tienePermiso('ordenes.cobrar')) {
+          <div class="grupo-en-linea separado">
+            <input class="input-corto" type="number" step="0.01" min="0.01" aria-label="Monto del abono" [(ngModel)]="monto" />
+            <select aria-label="Forma de pago" [(ngModel)]="metodo">
+              <option value="EFECTIVO">Efectivo</option>
+              <option value="TARJETA">Tarjeta</option>
+              <option value="TRANSFERENCIA">Transferencia</option>
+            </select>
+            <button class="btn btn-secondary" (click)="abonar()">Abonar</button>
+          </div>
+          @if (x.saldo > 0) {
+            <button class="btn btn-primary bloque separado" (click)="liquidar(x)">Liquidar {{ x.saldo | dinero }}</button>
+          }
+        }
+      </div>
+
+      @if (auth.tieneAlgunPermiso(['ordenes.cambiar_estado', 'ordenes.editar'])) {
+        <div class="card contenido">
+          <h2>Cambiar estatus</h2>
+          <div class="acciones-fila">
+            @for (e of estados; track e.valor) {
+              <button class="btn btn-sm" [class.btn-primary]="x.estado === e.valor" [class.btn-secondary]="x.estado !== e.valor" [disabled]="x.estado === e.valor" (click)="cambiarEstado(x, e.valor)">
+                {{ e.etiqueta }}
+              </button>
+            }
+          </div>
+        </div>
+      }
+
+      <div class="card contenido">
+        <h2>Password</h2>
+        @if (x.bloqueo_tipo === 'patron' && x.bloqueo_valor) {
+          <app-patron-vista [valor]="x.bloqueo_valor" />
+          <p class="ayuda">Orden: {{ x.bloqueo_valor }}</p>
+        } @else if (x.bloqueo_valor) {
+          <p>{{ x.bloqueo_tipo === 'clave' ? 'Contraseña' : 'PIN' }}: <b class="codigo">{{ x.bloqueo_valor }}</b></p>
+        }
+        @if (x.bloqueo_pin) {
+          <p>PIN / contraseña: <b class="codigo">{{ x.bloqueo_pin }}</b></p>
+        }
+        @if (!x.bloqueo_valor && !x.bloqueo_pin) {
+          <p class="tenue">Sin password registrado.</p>
+        }
+        @if (x.bloqueos?.length) {
+          <p class="ayuda">Bloqueos: {{ x.bloqueos?.join(', ') }}</p>
+        }
+      </div>
+
+      <div class="card contenido">
+        <label class="etiqueta-campo" for="enlace">Enlace para que el cliente consulte su orden:</label>
+        <input id="enlace" readonly [value]="x.enlaces.publico" (click)="$any($event.target).select()" />
+      </div>
+    </div>
+  </div>
+}

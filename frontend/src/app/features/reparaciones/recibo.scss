@@ -1,0 +1,166 @@
+/* El comprobante siempre va en negro sobre blanco, sea cual sea el tema. */
+:host {
+  display: block;
+  min-height: 100vh;
+  background: #fff;
+  color: #000;
+}
+
+.recibo {
+  max-width: 190mm;
+  margin: 0 auto;
+  padding: 1rem;
+  font-size: 12px;
+}
+
+.botones {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.cabecera {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 2px solid #000;
+}
+
+.crece {
+  flex: 1;
+}
+
+.logo {
+  height: 5rem;
+  max-width: 45mm;
+  object-fit: contain;
+}
+
+.nombre {
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.derecha {
+  text-align: right;
+}
+
+.folio {
+  font-size: 1.9rem;
+  font-weight: 800;
+  color: #b91c1c;
+}
+
+table {
+  width: 100%;
+  margin-top: 0.5rem;
+  border-collapse: collapse;
+  font-size: inherit;
+}
+
+td {
+  padding: 4px 6px;
+  border: 1px solid #111;
+  vertical-align: top;
+}
+
+tr:hover {
+  background: none;
+}
+
+.etq {
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.valor {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.revision td {
+  width: 20%;
+  text-align: center;
+}
+
+.revision .etq {
+  text-transform: uppercase;
+}
+
+.pie {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.clausulas {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid #000;
+
+  ul {
+    margin: 0.25rem 0 0;
+    padding-left: 1rem;
+    font-size: 9px;
+    line-height: 1.25;
+  }
+}
+
+.rojo {
+  color: #b91c1c;
+}
+
+.montos {
+  width: 13rem;
+
+  table {
+    margin-top: 0;
+    font-size: 1rem;
+  }
+}
+
+.der {
+  text-align: right;
+}
+
+.firma {
+  margin-top: 2rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid #000;
+  text-align: center;
+  font-size: 10px;
+}
+
+.qr-fila {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.qr {
+  width: 6rem;
+  height: 6rem;
+}
+
+.enlace-qr {
+  font-size: 10px;
+  color: #444;
+  word-break: break-all;
+}
+
+@page {
+  size: letter;
+  margin: 10mm;
+}
+
+@media print {
+  .no-imprimir {
+    display: none;
+  }
+
+  .recibo {
+    padding: 0;
+  }
+}

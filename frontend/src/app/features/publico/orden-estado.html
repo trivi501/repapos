@@ -1,0 +1,92 @@
+<main class="consulta-publica">
+  @if (noExiste()) {
+    <div class="card contenido tarjeta-publica">
+      <h1>No encontramos esta orden</h1>
+      <p class="tenue">Revisa el enlace de tu comprobante, o <a routerLink="/consulta">consulta con tu folio</a>.</p>
+    </div>
+  }
+  @if (d(); as o) {
+    <div class="card contenido tarjeta-publica">
+      <div class="venta-centro">
+        @if (o.logo_url) {
+          <img class="logo-publico" [src]="o.logo_url" alt="" />
+        }
+        <h1>{{ o.taller }}</h1>
+        <p class="tenue">Sucursal {{ o.sucursal }}</p>
+        <p class="tenue">Orden N° {{ o.numero }} · {{ o.equipo }}</p>
+        <app-estatus [valor]="o.estado_texto" />
+      </div>
+
+      <ol class="pasos">
+        @for (p of pasos(o); track p.texto; let i = $index) {
+          <li [class.hecho]="p.hecho">
+            <span class="paso-num">{{ i + 1 }}</span>
+            <span>{{ p.texto }}</span>
+          </li>
+        }
+      </ol>
+
+      <div class="separador-superior separado">
+        @if (o.fechas; as f) {
+          <div class="linea-monto"><span>Recibido</span><span>{{ f.recepcion | fecha }}</span></div>
+          @if (f.estimado_listo) {
+            <div class="linea-monto"><span>Fecha prometida</span><span>{{ f.estimado_listo | fecha }}</span></div>
+          }
+          @if (f.entrega) {
+            <div class="linea-monto"><span>Entregado</span><span>{{ f.entrega | fecha }}</span></div>
+          }
+        }
+        @if (o.costos; as c) {
+          @if (c.saldo > 0) {
+            <div class="linea-monto"><b>Resta por pagar</b><b>{{ c.saldo | dinero }}</b></div>
+          }
+        }
+      </div>
+
+      @if (o.estado === 'reparado' || o.estado === 'no_quedo') {
+        <p class="alert alert-success separado">Ya puedes pasar por tu equipo. Recuerda traer tu nota.</p>
+      }
+
+      @if (o.motivo) {
+        <p class="dato-publico"><span class="etiqueta-campo">Motivo de ingreso</span>{{ o.motivo }}</p>
+      }
+      @if (o.diagnostico || o.solucion || o.notas_cliente) {
+        <div class="dato-publico">
+          <span class="etiqueta-campo">Diagnóstico y solución</span>
+          @if (o.diagnostico) {
+            <p>{{ o.diagnostico }}</p>
+          }
+          @if (o.solucion) {
+            <p>{{ o.solucion }}</p>
+          }
+          @if (o.notas_cliente) {
+            <p class="tenue">{{ o.notas_cliente }}</p>
+          }
+        </div>
+      }
+      @for (g of gruposFotos(o); track g.titulo) {
+        <div class="dato-publico">
+          <span class="etiqueta-campo">{{ g.titulo }}</span>
+          <div class="galeria-publica">
+            @for (url of g.urls; track url) {
+              <a [href]="url" target="_blank" rel="noopener"><img [src]="url" [alt]="g.titulo" loading="lazy" /></a>
+            }
+          </div>
+        </div>
+      }
+
+      @if (o.enlace_pdf) {
+        <a class="btn btn-secondary bloque separado" [href]="o.enlace_pdf" target="_blank" rel="noopener">Ver mi nota en PDF</a>
+      }
+
+      <details class="separado clausulas-publicas">
+        <summary>Cláusulas</summary>
+        <ul>
+          @for (t of terminos(o); track t) {
+            <li>{{ t }}</li>
+          }
+        </ul>
+      </details>
+    </div>
+  }
+</main>

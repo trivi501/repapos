@@ -1,0 +1,35 @@
+<div class="login-page">
+  <form class="card login-card" [formGroup]="formulario" (ngSubmit)="enviar()">
+    <div class="login-brand">
+      <app-logo tamano="lg" [eslogan]="true" />
+      <h1 class="sr-only">Iniciar sesión en RepaPOS</h1>
+    </div>
+
+    @if (error()) {
+      <div class="alert alert-error">{{ error() }}</div>
+    }
+
+    <div class="form-field">
+      <label for="email">Correo electrónico</label>
+      <input id="email" type="email" formControlName="email" placeholder="tu@correo.com"autocomplete="username" />
+      @if (formulario.controls.email.touched && formulario.controls.email.invalid) {
+        <span class="form-error">Ingresa un correo válido.</span>
+      }
+    </div>
+
+    <div class="form-field">
+      <label for="password">Contraseña</label>
+      <input id="password" type="password" formControlName="password" placeholder="••••••••" autocomplete="current-password" />
+      @if (formulario.controls.password.touched && formulario.controls.password.invalid) {
+        <span class="form-error">La contraseña es obligatoria.</span>
+      }
+    </div>
+
+    <button type="submit" class="btn btn-primary login-submit" [disabled]="cargando()">
+      {{ cargando() ? 'Ingresando…' : 'Ingresar' }}
+    </button>
+
+    <p class="login-consulta">¿Eres cliente? <a routerLink="/consulta">Consulta tu reparación</a></p>
+    <p class="login-consulta">¿Tienes un taller? <a routerLink="/registro">Prueba gratis</a></p>
+  </form>
+</div>

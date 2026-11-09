@@ -1,0 +1,141 @@
+<div class="encabezado">
+  <h1>Teléfonos de locatarios</h1>
+  <div class="acciones-fila">
+    @if (auth.tienePermiso('telefonos.crear')) {
+      <a class="btn btn-primary" routerLink="/telefonos/nuevo">+ Alta de teléfono</a>
+    }
+    <button class="btn btn-secondary" (click)="exportar()">Exportar a Excel</button>
+  </div>
+</div>
+
+<div class="card filtros">
+  <div class="form-field">
+    <label for="f_loc">Locatario</label>
+    <select id="f_loc" [(ngModel)]="filtros.locatario" (ngModelChange)="filtrar()">
+      <option value="">(Todos los locatarios)</option>
+      @for (l of locatarios(); track l.id) {
+        <option [value]="l.id">{{ l.nombre }}</option>
+      }
+    </select>
+  </div>
+  <div class="form-field">
+    <label for="f_est">Ver</label>
+    <select id="f_est" [(ngModel)]="filtros.estado" (ngModelChange)="filtrar()">
+      @for (e of estados; track e.valor) {
+        <option [value]="e.valor">{{ e.texto }}</option>
+      }
+    </select>
+  </div>
+  <div class="form-field">
+    <label for="f_pri">Prioridad</label>
+    <select id="f_pri" [(ngModel)]="filtros.prioridad" (ngModelChange)="filtrar()">
+      <option value="">Toda prioridad</option>
+      <option value="ALTA">Solo ALTA</option>
+      <option value="MEDIA">Solo MEDIA</option>
+      <option value="BAJA">Solo BAJA</option>
+    </select>
+  </div>
+  <div class="form-field">
+    <label for="f_q">Buscar</label>
+    <input id="f_q" type="search" placeholder="Modelo, trabajo, IMEI…" [(ngModel)]="filtros.q" (keyup.enter)="filtrar()" />
+  </div>
+  <label class="check-linea">
+    <input type="checkbox" [(ngModel)]="filtros.urgentes" (ngModelChange)="filtrar()" /> Urgentes primero
+  </label>
+  <button class="btn btn-secondary" (click)="filtrar()">Filtrar</button>
+</div>
+
+@if (resumen(); as r) {
+  <div class="barra-resumen">
+    <span>Teléfonos: {{ r.telefonos }}</span>
+    <span>En taller: {{ +r.en_taller }}</span>
+    <span>Listos: {{ +r.listos }}</span>
+    <span>No quedaron: {{ +r.no_quedaron }}</span>
+    <span>Total: {{ r.total | dinero }}</span>
+    <span>Cobrado: {{ r.cobrado | dinero }}</span>
+    <span class="resaltado">Por cobrar: {{ r.por_cobrar | dinero }}</span>
+  </div>
+}
+
+<div class="card tabla-scroll">
+  <table>
+    <thead>
+      <tr>
+        <th>#</th><th>Prioridad</th><th>Recibido</th><th>Locatario</th><th>Modelo</th><th>Trabajo</th><th>Notas / IMEI</th>
+        <th class="der">Total</th><th class="der">Pagado</th><th class="der">Saldo</th>
+        <th>Pago</th><th>Estatus</th><th>Entrega</th><th>Entregado el</th><th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (t of telefonos(); track t.id) {
+        <tr (contextmenu)="abrirMenu($event, t)" [class.fila-activa]="menu()?.t?.id === t.id">
+          <td class="tenue">{{ t.id }}</td>
+          <td><app-estatus [valor]="t.prioridad" /></td>
+          <td class="sin-salto">{{ t.fecha_recibido | fecha }}</td>
+          <td><strong>{{ t.locatario?.nombre }}</strong></td>
+          <td>{{ t.modelo }}</td>
+          <td>{{ t.trabajo }}</td>
+          <td class="tenue">{{ t.notas }}</td>
+          <td class="der sin-salto">{{ t.total | dinero }}</td>
+          <td class="der sin-salto">{{ t.pagado | dinero }}</td>
+          <td class="der sin-salto" [class.debe]="t.saldo > 0">{{ t.saldo | dinero }}</td>
+          <td><app-estatus [valor]="t.estado_pago" /></td>
+          <td><app-estatus [valor]="t.resultado" /></td>
+          <td><app-estatus [valor]="t.entregado ? 'ENTREGADO' : 'POR ENTREGAR'" /></td>
+          <td class="sin-salto">{{ t.fecha_entrega | fecha }}</td>
+          <td class="sin-salto">
+            <div class="iconos">
+              @if (auth.tienePermiso('telefonos.editar')) {
+                <a class="icono-btn" [routerLink]="['/telefonos', t.id, 'editar']" title="Editar" aria-label="Editar">✏️</a>
+                <button class="icono-btn" [class.encendido]="t.resultado === 'LISTO'" (click)="accion(t, 'listo')"
+                        [title]="t.resultado === 'LISTO' ? 'Está LISTO (clic = regresar a En taller)' : 'Marcar como LISTO'" aria-label="Listo">✅</button>
+                <button class="icono-btn" [class.encendido]="t.entregado" (click)="entregar(t)"
+                        [title]="t.entregado ? 'Entregado (clic = quitar entrega)' : 'Marcar como entregado'" aria-label="Entregado">📦</button>
+              }
+              @if (t.aviso_url) {
+                <a class="icono-btn" [href]="t.aviso_url" target="_blank" rel="noopener" title="Avisar por WhatsApp" aria-label="Avisar por WhatsApp">💬</a>
+              }
+              <button class="icono-btn" (click)="abrirMenu($event, t)" title="Más acciones" aria-label="Más acciones">⋮</button>
+            </div>
+          </td>
+        </tr>
+      } @empty {
+        <tr><td colspan="15"><div class="empty-state">{{ cargando() ? 'Cargando…' : 'No hay teléfonos con estos filtros.' }}</div></td></tr>
+      }
+    </tbody>
+  </table>
+  <div class="pagination">
+    <button class="btn btn-secondary" (click)="pagina(-1)" [disabled]="paginaActual() <= 1">Anterior</button>
+    <span>Página {{ paginaActual() }} de {{ ultimaPagina() }}</span>
+    <button class="btn btn-secondary" (click)="pagina(1)" [disabled]="paginaActual() >= ultimaPagina()">Siguiente</button>
+  </div>
+</div>
+<p class="ayuda">Tip: clic derecho sobre cualquier teléfono para ver todas sus acciones.</p>
+
+@if (menu(); as m) {
+  <div class="menu-fondo" (click)="menu.set(null)" (contextmenu)="$event.preventDefault(); menu.set(null)"></div>
+  <div class="menu-flotante" role="menu" [style.top.px]="m.y" [style.left.px]="m.x" (keydown.escape)="menu.set(null)">
+    <div class="menu-titulo">#{{ m.t.id }} · {{ m.t.locatario?.nombre }} · {{ m.t.modelo }}</div>
+    @if (auth.tienePermiso('telefonos.editar')) {
+      <a class="menu-item" [routerLink]="['/telefonos', m.t.id, 'editar']">✏️ Editar</a>
+      <button class="menu-item" (click)="accion(m.t, 'listo')">{{ m.t.resultado === 'LISTO' ? '↩️ Regresar a En taller' : '✅ Marcar como Listo' }}</button>
+      <button class="menu-item" (click)="accion(m.t, 'noquedo')">{{ m.t.resultado === 'NO QUEDÓ' ? '↩️ Regresar a En taller' : '❌ Marcar como No quedó' }}</button>
+      <button class="menu-item" (click)="entregar(m.t)">{{ m.t.entregado ? '↩️ Quitar entrega' : '📦 Marcar como entregado' }}</button>
+    }
+    @if (auth.tienePermiso('telefonos.cobrar')) {
+      <div class="menu-linea">
+        <input type="number" step="0.01" min="0.01" placeholder="Monto" aria-label="Monto del abono" [(ngModel)]="montoAbono" (keyup.enter)="abonar(m.t)" />
+        <button class="btn btn-secondary" (click)="abonar(m.t)">Abonar</button>
+      </div>
+      @if (m.t.saldo > 0) {
+        <button class="menu-item" (click)="liquidar(m.t)">💲 Liquidar {{ m.t.saldo | dinero }}</button>
+      }
+    }
+    @if (m.t.aviso_url) {
+      <a class="menu-item" [href]="m.t.aviso_url" target="_blank" rel="noopener" (click)="menu.set(null)">💬 Avisar por WhatsApp</a>
+    }
+    @if (auth.tienePermiso('telefonos.eliminar')) {
+      <a class="menu-item peligro" [routerLink]="['/telefonos', m.t.id, 'editar']" fragment="eliminar">🗑️ Eliminar…</a>
+    }
+  </div>
+}

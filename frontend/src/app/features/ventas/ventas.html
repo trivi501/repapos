@@ -1,0 +1,66 @@
+<div class="encabezado">
+  <h1>Ventas <small class="tenue">· sucursal {{ auth.sucursalActual()?.nombre }}</small></h1>
+  @if (auth.tienePermiso('ventas.crear')) {
+    <a class="btn btn-primary" routerLink="/ventas/nueva">+ Nueva venta</a>
+  }
+</div>
+
+<div class="card filtros">
+  <div class="form-field"><label for="desde">Desde</label><input id="desde" type="date" [(ngModel)]="desde" /></div>
+  <div class="form-field"><label for="hasta">Hasta</label><input id="hasta" type="date" [(ngModel)]="hasta" /></div>
+  <button class="btn btn-secondary" (click)="ver(false)">Ver</button>
+  <button class="btn btn-secondary" (click)="hoy()">Hoy</button>
+  <button class="btn btn-secondary" (click)="esteMes()">Este mes</button>
+  <button class="btn btn-secondary" [class.activo]="credito()" (click)="ver(true)">A crédito que deben</button>
+</div>
+@if (credito()) {
+  <p class="ayuda">Todas las ventas a crédito con saldo pendiente, de cualquier fecha.</p>
+}
+
+@if (datos(); as d) {
+  <div class="tarjetas">
+    <div class="card dato"><span>Ventas</span><strong>{{ d.resumen.ventas }}</strong></div>
+    <div class="card dato"><span>Total vendido</span><strong>{{ d.resumen.total | dinero }}</strong></div>
+    <div class="card dato"><span>Ganancia (precio − costo)</span><strong class="a-favor">{{ d.resumen.ganancia | dinero }}</strong></div>
+    <div class="card dato"><span>Por cobrar (a crédito)</span><strong class="debe">{{ d.resumen.por_cobrar | dinero }}</strong></div>
+    <div class="card dato"><span>Clientes finales / locatarios</span><strong class="mediano">{{ d.resumen.cliente | dinero }} / {{ d.resumen.locatario | dinero }}</strong></div>
+    <div class="card dato">
+      @for (m of metodos(d); track m.clave) {
+        <div class="linea-monto"><small>{{ m.texto }}</small><b>{{ m.monto | dinero }}</b></div>
+      }
+    </div>
+  </div>
+
+  <div class="card tabla-scroll">
+    <table>
+      <thead><tr><th>N°</th><th>Fecha</th><th>Productos</th><th>Cliente</th><th>Pago</th><th class="der">Total</th><th class="der">Debe</th><th>Vendió</th><th></th></tr></thead>
+      <tbody>
+        @for (v of d.ventas; track v.id) {
+          <tr [class.cancelada]="v.estatus === 'CANCELADA'">
+            <td><strong>{{ v.folio }}</strong></td>
+            <td class="sin-salto">{{ v.created_at | fecha: true }}</td>
+            <td>
+              {{ productos(v) }}
+              @if (+v.devuelto > 0) {
+                <span class="badge badge-warning">devolución {{ v.devuelto | dinero }}</span>
+              }
+            </td>
+            <td>
+              @if (v.tipo === 'LOCATARIO') {
+                <span class="badge badge-primary">LOCATARIO</span>
+              }
+              {{ v.cliente_nombre }}
+            </td>
+            <td>{{ metodoTexto(v.metodo) }}</td>
+            <td class="der"><strong>{{ v.neto | dinero }}</strong></td>
+            <td class="der" [class.debe]="v.saldo > 0">{{ v.saldo > 0 ? (v.saldo | dinero) : '—' }}</td>
+            <td class="tenue">{{ v.user?.name }}</td>
+            <td><a class="btn btn-secondary btn-sm" [routerLink]="['/ventas', v.id]">Ver</a></td>
+          </tr>
+        } @empty {
+          <tr><td colspan="9"><div class="empty-state">Sin ventas.</div></td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}

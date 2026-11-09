@@ -1,0 +1,188 @@
+.shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: var(--sidebar-width);
+  flex-shrink: 0;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--sidebar-border);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem 0.9rem;
+  overflow-y: auto;
+}
+
+.sidebar-nombre {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* El logo de un taller puede ser cuadrado o muy ancho */
+.sidebar-logo-img {
+  width: auto;
+  max-width: 100%;
+  height: 3.5rem;
+  border-radius: 6px;
+  background: #fff;
+  object-fit: contain;
+  padding: 2px;
+}
+
+.sidebar-grupo {
+  margin: 0.9rem 0 0.25rem;
+  padding: 0 0.75rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--sidebar-text);
+  opacity: 0.7;
+}
+
+.boton-menu {
+  display: none;
+}
+
+.selector-sucursal select {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.4rem 0.5rem;
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.sucursal-fija {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.sidebar-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  padding: 0.5rem 0.6rem 1.5rem;
+
+  .sidebar-nombre {
+    max-width: 100%;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--sidebar-text);
+  }
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  color: var(--sidebar-text);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.sidebar-link:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.sidebar-link.active {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.sidebar-icon {
+  font-size: 1.05rem;
+}
+
+.shell-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.9rem 1.75rem;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.topbar-user {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.topbar-user-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.25;
+  font-size: 0.85rem;
+
+  span {
+    color: var(--color-text-muted);
+    font-size: 0.75rem;
+  }
+}
+
+.page {
+  flex: 1;
+  padding: 1.75rem;
+  min-width: 0;
+}
+
+/* celular: el menú lateral se abre con un botón */
+@media (max-width: 900px) {
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 40;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+  }
+
+  .sidebar.abierta {
+    transform: none;
+  }
+
+  .boton-menu {
+    display: inline-flex;
+    margin-right: auto;
+  }
+
+  .topbar,
+  .page {
+    padding: 0.75rem 1rem;
+  }
+}
+
+@media print {
+  .sidebar {
+    display: none;
+  }
+
+  .page {
+    padding: 0;
+  }
+}

@@ -1,0 +1,132 @@
+<h1>Equipos</h1>
+
+<div class="toolbar">
+  <input
+    class="search-input"
+    type="text"
+    placeholder="Buscar por marca, modelo o IMEI…"
+    (input)="buscar($any($event.target).value)"
+  />
+  @if (authService.tienePermiso('equipos.crear')) {
+    <button class="btn btn-primary" (click)="abrirCrear()">+ Nuevo equipo</button>
+  }
+</div>
+
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>Cliente</th>
+        <th>Tipo</th>
+        <th>Marca / Modelo</th>
+        <th>IMEI</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (equipo of equipos(); track equipo.id) {
+        <tr>
+          <td>{{ nombreCliente(equipo) }}</td>
+          <td><span class="badge">{{ equipo.tipo }}</span></td>
+          <td>{{ equipo.marca }} {{ equipo.modelo }}</td>
+          <td>{{ equipo.imei || '—' }}</td>
+          <td class="acciones">
+            @if (authService.tienePermiso('equipos.editar')) {
+              <button class="btn btn-secondary" (click)="abrirEditar(equipo)">Editar</button>
+            }
+            @if (authService.tienePermiso('equipos.eliminar')) {
+              <button class="btn btn-danger" (click)="eliminar(equipo)">Eliminar</button>
+            }
+          </td>
+        </tr>
+      }
+      @empty {
+        <tr>
+          <td colspan="5">
+            <div class="empty-state">
+              @if (cargando()) {
+                Cargando equipos…
+              } @else {
+                No hay equipos registrados todavía.
+              }
+            </div>
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+
+  <div class="pagination">
+    <button class="btn btn-secondary" (click)="cambiarPagina(-1)" [disabled]="pagina() <= 1">Anterior</button>
+    <span>Página {{ pagina() }} de {{ totalPaginas() }}</span>
+    <button class="btn btn-secondary" (click)="cambiarPagina(1)" [disabled]="pagina() >= totalPaginas()">Siguiente</button>
+  </div>
+</div>
+
+@if (modalAbierto()) {
+  <div class="modal-backdrop" (click)="cerrarModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>{{ equipoEditando() ? 'Editar equipo' : 'Nuevo equipo' }}</h2>
+        <button class="btn btn-secondary" (click)="cerrarModal()">✕</button>
+      </div>
+
+      @if (error()) {
+        <div class="alert alert-error">{{ error() }}</div>
+      }
+
+      <form [formGroup]="formulario" (ngSubmit)="guardar()">
+        <div class="form-field">
+          <label for="cliente_id">Cliente</label>
+          <select id="cliente_id" formControlName="cliente_id">
+            <option [ngValue]="null" disabled>Selecciona un cliente</option>
+            @for (cliente of clientes(); track cliente.id) {
+              <option [ngValue]="cliente.id">{{ cliente.nombre }} {{ cliente.apellido }}</option>
+            }
+          </select>
+        </div>
+        <div class="form-field">
+          <label for="tipo">Tipo de equipo</label>
+          <select id="tipo" formControlName="tipo">
+            @for (tipo of tipos; track tipo) {
+              <option [value]="tipo">{{ tipo }}</option>
+            }
+          </select>
+        </div>
+        <div class="form-field">
+          <label for="marca">Marca</label>
+          <input id="marca" type="text" formControlName="marca" />
+        </div>
+        <div class="form-field">
+          <label for="modelo">Modelo</label>
+          <input id="modelo" type="text" formControlName="modelo" />
+        </div>
+        <div class="form-field">
+          <label for="imei">IMEI</label>
+          <input id="imei" type="text" formControlName="imei" />
+        </div>
+        <div class="form-field">
+          <label for="color">Color</label>
+          <input id="color" type="text" formControlName="color" />
+        </div>
+        <div class="form-field">
+          <label for="patron_desbloqueo">Patrón / contraseña de desbloqueo</label>
+          <input id="patron_desbloqueo" type="text" formControlName="patron_desbloqueo" />
+        </div>
+        <div class="form-field">
+          <label for="accesorios">Accesorios recibidos</label>
+          <input id="accesorios" type="text" formControlName="accesorios" placeholder="Cargador, funda, etc." />
+        </div>
+        <div class="form-field">
+          <label for="condicion_inicial">Condición inicial</label>
+          <textarea id="condicion_inicial" rows="3" formControlName="condicion_inicial"></textarea>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" (click)="cerrarModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+}

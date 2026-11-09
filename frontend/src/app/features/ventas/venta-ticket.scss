@@ -1,0 +1,73 @@
+/* El ticket siempre va en negro sobre blanco, sea cual sea el tema. */
+:host {
+  display: block;
+  min-height: 100vh;
+  background: #fff;
+  color: #000;
+}
+
+.botones {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+}
+
+.ticket {
+  width: 72mm;
+  margin: 0 auto;
+  padding: 4mm 0;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.centro {
+  text-align: center;
+}
+
+.logo {
+  max-height: 22mm;
+  max-width: 50mm;
+}
+
+.linea {
+  border-top: 1px dashed #000;
+  margin: 6px 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: inherit;
+}
+
+td {
+  padding: 1px 0;
+  border: 0;
+  vertical-align: top;
+}
+
+.der {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.grande {
+  font-size: 15px;
+  font-weight: bold;
+}
+
+.pie {
+  white-space: pre-line;
+}
+
+@page {
+  margin: 3mm;
+}
+
+@media print {
+  .no-imprimir {
+    display: none;
+  }
+}

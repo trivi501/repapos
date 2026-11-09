@@ -1,0 +1,70 @@
+<div class="encabezado">
+  <h1>Talleres (panel del dueño)</h1>
+  <input class="search-input" type="search" placeholder="Buscar taller…" aria-label="Buscar taller" [(ngModel)]="q" (keyup.enter)="cargar()" />
+</div>
+
+@if (d(); as x) {
+  <div class="tarjetas cuatro">
+    <div class="card dato"><span>Talleres</span><strong>{{ x.resumen.total }}</strong></div>
+    <div class="card dato"><span>Pagando</span><strong class="a-favor">{{ x.resumen.pagando }}</strong></div>
+    <div class="card dato"><span>En prueba</span><strong class="sobra">{{ x.resumen.en_prueba }}</strong></div>
+    <div class="card dato"><span>Vencidos / suspendidos</span><strong class="debe">{{ x.resumen.vencidos }}</strong></div>
+  </div>
+
+  <div class="card tabla-scroll">
+    <table>
+      <thead><tr><th>#</th><th>Taller</th><th>Administrador</th><th>Estado</th><th>Uso</th><th>Alta</th><th>Acciones</th></tr></thead>
+      <tbody>
+        @for (t of x.talleres; track t.id) {
+          <tr>
+            <td class="tenue">{{ t.id }}</td>
+            <td>
+              <strong>{{ t.nombre }}</strong>
+              @if (t.whatsapp) {
+                <div><a [href]="'https://wa.me/' + t.whatsapp" target="_blank" rel="noopener"><small>WhatsApp {{ t.whatsapp }}</small></a></div>
+              }
+              <div class="grupo-en-linea separado-poco">
+                <input class="chico" placeholder="Notas…" [attr.aria-label]="'Notas de ' + t.nombre" [(ngModel)]="t.notas" />
+                <button class="enlace" (click)="actuar(t, 'notas', { notas: t.notas })">Guardar</button>
+              </div>
+            </td>
+            <td>{{ t.admin?.name }}<div class="tenue"><small>{{ t.admin?.email }}</small></div></td>
+            <td>
+              <span class="badge" [class.badge-danger]="!t.vigente" [class.badge-success]="t.vigente && (t.estado === 'activo' || t.estado === 'cortesia')" [class.badge-warning]="t.vigente && t.estado === 'prueba'">{{ t.estado_texto }}</span>
+            </td>
+            <td class="sin-salto">
+              {{ t.usuarios_count }} usuario(s)<br />{{ t.telefonos_count }} teléfono(s)
+              @if (t.ultimo_uso) {
+                <div class="tenue"><small>último: {{ t.ultimo_uso | fecha }}</small></div>
+              }
+            </td>
+            <td class="sin-salto">{{ t.created_at | fecha }}</td>
+            <td>
+              <div class="acciones-fila">
+                <span class="grupo-en-linea">
+                  <select [attr.aria-label]="'Meses a activar de ' + t.nombre" [(ngModel)]="meses[t.id]">
+                    <option [ngValue]="1">1 mes</option>
+                    <option [ngValue]="3">3 meses</option>
+                    <option [ngValue]="6">6 meses</option>
+                    <option [ngValue]="12">1 año</option>
+                  </select>
+                  <button class="btn btn-primary btn-sm" (click)="actuar(t, 'activar', { meses: meses[t.id] ?? 1 })">Activar / renovar</button>
+                </span>
+                <button class="btn btn-secondary btn-sm" (click)="actuar(t, 'extender_prueba', { dias: 7 })">+7 días prueba</button>
+                @if (t.estado !== 'suspendido') {
+                  <button class="btn btn-danger btn-sm" (click)="suspender(t)">Suspender</button>
+                }
+                @if (t.estado !== 'cortesia') {
+                  <button class="btn btn-secondary btn-sm" (click)="cortesia(t)">Cortesía</button>
+                }
+              </div>
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="7"><div class="empty-state">No hay talleres.</div></td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <p class="ayuda">"Activar / renovar" suma los meses a lo que ya tenga pagado (o desde hoy si estaba vencido o en prueba).</p>
+}

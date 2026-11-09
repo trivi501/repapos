@@ -1,0 +1,145 @@
+@if (venta(); as v) {
+  <div class="encabezado">
+    <h1>
+      Venta N° {{ v.folio }}
+      <span class="badge" [class.badge-primary]="v.tipo === 'LOCATARIO'" [class.badge-warning]="v.tipo !== 'LOCATARIO'">{{ v.tipo === 'LOCATARIO' ? 'LOCATARIO' : 'CLIENTE FINAL' }}</span>
+      @if (v.estatus === 'CANCELADA') {
+        <span class="badge badge-danger">CANCELADA</span>
+      } @else if (v.estatus === 'CRÉDITO') {
+        <span class="badge badge-warning">A CRÉDITO · DEBE {{ v.saldo | dinero }}</span>
+      }
+    </h1>
+    <div class="acciones-fila">
+      @if (auth.tienePermiso('ventas.crear')) {
+        <a class="btn btn-primary" routerLink="/ventas/nueva">+ Nueva venta</a>
+      }
+      <a class="btn btn-secondary" [routerLink]="['/ventas', v.id, 'ticket']" target="_blank">Imprimir ticket</a>
+      <button class="btn btn-secondary" (click)="api.abrirPdf('ventas/' + v.id + '/pdf')">PDF</button>
+      @if (v.whatsapp) {
+        <a class="btn btn-whatsapp" [href]="v.whatsapp" target="_blank" rel="noopener">Ticket por WhatsApp</a>
+      }
+      <a class="btn btn-secondary" routerLink="/ventas">Ventas</a>
+    </div>
+  </div>
+
+  <div class="rejilla-venta">
+    <div class="pila">
+      <div class="card tabla-scroll">
+        <table>
+          <thead>
+            <tr><th>Producto</th><th class="der">Cant.</th><th class="der">Precio</th><th class="der">Importe</th>
+              @if (activa()) {
+                <th>Devolver</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (d of v.detalles; track d.id) {
+              <tr>
+                <td>
+                  {{ d.nombre }}
+                  @if (d.devuelto) {
+                    <span class="badge badge-warning">{{ d.devuelto }} devuelta(s)</span>
+                  }
+                </td>
+                <td class="der">{{ d.cantidad }}</td>
+                <td class="der">{{ d.precio | dinero }}</td>
+                <td class="der">{{ d.importe | dinero }}</td>
+                @if (activa()) {
+                  <td>
+                    @if (d.cantidad - d.devuelto > 0) {
+                      <input class="input-corto" type="number" min="0" [max]="d.cantidad - d.devuelto" [attr.aria-label]="'Piezas que regresa de ' + d.nombre" [(ngModel)]="piezas[d.id]" />
+                    } @else {
+                      <span class="tenue">—</span>
+                    }
+                  </td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+        @if (activa() && puedeDevolver() && auth.tienePermiso('ventas.devolver')) {
+          <div class="contenido filas-centro separador-superior">
+            <div>
+              <p class="etiqueta-campo">Si ya pagó de más, la diferencia:</p>
+              <label class="check-linea"><input type="radio" name="destino" value="efectivo" [(ngModel)]="destino" /> Se le devuelve en efectivo</label>
+              @if (v.locatario_id) {
+                <label class="check-linea"><input type="radio" name="destino" value="saldo_favor" [(ngModel)]="destino" /> Queda como su saldo a favor</label>
+              }
+            </div>
+            <input placeholder="Motivo (opcional)" aria-label="Motivo de la devolución" [(ngModel)]="nota" />
+            <button class="btn btn-secondary" (click)="devolver()">Registrar devolución</button>
+          </div>
+        }
+      </div>
+
+      @if (v.pagos?.length) {
+        <div class="card tabla-scroll">
+          <div class="titulo-tarjeta"><h2>Movimientos de dinero</h2></div>
+          <table>
+            <thead><tr><th>Fecha</th><th>Concepto</th><th>Forma</th><th class="der">Monto</th></tr></thead>
+            <tbody>
+              @for (p of v.pagos; track p.id) {
+                <tr>
+                  <td>{{ p.fecha | fecha: true }}</td>
+                  <td>{{ p.concepto }}</td>
+                  <td>{{ metodoTexto(p.metodo) }}</td>
+                  <td class="der" [class.debe]="+p.monto < 0">{{ p.monto | dinero }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+
+    <div class="pila">
+      <div class="card contenido">
+        <div class="linea-monto"><span>Subtotal</span><span>{{ v.subtotal | dinero }}</span></div>
+        @if (+v.descuento > 0) {
+          <div class="linea-monto"><span>Descuento</span><span>-{{ v.descuento | dinero }}</span></div>
+        }
+        <div class="linea-monto total"><span>Total</span><span>{{ v.total | dinero }}</span></div>
+        @if (+v.devuelto > 0) {
+          <div class="linea-monto"><span>Devuelto</span><span>-{{ v.devuelto | dinero }}</span></div>
+          <div class="linea-monto"><b>Vale ahora</b><b>{{ v.neto | dinero }}</b></div>
+        }
+        <div class="linea-monto"><span>Forma de pago</span><span>{{ metodoTexto(v.metodo) }}</span></div>
+        <div class="linea-monto"><span>Pagado</span><span>{{ v.pagado | dinero }}</span></div>
+        @if (v.saldo > 0) {
+          <div class="linea-monto debe"><b>Debe</b><b>{{ v.saldo | dinero }}</b></div>
+        }
+        @if (v.recibido !== null) {
+          <div class="linea-monto"><span>Pagó con</span><span>{{ v.recibido | dinero }}</span></div>
+          <div class="linea-monto a-favor"><b>Cambio</b><b>{{ v.cambio | dinero }}</b></div>
+        }
+        <p class="ayuda">
+          {{ v.created_at | fecha: true }} · {{ v.user?.name }}
+          @if (v.cliente_nombre) {
+            <br />{{ v.tipo === 'LOCATARIO' ? 'Locatario' : 'Cliente' }}: {{ v.cliente_nombre }} {{ v.cliente_telefono }}
+          }
+        </p>
+      </div>
+
+      @if (v.saldo > 0 && auth.tienePermiso('ventas.cobrar')) {
+        <div class="card contenido">
+          <h2>Registrar abono</h2>
+          <div class="grupo-en-linea">
+            <input class="input-corto" type="number" step="0.01" min="0.01" aria-label="Monto del abono" [max]="v.saldo" [(ngModel)]="montoAbono" (focus)="$any($event.target).select()" />
+            <select aria-label="Forma de pago" [(ngModel)]="metodoAbono">
+              <option value="EFECTIVO">Efectivo</option>
+              <option value="TARJETA">Tarjeta</option>
+              <option value="TRANSFERENCIA">Transferencia</option>
+            </select>
+          </div>
+          <button class="btn btn-primary bloque separado" (click)="abonar()">Abonar</button>
+          <p class="ayuda">El abono entra a la caja de hoy.</p>
+        </div>
+      }
+
+      @if (activa() && auth.tienePermiso('ventas.cancelar')) {
+        <button class="btn btn-danger bloque" (click)="cancelar()">Cancelar venta completa</button>
+      }
+    </div>
+  </div>
+}

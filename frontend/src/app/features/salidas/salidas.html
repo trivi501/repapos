@@ -1,0 +1,80 @@
+<div class="encabezado"><h1>Salidas de dinero</h1></div>
+
+@if (auth.tienePermiso(editando() ? 'salidas.editar' : 'salidas.crear')) {
+  <form class="card contenido separado-abajo" (ngSubmit)="guardar()">
+    <h2>{{ editando() ? 'Editando salida #' + editando() : 'Registrar salida' }}</h2>
+    <div class="rejilla-4">
+      <div class="form-field doble">
+        <label for="concepto">¿En qué se gastó? *</label>
+        <input id="concepto" name="concepto" required [(ngModel)]="m.concepto" />
+      </div>
+      <div class="form-field">
+        <label for="monto">Monto $ *</label>
+        <input id="monto" name="monto" type="number" step="0.01" min="0.01" required [(ngModel)]="m.monto" />
+      </div>
+      <div class="form-field">
+        <label for="fecha">Fecha y hora</label>
+        <input id="fecha" name="fecha" type="datetime-local" required [(ngModel)]="m.fecha" />
+      </div>
+      <div class="form-field">
+        <label for="categoria">Categoría</label>
+        <input id="categoria" name="categoria" list="categorias" [(ngModel)]="m.categoria" />
+        <datalist id="categorias">
+          @for (c of categorias(); track c) {
+            <option [value]="c"></option>
+          }
+        </datalist>
+      </div>
+      <div class="form-field triple">
+        <label for="notas">Notas</label>
+        <input id="notas" name="notas" [(ngModel)]="m.notas" />
+      </div>
+    </div>
+    <div class="acciones-fila">
+      <button class="btn btn-primary" type="submit">{{ editando() ? 'Guardar cambios' : 'Guardar salida' }}</button>
+      @if (editando()) {
+        <button class="btn btn-secondary" type="button" (click)="cancelarEdicion()">Cancelar</button>
+      }
+    </div>
+  </form>
+}
+
+<div class="card filtros">
+  <div class="form-field"><label for="desde">Ver desde</label><input id="desde" type="date" [(ngModel)]="desde" /></div>
+  <div class="form-field"><label for="hasta">hasta</label><input id="hasta" type="date" [(ngModel)]="hasta" /></div>
+  <button class="btn btn-secondary" (click)="cargar()">Ver</button>
+  <button class="btn btn-secondary" (click)="hoy()">Hoy</button>
+  <button class="btn btn-secondary" (click)="esteMes()">Este mes</button>
+</div>
+
+<div class="card tabla-scroll">
+  <table>
+    <thead><tr><th>#</th><th>Fecha</th><th>Concepto</th><th>Categoría</th><th class="der">Monto</th><th>Notas</th><th></th></tr></thead>
+    <tbody>
+      @for (s of salidas(); track s.id) {
+        <tr>
+          <td class="tenue">{{ s.id }}</td>
+          <td class="sin-salto">{{ s.fecha | fecha: true }}</td>
+          <td>{{ s.concepto }}</td>
+          <td>{{ s.categoria }}</td>
+          <td class="der debe"><strong>{{ s.monto | dinero }}</strong></td>
+          <td class="tenue">{{ s.notas }}</td>
+          <td class="sin-salto">
+            @if (auth.tienePermiso('salidas.editar')) {
+              <button class="btn btn-secondary btn-sm" (click)="editar(s)">Editar</button>
+            }
+            @if (auth.tienePermiso('salidas.eliminar')) {
+              <button class="btn btn-danger btn-sm" (click)="eliminar(s)">Eliminar</button>
+            }
+          </td>
+        </tr>
+      } @empty {
+        <tr><td colspan="7"><div class="empty-state">Sin salidas en estas fechas.</div></td></tr>
+      }
+    </tbody>
+  </table>
+</div>
+<div class="barra-resumen separado">
+  <span>Salidas: {{ salidas().length }}</span>
+  <span>Total gastado: {{ total() | dinero }}</span>
+</div>

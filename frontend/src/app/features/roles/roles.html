@@ -1,0 +1,91 @@
+<h1>Roles y permisos</h1>
+
+<div class="toolbar">
+  <div></div>
+  <button class="btn btn-primary" (click)="abrirCrear()">+ Nuevo rol</button>
+</div>
+
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>Rol</th>
+        <th>Permisos</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (rol of roles(); track rol.id) {
+        <tr>
+          <td><strong>{{ rol.name }}</strong></td>
+          <td>{{ rol.permissions?.length || 0 }} permisos</td>
+          <td class="acciones">
+            <button class="btn btn-secondary" (click)="abrirEditar(rol)">Editar</button>
+            <button class="btn btn-danger" (click)="eliminar(rol)">Eliminar</button>
+          </td>
+        </tr>
+      }
+      @empty {
+        <tr>
+          <td colspan="3">
+            <div class="empty-state">
+              @if (cargando()) {
+                Cargando roles…
+              } @else {
+                No hay roles registrados todavía.
+              }
+            </div>
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>
+
+@if (modalAbierto()) {
+  <div class="modal-backdrop" (click)="cerrarModal()">
+    <div class="modal modal-wide" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>{{ rolEditando() ? 'Editar rol' : 'Nuevo rol' }}</h2>
+        <button class="btn btn-secondary" (click)="cerrarModal()">✕</button>
+      </div>
+
+      @if (error()) {
+        <div class="alert alert-error">{{ error() }}</div>
+      }
+
+      <form [formGroup]="formulario" (ngSubmit)="guardar()">
+        <div class="form-field">
+          <label for="name">Nombre del rol</label>
+          <input id="name" type="text" formControlName="name" />
+        </div>
+
+        <div class="form-field">
+          <label>Permisos</label>
+          <div class="permisos-grid">
+            @for (grupo of modulos(); track grupo.modulo) {
+              <div class="permisos-modulo">
+                <h4>{{ grupo.modulo }}</h4>
+                @for (permiso of grupo.permisos; track permiso.id) {
+                  <label class="checkbox-item">
+                    <input
+                      type="checkbox"
+                      [checked]="permisoSeleccionado(permiso.name)"
+                      (change)="alternarPermiso(permiso.name, $any($event.target).checked)"
+                    />
+                    {{ permiso.name }}
+                  </label>
+                }
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" (click)="cerrarModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+}

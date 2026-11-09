@@ -1,0 +1,148 @@
+export interface Paginado<T> {
+  data: T[];
+  current_page: number;
+  last_page: number;
+  total: number;
+  per_page: number;
+}
+
+export interface Cliente {
+  id: number;
+  nombre: string;
+  apellido?: string | null;
+  telefono: string;
+  telefono2?: string;
+  email?: string | null;
+  direccion?: string | null;
+  notas?: string | null;
+  created_at?: string;
+}
+
+export interface Equipo {
+  id: number;
+  cliente_id: number;
+  cliente?: Cliente;
+  tipo: string;
+  marca: string;
+  modelo: string;
+  imei?: string | null;
+  color?: string | null;
+  patron_desbloqueo?: string | null;
+  accesorios?: string | null;
+  condicion_inicial?: string | null;
+}
+
+export type EstadoOrden =
+  | 'recibido'
+  | 'diagnostico'
+  | 'en_reparacion'
+  | 'esperando_repuesto'
+  | 'reparado'
+  | 'no_quedo'
+  | 'entregado'
+  | 'cancelado';
+
+export interface OrdenReparacion {
+  id: number;
+  numero_orden: string;
+  folio?: number;
+  token?: string;
+  cliente_id: number;
+  cliente?: Cliente;
+  equipo_id: number;
+  equipo?: Equipo;
+  tecnico_id?: number | null;
+  tecnico?: { id: number; name: string } | null;
+  sucursal_id?: number | null;
+  estado: EstadoOrden;
+  prioridad: 'baja' | 'media' | 'alta';
+  tipo_servicio?: string;
+  bloqueo_tipo?: string;
+  bloqueo_valor?: string | null;
+  bloqueo_pin?: string | null;
+  bloqueos?: string[] | null;
+  estado_fisico?: Record<string, string> | null;
+  revision?: Record<string, string> | null;
+  observaciones?: string | null;
+  total?: number;
+  saldo?: number;
+  pagado?: string;
+  pagos?: { id: number; fecha: string; concepto: string; metodo: string; monto: string }[];
+  anticipo?: string | number | null;
+  metodo_pago?: string;
+  estimado_listo_at?: string | null;
+  falla_reportada: string;
+  diagnostico?: string | null;
+  solucion?: string | null;
+  costo_estimado?: string | null;
+  costo_final?: string | null;
+  fecha_recepcion?: string;
+  fecha_entrega_estimada?: string | null;
+  fecha_entrega_real?: string | null;
+  notas?: string | null;
+  notas_cliente?: string | null;
+  visible_cliente?: boolean;
+  visibilidad?: string[] | null;
+  fotos?: FotoOrden[];
+}
+
+export type CategoriaFoto = 'antes' | 'proceso' | 'despues';
+
+export interface FotoOrden {
+  id: number;
+  orden_reparacion_id: number | null;
+  categoria: CategoriaFoto;
+  nombre_original: string | null;
+  tamano: number;
+  url: string;
+}
+
+export interface Rol {
+  id: number;
+  name: string;
+  permissions?: Permiso[];
+}
+
+export interface Permiso {
+  id: number;
+  name: string;
+}
+
+export interface UsuarioAdmin {
+  id: number;
+  name: string;
+  email: string;
+  roles: Rol[];
+  sucursal_id?: number | null;
+  sucursal?: { id: number; nombre: string } | null;
+}
+
+export interface Sucursal {
+  id: number;
+  nombre: string;
+}
+
+/** Revisión al recibir el equipo: cada punto se marca Sí o No (igual que la nota de recepción en papel). */
+export const REVISION_ORDEN = [
+  { clave: 'bateria', texto: 'Batería' },
+  { clave: 'chip', texto: 'Chip' },
+  { clave: 'memoria', texto: 'Memoria' },
+  { clave: 'cargador', texto: 'Cargador' },
+  { clave: 'senal', texto: 'Señal' },
+  { clave: 'receptor_voz', texto: 'Receptor de voz' },
+  { clave: 'pantalla', texto: 'Pantalla' },
+  { clave: 'botones', texto: 'Botones' },
+  { clave: 'golpes', texto: 'Golpes' },
+  { clave: 'mojado', texto: 'Mojado' },
+];
+
+export const ESTADOS_ORDEN: { valor: EstadoOrden; etiqueta: string }[] = [
+  { valor: 'recibido', etiqueta: 'Recibido' },
+  { valor: 'diagnostico', etiqueta: 'En diagnóstico' },
+  { valor: 'en_reparacion', etiqueta: 'En reparación' },
+  { valor: 'esperando_repuesto', etiqueta: 'Esperando repuesto' },
+  { valor: 'reparado', etiqueta: 'Listo' },
+  { valor: 'no_quedo', etiqueta: 'No quedó' },
+  { valor: 'entregado', etiqueta: 'Entregado' },
+  { valor: 'cancelado', etiqueta: 'Cancelado' },
+];

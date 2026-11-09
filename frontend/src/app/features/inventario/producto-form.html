@@ -1,0 +1,45 @@
+<div class="encabezado">
+  <h1>{{ id() ? 'Editar producto' : 'Nuevo producto' }}</h1>
+  <a class="btn btn-secondary" routerLink="/inventario">← Inventario</a>
+</div>
+
+<form class="card contenido ancho-3xl" (ngSubmit)="guardar()">
+  <div class="rejilla-1-2">
+    <div class="form-field"><label for="codigo">Código</label><input id="codigo" name="codigo" [(ngModel)]="m.codigo" /></div>
+    <div class="form-field">
+      <label for="nombre">Nombre *</label>
+      <input id="nombre" name="nombre" required placeholder="Pantalla Redmi Note 12S OLED" [(ngModel)]="m.nombre" />
+    </div>
+  </div>
+  <div class="rejilla-3">
+    <div class="form-field">
+      <label for="categoria">Categoría</label>
+      <input id="categoria" name="categoria" list="categorias" [(ngModel)]="m.categoria" />
+      <datalist id="categorias">
+        @for (c of categorias; track c) {
+          <option [value]="c"></option>
+        }
+      </datalist>
+    </div>
+    <div class="form-field"><label for="costo">Costo $</label><input id="costo" name="costo" type="number" step="0.01" min="0" [(ngModel)]="m.costo" (focus)="$any($event.target).select()" /></div>
+    <div class="form-field"><label for="minimo">Mínimo (avisar)</label><input id="minimo" name="minimo" type="number" min="0" [(ngModel)]="m.minimo" (focus)="$any($event.target).select()" /></div>
+  </div>
+  <div class="rejilla-2">
+    <div class="form-field"><label for="precio">Precio cliente final $</label><input id="precio" name="precio" type="number" step="0.01" min="0" [(ngModel)]="m.precio" (focus)="$any($event.target).select()" /></div>
+    <div class="form-field">
+      <label for="precio_locatario">Precio locatario $</label>
+      <input id="precio_locatario" name="precio_locatario" type="number" step="0.01" min="0" placeholder="Vacío = mismo que cliente final" [(ngModel)]="m.precio_locatario" />
+    </div>
+  </div>
+  @if (!id()) {
+    <div class="form-field campo-corto">
+      <label for="existencia_inicial">Piezas que hay ahorita en esta sucursal</label>
+      <input id="existencia_inicial" name="existencia_inicial" type="number" min="0" [(ngModel)]="m.existencia_inicial" (focus)="$any($event.target).select()" />
+    </div>
+  }
+  <button class="btn btn-primary" type="submit" [disabled]="guardando()">Guardar</button>
+</form>
+
+@if (id() && auth.tienePermiso('inventario.eliminar')) {
+  <button class="btn btn-danger separado" (click)="eliminar()">Eliminar producto</button>
+}

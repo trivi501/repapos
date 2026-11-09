@@ -1,0 +1,15 @@
+# Paquetes para el VPS: el de datos trae información de clientes y el APP_KEY
+/paquetes/
+*.tar.gz
+
+# Respaldos de bases de datos
+*.sql
+*.sql.gz
+
+# Archivos locales
+/.claude/
+.env
+.env.*
+!.env.example
+Thumbs.db
+.DS_Store
