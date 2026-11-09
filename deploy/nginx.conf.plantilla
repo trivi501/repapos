@@ -5,7 +5,8 @@ server {
     listen [::]:80;
     server_name __SERVIDORES__;
 
-    root /var/www/repapos/frontend;
+    # Solo se publica el Angular compilado; el resto de la carpeta (.git, código, .env) queda fuera.
+    root /var/www/repapos/frontend/dist/frontend/browser;
     index index.html;
     charset utf-8;
 

@@ -63,14 +63,14 @@ El repo es privado y GitHub no acepta tu contraseña normal por Git. Necesitas u
 3. En **Permissions → Contents** elige **Read-only**.
 4. Ponle una caducidad corta y cópialo. No lo compartas ni lo pongas dentro de la dirección del repo.
 
-Clónalo en `/root`, **no en `/var/www`**:
+Clónalo en `/var/www/repapos`, junto a tus otros proyectos. Esa carpeta es la instalación: el sistema corre ahí mismo.
 
 **VPS**
 ```bash
-git clone https://github.com/trivi501/repapos /root/repapos
+git clone https://github.com/trivi501/repapos /var/www/repapos
 ```
 
-Cuando lo pida, escribe `trivi501` como usuario y pega el token como contraseña. La contraseña no se ve al escribirla, y Git no la guarda: te la pedirá en cada `git pull`.
+Cuando lo pida, escribe `trivi501` como usuario y pega el token como contraseña. La contraseña no se ve al escribirla, y Git no la guarda: te la pedirá en cada actualización.
 
 ## 3. Subir tus datos
 
@@ -78,10 +78,10 @@ Tus clientes, fotos, logos y `APP_KEY` **no van en Git**. Van en un paquete apar
 
 **PC** (MySQL de Laragon encendido)
 ```bash
-powershell -ExecutionPolicy Bypass -File deploy\empaquetar.ps1 -ConDatos
+powershell -ExecutionPolicy Bypass -File deploy\exportar-datos.ps1
 ```
 
-De lo que deja en la carpeta `paquetes`, sube solo el de datos, cambiando `FECHA` por la de tu archivo. **Trae información de tus clientes**: no lo compartas.
+Súbelo, cambiando `FECHA` por la de tu archivo en la carpeta `paquetes`. **Trae información de tus clientes**: no lo compartas.
 
 **PC**
 ```bash
@@ -94,7 +94,7 @@ Si quieres empezar con la base vacía, sáltate este paso y quita `--datos` del 
 
 **VPS** (pon tu correo: Let's Encrypt lo usa para avisos del certificado)
 ```bash
-bash /root/repapos/deploy/instalar.sh --dominio repapos.tech --correo TU_CORREO --datos /root/repapos-datos-FECHA.tar.gz
+bash /var/www/repapos/deploy/instalar.sh --dominio repapos.tech --correo TU_CORREO --datos /root/repapos-datos-FECHA.tar.gz
 ```
 
 Primero revisa el servidor, y si encuentra algo que pueda chocar se detiene sin haber cambiado nada. Después instala solo lo que falte, crea la base con una contraseña al azar, carga tus datos, saca el certificado HTTPS de este dominio y programa los respaldos. Al final comprueba que el sitio responda.
@@ -161,15 +161,15 @@ git commit -m "Describe el cambio"
 git push
 ```
 
-**VPS**
+**VPS** (te pedirá usuario y token)
 ```bash
-cd /root/repapos && git pull && bash deploy/actualizar.sh
+bash /var/www/repapos/deploy/actualizar.sh
 ```
 
-`actualizar.sh` respalda la base en `/var/backups/repapos`, pone RepaPOS en mantenimiento, aplica el código y las migraciones, y lo vuelve a abrir.
+`actualizar.sh` baja la versión nueva de GitHub, respalda la base en `/var/backups/repapos`, pone RepaPOS en mantenimiento, aplica el código y las migraciones, y lo vuelve a abrir.
 No toca `.env`, las fotos, los logos ni las otras apps.
 
-**No uses `-ConDatos` para actualizar:** en producción los datos buenos ya son los del servidor.
+**No uses `exportar-datos.ps1` para actualizar:** en producción los datos buenos ya son los del servidor.
 
 ## Respaldos
 

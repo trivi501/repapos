@@ -4,7 +4,7 @@
 
 APP=/var/www/repapos
 USUARIO=repapos
-ORIGEN="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 paso() { printf '\n\033[1;34m==> %s\033[0m\n' "$1"; }
 aviso() { printf '\033[1;33m%s\033[0m\n' "$1"; }
@@ -43,21 +43,11 @@ exigir_root() {
   [ "$(id -u)" -eq 0 ] || fallo 'Corre este script como root.'
 }
 
-exigir_paquete() {
-  [ "$ORIGEN" != "$APP" ] || fallo "El clon no puede estar en $APP, porque ahí se instala el sistema. Muévelo con: mv $APP /root/repapos"
-  [ -f "$ORIGEN/backend/artisan" ] && [ -f "$ORIGEN/frontend/dist/frontend/browser/index.html" ] \
-    || fallo "No encuentro el código o Angular compilado en $ORIGEN: revisa el clon y corre git pull."
-}
-
-# Copia el código. Nunca toca .env, storage ni vendor, que son propios del servidor.
-copiar_codigo() {
-  mkdir -p "$APP/backend" "$APP/frontend"
-  local modos='--chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r'
-  rsync -a --delete --no-owner --no-group "$modos" \
-    --exclude=/.env --exclude=/storage/ --exclude=/vendor/ --exclude=/bootstrap/cache/ --exclude=/tests/ \
-    "$ORIGEN/backend/" "$APP/backend/"
-  rsync -a --delete --no-owner --no-group "$modos" "$ORIGEN/frontend/dist/frontend/browser/" "$APP/frontend/"
-  chown root:root "$APP" "$APP/backend" "$APP/frontend"
+# El clon de Git es la instalación: se usa ahí mismo, sin copiarlo a otro lado.
+exigir_codigo() {
+  [ "$RAIZ" = "$APP" ] || fallo "El proyecto debe estar en $APP y este script está en $RAIZ. Muévelo con: mv $RAIZ $APP"
+  [ -f "$APP/backend/artisan" ] && [ -f "$APP/frontend/dist/frontend/browser/index.html" ] \
+    || fallo "No encuentro el código o Angular compilado en $APP: revisa el clon y corre git pull."
 }
 
 # El código es de root. El usuario repapos solo escribe en storage y bootstrap/cache,

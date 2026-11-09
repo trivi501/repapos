@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
-# Sube una versión nueva sobre una instalación que ya funciona. Respalda la base antes de tocar nada.
+# Baja de GitHub la versión nueva y la aplica. Respalda la base antes de tocar nada.
 #
-#   bash deploy/actualizar.sh
+#   bash /var/www/repapos/deploy/actualizar.sh
 set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/comun.sh"
 
 exigir_root
-exigir_paquete
-[ -f "$APP/backend/.env" ] && [ -n "$PHP_V" ] || fallo "No hay instalación en $APP: corre primero instalar.sh."
+exigir_codigo
+[ -f "$APP/backend/.env" ] && [ -n "$PHP_V" ] || fallo "RepaPOS no está instalado: corre primero instalar.sh."
+[ -z "$(git -C "$APP" status --porcelain --untracked-files=no)" ] \
+  || fallo "Hay archivos modificados en $APP y git pull los pisaría. Revísalos con: git -C $APP status"
+
+# Aquí se piden tu usuario y token, antes de poner el sistema en mantenimiento.
+paso 'Revisando GitHub'
+git -C "$APP" fetch origin
 
 paso 'Respaldo de la base de datos'
 mkdir -p /var/backups/repapos
@@ -24,7 +30,7 @@ paso 'Actualizando'
 artisan down --retry=30 || true
 trap 'aviso "Algo falló y el sitio sigue en mantenimiento. Corrige y vuelve a correr este script, o restaura $RESPALDO y corre: cd $APP/backend && sudo -u $USUARIO php$PHP_V artisan up"' ERR
 
-copiar_codigo
+git -C "$APP" merge --ff-only '@{u}'
 instalar_dependencias
 ajustar_permisos
 artisan config:clear
@@ -35,4 +41,4 @@ systemctl reload "php$PHP_V-fpm"   # recarga sin cortar a las otras apps
 artisan up
 
 trap - ERR
-printf '\n\033[1;32mActualizado.\033[0m\n'
+printf '\n\033[1;32mActualizado a %s.\033[0m\n' "$(git -C "$APP" log -1 --format='%h %s')"
