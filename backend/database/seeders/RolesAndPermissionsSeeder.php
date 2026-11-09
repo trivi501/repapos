@@ -22,6 +22,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'taller.editar',
         'respaldo.descargar',
         'talleres.administrar',
+        'panel.ingresos', 'panel.ventas', 'panel.reparaciones', 'panel.telefonos', 'panel.cobranza',
     ];
 
     /**
@@ -55,7 +56,8 @@ class RolesAndPermissionsSeeder extends Seeder
 
         // empleado de RepaPOS: opera todo, menos lo que allá era solo del administrador
         Role::firstOrCreate(['name' => 'Empleado', 'guard_name' => 'web'])->syncPermissions(
-            $todos->reject(fn ($p) => str_starts_with($p, 'usuarios.') || str_starts_with($p, 'roles.') || str_starts_with($p, 'sucursales.'))
+            // las gráficas del panel se eligen usuario por usuario (solo los administradores las tienen por rol)
+            $todos->reject(fn ($p) => str_starts_with($p, 'usuarios.') || str_starts_with($p, 'roles.') || str_starts_with($p, 'sucursales.') || str_starts_with($p, 'panel.'))
                 ->diff(['ventas.cancelar', 'taller.editar', 'respaldo.descargar', 'talleres.administrar'])
         );
 

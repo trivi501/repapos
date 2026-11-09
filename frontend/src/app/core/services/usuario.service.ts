@@ -14,11 +14,11 @@ export class UsuarioService {
     return this.http.get<Paginado<UsuarioAdmin>>(this.baseUrl, { params });
   }
 
-  crear(datos: { name: string; email: string; password: string; sucursal_id: number | null; roles: string[] }) {
+  crear(datos: { name: string; email: string; password: string; sucursal_id: number | null; roles: string[]; panel: string[] }) {
     return this.http.post<UsuarioAdmin>(this.baseUrl, datos);
   }
 
-  actualizar(id: number, datos: { name: string; email: string; password?: string; sucursal_id: number | null; roles: string[] }) {
+  actualizar(id: number, datos: { name: string; email: string; password?: string; sucursal_id: number | null; roles: string[]; panel: string[] }) {
     return this.http.put<UsuarioAdmin>(`${this.baseUrl}/${id}`, datos);
   }
 

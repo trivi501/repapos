@@ -115,7 +115,21 @@ export interface UsuarioAdmin {
   roles: Rol[];
   sucursal_id?: number | null;
   sucursal?: { id: number; nombre: string } | null;
+  /** Gráficas del panel asignadas a esta persona (las de su rol van aparte). */
+  panel?: string[];
 }
+
+/** Cada gráfica del panel tiene su permiso. */
+export const GRAFICAS_PANEL: { permiso: string; nombre: string }[] = [
+  { permiso: 'panel.ingresos', nombre: 'Cobros y salidas' },
+  { permiso: 'panel.ventas', nombre: 'Ventas de mostrador' },
+  { permiso: 'panel.telefonos', nombre: 'Teléfonos de locatarios' },
+  { permiso: 'panel.reparaciones', nombre: 'Reparaciones' },
+  { permiso: 'panel.cobranza', nombre: 'Por cobrar a locatarios' },
+];
+
+/** Las que se marcan de inicio en un usuario nuevo: no muestran dinero. */
+export const GRAFICAS_BASICAS = ['panel.reparaciones', 'panel.telefonos'];
 
 export interface Sucursal {
   id: number;

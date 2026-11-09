@@ -14,7 +14,7 @@ class UserController extends Controller
     {
         $usuarios = User::query()
             ->where('taller_id', $request->user()->taller_id)
-            ->with(['roles:id,name', 'sucursal:id,nombre'])
+            ->with(['roles:id,name', 'sucursal:id,nombre', 'permissions:id,name'])
             ->when($request->query('buscar'), function ($query, $buscar) {
                 $query->where(function ($q) use ($buscar) {
                     $q->where('name', 'like', "%{$buscar}%")
@@ -22,7 +22,12 @@ class UserController extends Controller
                 });
             })
             ->orderBy('name')
-            ->paginate($request->integer('por_pagina', 15));
+            ->paginate($request->integer('por_pagina', 15))
+            ->through(function (User $u) {
+                $u->setAttribute('panel', $u->permissions->pluck('name')->intersect(PanelController::GRAFICAS)->values());
+
+                return $u->unsetRelation('permissions');
+            });
 
         return response()->json($usuarios);
     }
@@ -37,7 +42,23 @@ class UserController extends Controller
             'roles' => ['array'],
             'roles.*' => ['string', $roles, $request->user()->esSuperadmin() ? 'string' : Rule::notIn([User::ROL_SUPERADMIN])],
             'sucursal_id' => ['nullable', Rule::exists('sucursales', 'id')->where('taller_id', $request->user()->taller_id)],
+            'panel' => ['array'],
+            'panel.*' => ['string', Rule::in(PanelController::GRAFICAS)],
         ];
+    }
+
+    /** Gráficas elegidas para este usuario. Solo se puede dar o quitar lo que uno mismo puede ver. */
+    private function asignarGraficas(Request $request, User $usuario, ?array $graficas): void
+    {
+        if ($graficas === null) {
+            return;
+        }
+        foreach (PanelController::GRAFICAS as $grafica) {
+            if (! $request->user()->can($grafica)) {
+                continue;
+            }
+            in_array($grafica, $graficas, true) ? $usuario->givePermissionTo($grafica) : $usuario->revokePermissionTo($grafica);
+        }
     }
 
     public function store(Request $request)
@@ -56,6 +77,7 @@ class UserController extends Controller
         ]);
 
         $usuario->syncRoles($datos['roles'] ?? []);
+        $this->asignarGraficas($request, $usuario, $datos['panel'] ?? null);
 
         return response()->json($usuario->load('roles:id,name'), 201);
     }
@@ -92,6 +114,7 @@ class UserController extends Controller
             $roles[] = User::ROL_SUPERADMIN;
         }
         $user->syncRoles($roles);
+        $this->asignarGraficas($request, $user, $datos['panel'] ?? null);
 
         return response()->json($user->load('roles:id,name'));
     }

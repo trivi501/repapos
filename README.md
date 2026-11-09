@@ -79,6 +79,10 @@ Los permisos se validan en el backend (middleware `permission:` en `routes/api.p
 | Recepcionista | Recepción, cobros y ventas; no elimina |
 | Tecnico | Ve y actualiza órdenes y teléfonos; no cobra |
 
+Las gráficas del **Panel** tienen un permiso cada una (`panel.ingresos`, `panel.ventas`, `panel.telefonos`, `panel.reparaciones`, `panel.cobranza`).
+Los administradores las ven todas por su rol. A los demás se les eligen persona por persona en **Usuarios**, y de inicio solo tienen reparaciones y teléfonos.
+`GET /api/panel` entrega únicamente las secciones que el usuario puede ver. Si un rol incluye una gráfica, no se le puede quitar a una sola persona de ese rol.
+
 ## Separación de datos
 
 Los modelos con `DelTaller` y `DeSucursal` filtran solos por el taller y la sucursal del usuario, también al buscar por id en una URL.

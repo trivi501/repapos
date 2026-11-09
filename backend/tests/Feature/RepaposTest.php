@@ -576,6 +576,118 @@ class RepaposTest extends TestCase
         $this->assertTrue($r->json('user.taller.vigente'));
     }
 
+    public function test_el_panel_solo_entrega_las_graficas_que_el_usuario_puede_ver(): void
+    {
+        $this->telefonoDe($this->adminA);
+        $tecnico = $this->usuario($this->tallerA, 'Tecnico');
+
+        // sin permisos: el periodo, y ninguna gráfica
+        $this->comoTaller($tecnico);
+        $r = $this->getJson('/api/panel')->assertOk();
+        foreach (['ingresos', 'ventas', 'reparaciones', 'telefonos', 'cobranza'] as $grafica) {
+            $r->assertJsonMissingPath($grafica);
+        }
+
+        // con una gráfica asignada: esa y nada más
+        $tecnico->givePermissionTo('panel.telefonos');
+        $this->comoTaller($tecnico);
+        $this->getJson('/api/panel')->assertOk()
+            ->assertJsonPath('telefonos.en_taller', 1)
+            ->assertJsonMissingPath('ingresos')
+            ->assertJsonMissingPath('cobranza');
+
+        // el administrador las ve todas por su rol
+        $this->comoTaller($this->adminA);
+        $this->getJson('/api/panel')->assertOk()
+            ->assertJsonStructure(['ingresos', 'ventas', 'reparaciones', 'telefonos', 'cobranza']);
+
+        $this->getJson('/api/panel?dias=12')->assertStatus(422);
+    }
+
+    public function test_el_panel_suma_bien_y_no_mezcla_talleres(): void
+    {
+        $hoy = now()->toDateString();
+        $this->telefonoDe($this->adminA, ['fecha_recibido' => $hoy, 'total' => 500, 'pagado' => 100]);
+        $this->telefonoDe($this->adminB, ['fecha_recibido' => $hoy, 'total' => 9000, 'pagado' => 1000, 'locatario' => 'De otro taller']);
+
+        $this->comoTaller($this->adminA);
+        $r = $this->getJson('/api/panel?dias=7')->assertOk();
+
+        $this->assertCount(7, $r->json('fechas'));
+        $this->assertSame($hoy, $r->json('fechas.6'));
+        $this->assertEquals(100, $r->json('ingresos.total_cobrado'));
+        $this->assertEquals(100, $r->json('ingresos.cobrado.6'));
+        $this->assertEquals(0, $r->json('ingresos.cobrado.0'));
+        $this->assertEquals(1, $r->json('telefonos.recibidos.6'));
+        $this->assertEquals(400, $r->json('cobranza.total'));
+        $this->assertSame('DON PEPE', mb_strtoupper($r->json('cobranza.locatarios.0.nombre')));
+        $this->assertCount(1, $r->json('cobranza.locatarios'));
+    }
+
+    public function test_las_ventas_del_panel_no_cuentan_canceladas_ni_otro_taller(): void
+    {
+        $producto = $this->productoDe($this->adminA);
+        $this->comoTaller($this->adminA);
+        $vender = fn () => $this->postJson('/api/ventas', [
+            'tipo' => 'CLIENTE', 'metodo' => 'EFECTIVO', 'lineas' => [['producto_id' => $producto->id, 'cantidad' => 2, 'precio' => 100]],
+        ])->assertCreated();
+        $primera = $vender();
+        $vender();
+        $this->assertSame(1, Venta::withoutGlobalScopes()->where('id', $primera->json('venta.id'))->update(['estatus' => Venta::CANCELADA]));
+
+        $this->comoTaller($this->adminA);
+        $r = $this->getJson('/api/panel')->assertOk();
+        $this->assertSame(1, $r->json('ventas.numero'));
+        $this->assertEquals(200, $r->json('ventas.total'));
+        $this->assertSame(2, $r->json('ventas.productos.0.valor'));
+
+        $this->comoTaller($this->adminB);
+        $this->assertSame([], $this->getJson('/api/panel')->json('ventas.productos'));
+    }
+
+    public function test_las_graficas_se_eligen_por_usuario(): void
+    {
+        $this->comoTaller($this->adminA);
+        $datos = ['name' => 'Lupe', 'email' => 'lupe@taller.mx', 'password' => 'password123', 'roles' => ['Recepcionista']];
+
+        $id = $this->postJson('/api/usuarios', $datos + ['panel' => ['panel.telefonos', 'panel.ingresos']])->assertCreated()->json('id');
+        $lupe = User::findOrFail($id);
+        $this->assertTrue($lupe->can('panel.ingresos'));
+        $this->assertFalse($lupe->can('panel.ventas'));
+
+        // la lista dice cuáles tiene, para marcarlas al editar
+        $fila = collect($this->getJson('/api/usuarios')->assertOk()->json('data'))->firstWhere('id', $id);
+        $this->assertEqualsCanonicalizing(['panel.telefonos', 'panel.ingresos'], $fila['panel']);
+        $this->assertArrayNotHasKey('permissions', $fila);
+
+        // quitarle una no toca sus otros permisos
+        $datos = ['name' => 'Lupe', 'email' => 'lupe@taller.mx', 'roles' => ['Recepcionista']];
+        $this->putJson("/api/usuarios/{$id}", $datos + ['panel' => ['panel.telefonos']])->assertOk();
+        $lupe = User::findOrFail($id);
+        $this->assertFalse($lupe->can('panel.ingresos'));
+        $this->assertTrue($lupe->can('panel.telefonos'));
+        $this->assertTrue($lupe->can('clientes.ver'));
+
+        // no mandar la lista no cambia nada
+        $this->putJson("/api/usuarios/{$id}", $datos)->assertOk();
+        $this->assertTrue(User::findOrFail($id)->can('panel.telefonos'));
+
+        // solo se aceptan gráficas, no otros permisos
+        $this->putJson("/api/usuarios/{$id}", $datos + ['panel' => ['usuarios.eliminar']])->assertStatus(422);
+        $this->assertFalse(User::findOrFail($id)->can('usuarios.eliminar'));
+
+        // nadie da una gráfica que él mismo no puede ver
+        $encargado = $this->usuario($this->tallerA, 'Recepcionista');
+        $encargado->givePermissionTo(['usuarios.editar', 'panel.telefonos']);
+        $this->comoTaller($encargado);
+        $this->putJson("/api/usuarios/{$encargado->id}", ['name' => $encargado->name, 'email' => $encargado->email, 'roles' => ['Recepcionista'], 'panel' => ['panel.telefonos', 'panel.ingresos']])->assertOk();
+        $this->assertFalse(User::findOrFail($encargado->id)->can('panel.ingresos'));
+
+        // y otro taller no puede tocarlo
+        $this->comoTaller($this->adminB);
+        $this->putJson("/api/usuarios/{$id}", $datos + ['panel' => ['panel.ventas']])->assertNotFound();
+    }
+
     public function test_preparar_produccion_bloquea_cuentas_de_prueba_y_cierra_sesiones(): void
     {
         $prueba = User::factory()->create(['taller_id' => $this->tallerA->id, 'email' => 'admin@tallercelulares.test', 'password' => 'password']);

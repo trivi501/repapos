@@ -31,6 +31,9 @@
   --sidebar-text: #c4cbe6;
   --login-glow: #e0f7f4;
   --sidebar-width: 250px;
+  /* Gráficas: validadas contra la superficie de cada tema (daltonismo y contraste) */
+  --serie-1: #2a78d6;
+  --serie-2: #eb6834;
   --radius: 10px;
   --shadow: 0 1px 3px rgba(16, 24, 40, 0.08), 0 1px 2px rgba(16, 24, 40, 0.06);
   color-scheme: light;
@@ -64,6 +67,8 @@
   --sidebar-border: var(--color-border);
   --sidebar-text: #8a94a7;
   --login-glow: #10303a;
+  --serie-1: #3987e5;
+  --serie-2: #d95926;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
   color-scheme: dark;
 }
@@ -1304,6 +1309,185 @@ input.input-corto,
   color: #fff;
   font-size: 1.15rem;
   font-weight: 700;
+}
+
+/* Gráficas del panel (shared/graficas.ts) */
+app-grafica-lineas,
+app-grafica-barras {
+  display: block;
+  min-width: 0;
+}
+
+.grafica-lineas {
+  position: relative;
+  height: 220px;
+  border-radius: 6px;
+  touch-action: pan-y;
+  cursor: crosshair;
+
+  svg {
+    display: block;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  .rejilla {
+    stroke: var(--color-border);
+    stroke-width: 1;
+
+    &.base {
+      stroke: var(--color-text-muted);
+    }
+  }
+
+  .eje {
+    fill: var(--color-text-muted);
+    font-size: 11px;
+  }
+
+  .linea {
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .punto {
+    stroke: var(--color-surface);
+    stroke-width: 2;
+  }
+
+  .guia {
+    stroke: var(--color-text-muted);
+    stroke-width: 1;
+  }
+}
+
+.grafica-globo {
+  position: absolute;
+  top: 6px;
+  z-index: 2;
+  margin-left: 12px;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  box-shadow: 0 4px 14px rgba(16, 24, 40, 0.16);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  pointer-events: none;
+
+  &.al-reves {
+    margin-left: -12px;
+    transform: translateX(-100%);
+  }
+}
+
+.grafica-globo-fecha {
+  margin-bottom: 0.25rem;
+  color: var(--color-text-muted);
+}
+
+.grafica-globo-fila {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+
+  span:last-child {
+    color: var(--color-text-muted);
+  }
+}
+
+.clave {
+  flex: none;
+  display: inline-block;
+  width: 12px;
+  height: 2px;
+  border-radius: 1px;
+}
+
+.grafica-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+}
+
+.grafica-tabla {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+
+  summary {
+    color: var(--color-text-muted);
+    cursor: pointer;
+  }
+
+  .der {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.grafica-tabla-marco {
+  max-height: 240px;
+  margin-top: 0.4rem;
+  overflow: auto;
+}
+
+.grafica-barras {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li:hover .grafica-barra {
+    filter: brightness(1.15);
+  }
+}
+
+.grafica-barras-texto {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.2rem;
+  font-size: 0.85rem;
+
+  .nombre {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  strong {
+    flex: none;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.grafica-barras-pista {
+  height: 10px;
+}
+
+.grafica-barra {
+  min-width: 2px;
+  height: 100%;
+  border-radius: 0 4px 4px 0;
+  background: var(--serie-1);
 }
 
 /* Logo de RepaPOS (componente app-logo) */

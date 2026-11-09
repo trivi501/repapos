@@ -10,6 +10,7 @@ use App\Http\Controllers\EquipoController;
 use App\Http\Controllers\FotoOrdenController;
 use App\Http\Controllers\InventarioController;
 use App\Http\Controllers\OrdenReparacionController;
+use App\Http\Controllers\PanelController;
 use App\Http\Controllers\PerfilController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\RegistroController;
@@ -60,7 +61,10 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::middleware('suscripcion')->group(function () {
-        Route::get('clientes', [ClienteController::class, 'index'])->middleware('permission:clientes.ver');
+        // sin middleware de permiso: entrega solo las gráficas que el usuario puede ver
+        Route::get('panel', [PanelController::class, 'index']);
+
+        Route::get('clientes',[ClienteController::class, 'index'])->middleware('permission:clientes.ver');
         Route::get('clientes/{cliente}', [ClienteController::class, 'show'])->middleware('permission:clientes.ver');
         Route::post('clientes', [ClienteController::class, 'store'])->middleware('permission:clientes.crear');
         Route::put('clientes/{cliente}', [ClienteController::class, 'update'])->middleware('permission:clientes.editar');

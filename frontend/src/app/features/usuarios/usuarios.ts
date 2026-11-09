@@ -3,7 +3,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { UsuarioService } from '../../core/services/usuario.service';
 import { RolService } from '../../core/services/rol.service';
 import { AuthService } from '../../core/services/auth.service';
-import { Rol, Sucursal, UsuarioAdmin } from '../../core/models/taller.model';
+import { GRAFICAS_BASICAS, GRAFICAS_PANEL, Rol, Sucursal, UsuarioAdmin } from '../../core/models/taller.model';
 import { OrdenService } from '../../core/services/orden.service';
 import { HttpErrorResponse } from '@angular/common/http';
 import { textoError } from '../../core/services/api.service';
@@ -32,6 +32,7 @@ export class Usuarios implements OnInit {
   readonly pagina = signal(1);
   readonly totalPaginas = signal(1);
   readonly termino = signal('');
+  readonly graficas = GRAFICAS_PANEL;
 
   readonly formulario = this.fb.group({
     name: ['', Validators.required],
@@ -39,6 +40,7 @@ export class Usuarios implements OnInit {
     password: [''],
     sucursal_id: [null as number | null],
     roles: this.fb.control<string[]>([]),
+    panel: this.fb.control<string[]>([]),
   });
 
   ngOnInit(): void {
@@ -74,7 +76,7 @@ export class Usuarios implements OnInit {
 
   abrirCrear(): void {
     this.usuarioEditando.set(null);
-    this.formulario.reset({ roles: [] });
+    this.formulario.reset({ roles: [], panel: [...GRAFICAS_BASICAS] });
     this.formulario.controls.password.setValidators([Validators.required, Validators.minLength(8)]);
     this.formulario.controls.password.updateValueAndValidity();
     this.error.set(null);
@@ -89,6 +91,7 @@ export class Usuarios implements OnInit {
       password: '',
       sucursal_id: usuario.sucursal_id ?? null,
       roles: usuario.roles.map((r) => r.name),
+      panel: usuario.panel ?? [],
     });
     this.formulario.controls.password.setValidators([Validators.minLength(8)]);
     this.formulario.controls.password.updateValueAndValidity();
@@ -111,6 +114,20 @@ export class Usuarios implements OnInit {
     return (this.formulario.controls.roles.value ?? []).includes(nombreRol);
   }
 
+  /** Si el rol ya la incluye, no se puede quitar desde aquí. */
+  graficaPorRol(permiso: string): boolean {
+    return this.roles().some((r) => this.rolSeleccionado(r.name) && r.permissions?.some((p) => p.name === permiso));
+  }
+
+  graficaSeleccionada(permiso: string): boolean {
+    return (this.formulario.controls.panel.value ?? []).includes(permiso);
+  }
+
+  alternarGrafica(permiso: string, marcada: boolean): void {
+    const actuales = this.formulario.controls.panel.value ?? [];
+    this.formulario.controls.panel.setValue(marcada ? [...actuales, permiso] : actuales.filter((p) => p !== permiso));
+  }
+
   guardar(): void {
     if (this.formulario.invalid) {
       this.formulario.markAllAsTouched();
@@ -127,6 +144,7 @@ export class Usuarios implements OnInit {
           password: datos.password || undefined,
           sucursal_id: datos.sucursal_id,
           roles: datos.roles ?? [],
+          panel: datos.panel ?? [],
         })
       : this.usuarioService.crear({
           name: datos.name!,
@@ -134,6 +152,7 @@ export class Usuarios implements OnInit {
           password: datos.password!,
           sucursal_id: datos.sucursal_id,
           roles: datos.roles ?? [],
+          panel: datos.panel ?? [],
         });
 
     peticion.subscribe({

@@ -118,6 +118,27 @@
             }
           </div>
         </div>
+        <div class="form-field">
+          <label>Gráficas que ve en el Panel</label>
+          <div class="checkbox-list">
+            @for (g of graficas; track g.permiso) {
+              <label class="checkbox-item">
+                <input
+                  type="checkbox"
+                  [checked]="graficaPorRol(g.permiso) || graficaSeleccionada(g.permiso)"
+                  [disabled]="graficaPorRol(g.permiso) || !authService.tienePermiso(g.permiso)"
+                  (change)="alternarGrafica(g.permiso, $any($event.target).checked)"
+                />
+                <span>
+                  {{ g.nombre }}
+                  @if (graficaPorRol(g.permiso)) {
+                    <small class="nota-grafica">(incluida en su rol)</small>
+                  }
+                </span>
+              </label>
+            }
+          </div>
+        </div>
 
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" (click)="cerrarModal()">Cancelar</button>
