@@ -104,7 +104,8 @@ Si el dominio todavía no apunta al VPS, instala sin HTTPS y te avisa. Cuando el
 **Con `--datos`:**
 
 - Conserva tu `APP_KEY`. Sin ella no se podrían leer los PIN y patrones guardados.
-- Borra del VPS el paquete de datos cuando termina de cargarlo. Solo lo carga si la base está vacía.
+- Borra del VPS el paquete de datos cuando termina de cargarlo.
+- Solo lo carga si la base no tiene usuarios. Si ya los tiene, se detiene; para reemplazarlos agrega `--reemplazar-datos`, que antes respalda lo que hay en `/var/backups/repapos`.
 - Bloquea las cuentas de prueba (`*@tallercelulares.test` y `demo@local.test`), porque sus contraseñas no son seguras.
 - Cierra todas las sesiones de RepaPOS, así que hay que volver a entrar. Cada vez que corras `instalar.sh` vuelve a cerrarlas.
 

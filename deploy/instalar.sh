@@ -6,7 +6,8 @@
 #
 # --dominio  Dominio ya apuntando al VPS (o la IP, solo para probar: sin HTTPS).
 # --correo   Correo para los avisos de Let's Encrypt.
-# --datos    Opcional. Paquete con tus datos, hecho con exportar-datos.ps1. Solo se carga si la base está vacía.
+# --datos    Opcional. Paquete con tus datos, hecho con exportar-datos.ps1. Se carga si la base no tiene usuarios.
+# --reemplazar-datos  Carga el paquete aunque ya haya usuarios. Antes respalda lo que hay en /var/backups/repapos.
 #
 # Lo que NO hace, para no afectar a las otras apps: quitar sitios de nginx, activar el firewall,
 # cambiar la configuración global de PHP o de MySQL, actualizar paquetes ya instalados ni instalar
@@ -18,11 +19,13 @@ source "$(dirname "${BASH_SOURCE[0]}")/comun.sh"
 DOMINIO=''
 CORREO=''
 DATOS=''
+REEMPLAZAR=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --dominio) DOMINIO="${2:-}"; shift 2 ;;
     --correo) CORREO="${2:-}"; shift 2 ;;
     --datos) DATOS="${2:-}"; shift 2 ;;
+    --reemplazar-datos) REEMPLAZAR=1; shift ;;
     *) fallo "Opción desconocida: $1" ;;
   esac
 done
@@ -166,8 +169,23 @@ ajustar_permisos
 # Sin esta llave no se pueden leer los PIN y patrones, por eso nunca se cambia si ya existe.
 TABLAS="$(con_usuario_bd mysql -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='repapos'")"
 if [ -n "$DATOS" ] && [ "$TABLAS" -gt 0 ]; then
-  aviso "La base ya tiene $TABLAS tablas: NO cargo $DATOS para no pisar lo que hay."
-  DATOS=''
+  USUARIOS=0
+  if [ "$(con_usuario_bd mysql -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='repapos' AND table_name='users'")" -gt 0 ]; then
+    USUARIOS="$(con_usuario_bd mysql -N -e 'SELECT COUNT(*) FROM repapos.users')"
+  fi
+  if [ "$USUARIOS" -gt 0 ]; then
+    [ "$REEMPLAZAR" -eq 1 ] || fallo "La base ya tiene $USUARIOS usuarios y no voy a pisarlos. Tus datos no se cargaron.
+Si lo que hay se puede perder, agrega --reemplazar-datos: antes se respalda en /var/backups/repapos."
+    mkdir -p /var/backups/repapos
+    chmod 700 /var/backups/repapos
+    RESPALDO="/var/backups/repapos/antes-de-datos-$(date +%Y%m%d-%H%M%S).sql.gz"
+    con_usuario_bd mysqldump --single-transaction --no-tablespaces repapos | gzip > "$RESPALDO"
+    chmod 600 "$RESPALDO"
+    # Lo capturado hasta ahora solo se puede leer con esta llave, que está por cambiar.
+    grep '^APP_KEY=' "$APP/backend/.env" > "$RESPALDO.app_key"
+    chmod 600 "$RESPALDO.app_key"
+    aviso "Lo que había quedó respaldado en $RESPALDO"
+  fi
 fi
 
 if [ -n "$DATOS" ]; then
