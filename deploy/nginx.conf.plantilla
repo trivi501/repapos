@@ -19,7 +19,7 @@ server {
     # API de Laravel
     location ^~ /api/ {
         include fastcgi_params;
-        fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+        fastcgi_pass unix:/run/php/repapos.sock;   # proceso de PHP propio, separado de las otras apps
         fastcgi_param SCRIPT_FILENAME /var/www/repapos/backend/public/index.php;
         fastcgi_param SCRIPT_NAME /index.php;
         fastcgi_param DOCUMENT_ROOT /var/www/repapos/backend/public;
