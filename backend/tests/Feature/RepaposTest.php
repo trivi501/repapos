@@ -470,6 +470,21 @@ class RepaposTest extends TestCase
             && $p->hasHeader('apikey', 'clave-evo'));
         $this->assertSame('BAE5', WhatsappMensaje::latest('id')->value('meta_id'));
 
+        // historial de mensajes: filtros y reenviar
+        $h = $this->getJson('/api/whatsapp/mensajes')->assertOk();
+        $h->assertJsonPath('conteo.total', 1)->assertJsonPath('conteo.enviados', 1)->assertJsonPath('data.0.telefono', '525512345678');
+        $this->assertCount(0, $this->getJson('/api/whatsapp/mensajes?estado=fallido')->json('data'));
+        $this->assertCount(1, $this->getJson('/api/whatsapp/mensajes?q=listo')->json('data'));
+        $id = $h->json('data.0.id');
+        $this->postJson("/api/whatsapp/mensajes/{$id}/reenviar")->assertOk();
+        $this->getJson('/api/whatsapp/mensajes')->assertJsonPath('conteo.total', 2);
+
+        // otro taller no ve ni reenvía los mensajes de este
+        $this->comoTaller($this->adminB);
+        $this->getJson('/api/whatsapp/mensajes')->assertJsonPath('conteo.total', 0);
+        $this->postJson("/api/whatsapp/mensajes/{$id}/reenviar")->assertNotFound();
+        $this->comoTaller($this->adminA);
+
         // desvincular apaga el envío directo
         $this->postJson('/api/whatsapp-api/evolution/desconectar')->assertOk();
         $this->assertFalse($this->getJson('/api/whatsapp-api')->json('activa'));

@@ -154,6 +154,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('whatsapp-api/evolution/conectar', [WhatsAppApiController::class, 'evolutionConectar'])->middleware('permission:configuracion.editar');
         Route::post('whatsapp-api/evolution/desconectar', [WhatsAppApiController::class, 'evolutionDesconectar'])->middleware('permission:configuracion.editar');
         Route::post('whatsapp/enviar', [WhatsAppApiController::class, 'enviar'])->middleware('throttle:30,1');
+        Route::get('whatsapp/mensajes', [WhatsAppApiController::class, 'mensajes'])->middleware('permission:configuracion.ver');
+        Route::post('whatsapp/mensajes/{mensaje}/reenviar', [WhatsAppApiController::class, 'reenviar'])->middleware(['permission:configuracion.ver', 'throttle:30,1']);
 
         // administrador de cada taller
         Route::get('sucursales', [SucursalController::class, 'index'])->middleware('permission:ordenes.ver|sucursales.ver');

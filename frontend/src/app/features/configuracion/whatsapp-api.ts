@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { AvisosService } from '../../core/services/avisos.service';
-import { FechaPipe } from '../../shared/ui';
+import { RouterLink } from '@angular/router';
 
 type Proveedor = 'evolution' | 'meta';
 
@@ -20,7 +20,6 @@ interface Config {
   numero_id: string;
   plantilla: string;
   idioma: string;
-  mensajes: { id: number; telefono: string; tipo: string; texto: string; estado: string; error: string | null; created_at: string; user?: { name: string } | null }[];
 }
 
 const TEXTO_ESTADO: Record<string, string> = {
@@ -33,7 +32,7 @@ const TEXTO_ESTADO: Record<string, string> = {
 /** Envío directo de WhatsApp: Evolution API (QR, open source) o la API oficial de Meta. */
 @Component({
   selector: 'app-whatsapp-api',
-  imports: [FormsModule, FechaPipe],
+  imports: [FormsModule, RouterLink],
   styles: `
     .proveedores { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.75rem; margin: 0.75rem 0 1rem; }
     .proveedor { border: 1px solid var(--color-border); border-radius: var(--radius); padding: 0.75rem; cursor: pointer; display: block; }
@@ -153,30 +152,7 @@ const TEXTO_ESTADO: Record<string, string> = {
           </div>
         }
 
-        @if (x.mensajes.length) {
-          <h3 class="separado">Últimos mensajes enviados</h3>
-          <div class="tabla-scroll">
-            <table>
-              <thead><tr><th>Cuándo</th><th>A</th><th>Mensaje</th><th>Estado</th><th>Quién</th></tr></thead>
-              <tbody>
-                @for (m of x.mensajes; track m.id) {
-                  <tr>
-                    <td class="sin-salto">{{ m.created_at | fecha: true }}</td>
-                    <td class="sin-salto">{{ m.telefono }}</td>
-                    <td class="tenue" [title]="m.texto">{{ m.texto.length > 70 ? m.texto.slice(0, 70) + '…' : m.texto }}</td>
-                    <td>
-                      <span class="badge" [class.badge-success]="m.estado === 'enviado'" [class.badge-danger]="m.estado !== 'enviado'">{{ m.estado }}</span>
-                      @if (m.error) {
-                        <small class="bloque-texto debe">{{ m.error }}</small>
-                      }
-                    </td>
-                    <td class="tenue">{{ m.user?.name }}</td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-        }
+        <p class="separado"><a routerLink="/whatsapp/mensajes">💬 Ver los mensajes enviados →</a></p>
       </form>
     }
   `,

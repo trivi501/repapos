@@ -117,6 +117,7 @@ export const routes: Routes = [
 
       // ajustes
       { path: 'configuracion', ...conPermiso('configuracion.ver'), loadComponent: () => import('./features/configuracion/configuracion').then((m) => m.Configuracion) },
+      { path: 'whatsapp/mensajes', ...conPermiso('configuracion.ver'), loadComponent: () => import('./features/configuracion/whatsapp-mensajes').then((m) => m.WhatsAppMensajes) },
       { path: 'usuarios', ...conPermiso('usuarios.ver'), loadComponent: () => import('./features/usuarios/usuarios').then((m) => m.Usuarios) },
       { path: 'sucursales', ...conPermiso('sucursales.ver'), loadComponent: () => import('./features/sucursales/sucursales').then((m) => m.Sucursales) },
       { path: 'roles', ...conPermiso('roles.crear'), loadComponent: () => import('./features/roles/roles').then((m) => m.Roles) },

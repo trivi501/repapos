@@ -34,8 +34,6 @@ class WhatsAppApiController extends Controller
             'numero_id' => Ajuste::valor(WhatsAppCloud::NUMERO_ID),
             'plantilla' => Ajuste::valor(WhatsAppCloud::PLANTILLA),
             'idioma' => Ajuste::valor(WhatsAppCloud::IDIOMA, 'es_MX'),
-            'mensajes' => WhatsappMensaje::with('user:id,name')->latest('id')->limit(30)
-                ->get(['id', 'telefono', 'tipo', 'texto', 'estado', 'error', 'user_id', 'created_at']),
         ]);
     }
 
@@ -166,6 +164,43 @@ class WhatsAppApiController extends Controller
         } catch (RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
+    }
+
+    // ------------------------------------------------------------------ mensajes enviados
+
+    /** Historial de mensajes del taller, con filtros. */
+    public function mensajes(Request $r)
+    {
+        $q = WhatsappMensaje::with('user:id,name')
+            ->when(in_array($r->input('estado'), [WhatsappMensaje::ENVIADO, WhatsappMensaje::FALLIDO], true), fn ($w) => $w->where('estado', $r->input('estado')))
+            ->when($r->filled('desde'), fn ($w) => $w->where('created_at', '>=', $r->date('desde')->startOfDay()))
+            ->when($r->filled('hasta'), fn ($w) => $w->where('created_at', '<', $r->date('hasta')->startOfDay()->addDay()))
+            ->when($r->filled('q'), function ($w) use ($r) {
+                $texto = '%'.$r->input('q').'%';
+                $w->where(fn ($x) => $x->where('telefono', 'like', $texto)->orWhere('texto', 'like', $texto));
+            });
+
+        $conteo = (clone $q)->toBase()->reorder()
+            ->selectRaw('COUNT(*) as total, SUM(CASE WHEN estado = ? THEN 1 ELSE 0 END) as enviados', [WhatsappMensaje::ENVIADO])->first();
+
+        return response()->json($q->latest('id')->paginate(50)->toArray() + [
+            'conteo' => ['total' => (int) $conteo->total, 'enviados' => (int) $conteo->enviados, 'fallidos' => (int) $conteo->total - (int) $conteo->enviados],
+            'activa' => WhatsAppCloud::config() !== null,
+        ]);
+    }
+
+    /** Vuelve a mandar un mensaje (normalmente uno que falló). */
+    public function reenviar(WhatsappMensaje $mensaje)
+    {
+        if (! WhatsAppCloud::config()) {
+            return response()->json(['message' => 'El envío directo de WhatsApp no está activo en este taller.'], 422);
+        }
+        $nuevo = WhatsAppCloud::enviar($mensaje->telefono, $mensaje->texto);
+        if ($nuevo->estado !== WhatsappMensaje::ENVIADO) {
+            return response()->json(['message' => "No se envió a {$mensaje->telefono}: {$nuevo->error}"], 422);
+        }
+
+        return response()->json(['message' => "Mensaje reenviado a {$mensaje->telefono}."]);
     }
 
     // ------------------------------------------------------------------ envío

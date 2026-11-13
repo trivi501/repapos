@@ -55,6 +55,7 @@ const MENU: GrupoMenu[] = [
     titulo: 'Ajustes',
     items: [
       { ruta: '/configuracion', etiqueta: 'Configuración y WhatsApp', icono: '⚙️', permisos: ['configuracion.ver'] },
+      { ruta: '/whatsapp/mensajes', etiqueta: 'Mensajes de WhatsApp', icono: '💬', permisos: ['configuracion.ver'] },
       { ruta: '/usuarios', etiqueta: 'Usuarios', icono: '🧑‍💼', permisos: ['usuarios.ver'] },
       { ruta: '/sucursales', etiqueta: 'Sucursales', icono: '🏬', permisos: ['sucursales.ver'] },
       { ruta: '/roles', etiqueta: 'Roles y permisos', icono: '🔐', permisos: ['roles.crear'] },
