@@ -66,6 +66,8 @@ class AuthController extends Controller
                 'logo_url' => $taller->logoUrl(),
                 'vigente' => $taller->vigente(),
                 'estado_texto' => $taller->estadoTexto(),
+                // con la API de WhatsApp activa, los botones de WhatsApp envían directo
+                'whatsapp_api' => \App\Support\WhatsAppCloud::activaPara($taller->id),
             ] : null,
         ];
     }

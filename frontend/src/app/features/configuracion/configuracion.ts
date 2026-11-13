@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { AvisosService } from '../../core/services/avisos.service';
+import { WhatsAppApi } from './whatsapp-api';
 
 interface Datos {
   lada: string;
@@ -16,7 +17,7 @@ interface Datos {
 
 @Component({
   selector: 'app-configuracion',
-  imports: [FormsModule],
+  imports: [FormsModule, WhatsAppApi],
   templateUrl: './configuracion.html',
 })
 export class Configuracion implements OnInit {

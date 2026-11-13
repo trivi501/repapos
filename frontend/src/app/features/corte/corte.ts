@@ -5,6 +5,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { AvisosService } from '../../core/services/avisos.service';
+import { WhatsAppService } from '../../core/services/whatsapp.service';
 import { DineroPipe, FechaPipe, fechaISO } from '../../shared/ui';
 import { metodoTexto } from '../ventas/ventas';
 import { CorteDatos, diaLargo, esperado, hora, horario, textoDiferencia, textoWhatsApp } from './corte-datos';
@@ -28,6 +29,7 @@ export class Corte implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   readonly auth = inject(AuthService);
+  private readonly whatsappEnvio = inject(WhatsAppService);
 
   readonly hoy = fechaISO();
   readonly dia = signal(this.hoy);
@@ -147,7 +149,8 @@ export class Corte implements OnInit {
     const x = this.d();
     if (!x) return;
     const texto = textoWhatsApp(x, { fondo: this.fondo, contado: this.contado, retiro: this.retiro }, this.auth.usuarioActual()?.taller?.nombre ?? '');
-    window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank', 'noopener');
+    // con la API activa se manda directo al WhatsApp del dueño; si no, abre WhatsApp para elegir a quién
+    this.whatsappEnvio.abrir(`https://wa.me/?text=${encodeURIComponent(texto)}`);
   }
 
   ticket(): void {

@@ -4,6 +4,8 @@ export interface TallerActual {
   logo_url: string | null;
   vigente: boolean;
   estado_texto: string;
+  /** La API de WhatsApp Cloud está activa: los botones de WhatsApp envían directo. */
+  whatsapp_api?: boolean;
 }
 
 export interface Usuario {

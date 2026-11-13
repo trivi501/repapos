@@ -23,6 +23,7 @@ use App\Http\Controllers\SuscripcionController;
 use App\Http\Controllers\TelefonoController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VentaController;
+use App\Http\Controllers\WhatsAppApiController;
 use App\Support\Respaldo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -144,6 +145,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('configuracion', [ConfiguracionController::class, 'edit'])->middleware('permission:configuracion.ver');
         Route::post('configuracion', [ConfiguracionController::class, 'update'])->middleware('permission:configuracion.editar');
+
+        // API de WhatsApp Cloud (Meta)
+        Route::get('whatsapp-api', [WhatsAppApiController::class, 'show'])->middleware('permission:configuracion.ver');
+        Route::put('whatsapp-api', [WhatsAppApiController::class, 'update'])->middleware('permission:configuracion.editar');
+        Route::post('whatsapp-api/probar', [WhatsAppApiController::class, 'probar'])->middleware('permission:configuracion.ver');
+        Route::post('whatsapp/enviar', [WhatsAppApiController::class, 'enviar'])->middleware('throttle:30,1');
 
         // administrador de cada taller
         Route::get('sucursales', [SucursalController::class, 'index'])->middleware('permission:ordenes.ver|sucursales.ver');

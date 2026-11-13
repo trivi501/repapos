@@ -28,6 +28,11 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    // API de WhatsApp Cloud (Meta). El token y el número de cada taller se capturan en Configuración.
+    'whatsapp' => [
+        'version' => env('WHATSAPP_GRAPH_VERSION', 'v23.0'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

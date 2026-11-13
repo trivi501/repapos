@@ -18,7 +18,10 @@ use App\Models\User;
 use App\Models\Venta;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Models\WhatsappMensaje;
+use Illuminate\Http\Client\Request as PeticionHttp;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -375,6 +378,66 @@ class RepaposTest extends TestCase
         $this->getJson('/api/cortes/resumen?agrupar=mes')->assertOk()->assertJsonCount(1, 'filas');
         $csv = $this->get('/api/cortes/exportar?agrupar=mes')->assertOk()->streamedContent();
         $this->assertStringContainsString('Detalle de cortes', $csv);
+    }
+
+    public function test_whatsapp_api_se_configura_prueba_y_envia_con_plantilla(): void
+    {
+        $token = 'EAAG'.str_repeat('x', 40).'abcd';
+        Http::fake([
+            'graph.facebook.com/*/123456789/messages' => Http::response(['messages' => [['id' => 'wamid.prueba']]]),
+            'graph.facebook.com/*/123456789*' => Http::response(['display_phone_number' => '+52 55 1111 2222', 'verified_name' => 'Taller A']),
+        ]);
+        $this->comoTaller($this->adminA);
+
+        // sin activar: no envía
+        $this->postJson('/api/whatsapp/enviar', ['numero' => '5512345678', 'texto' => 'Hola'])->assertUnprocessable();
+
+        $this->putJson('/api/whatsapp-api', [
+            'numero_id' => '123456789', 'token' => $token, 'plantilla' => 'aviso_taller', 'idioma' => 'es_MX',
+            'dueno' => '55 9999 8888', 'encendida' => true,
+        ])->assertOk()->assertJsonPath('info.nombre', 'Taller A');
+
+        // el token se guarda cifrado y nunca se regresa completo
+        $this->assertNotSame($token, \App\Models\Ajuste::valor('wa_api_token'));
+        $cfg = $this->getJson('/api/whatsapp-api')->assertOk()->json();
+        $this->assertTrue($cfg['activa']);
+        $this->assertSame('abcd', $cfg['token_final']);
+        $this->assertStringNotContainsString($token, json_encode($cfg));
+        $this->assertTrue($this->getJson('/api/me')->json('taller.whatsapp_api'));
+
+        // con plantilla: el mensaje va en {{1}}, sin saltos de línea
+        $this->postJson('/api/whatsapp/enviar', ['numero' => '5512345678', 'texto' => "Hola Juan\nTu equipo ya está listo"])->assertOk();
+        Http::assertSent(fn (PeticionHttp $p) => str_ends_with($p->url(), '/messages')
+            && $p['to'] === '525512345678'
+            && $p['template']['name'] === 'aviso_taller'
+            && $p['template']['components'][0]['parameters'][0]['text'] === 'Hola Juan | Tu equipo ya está listo'
+            && $p->hasHeader('Authorization', 'Bearer '.$token));
+
+        // sin número (el corte de caja) va al dueño
+        $this->postJson('/api/whatsapp/enviar', ['texto' => 'Corte'])->assertOk();
+        Http::assertSent(fn (PeticionHttp $p) => str_ends_with($p->url(), '/messages') && $p['to'] === '525599998888');
+        $this->assertSame(2, WhatsappMensaje::where('estado', 'enviado')->count());
+
+        // la recepcionista puede enviar pero no cambiar la configuración
+        $this->comoTaller($this->usuario($this->tallerA, 'Recepcionista'));
+        $this->putJson('/api/whatsapp-api', ['encendida' => false])->assertForbidden();
+        $this->postJson('/api/whatsapp/enviar', ['numero' => '5512345678', 'texto' => 'Hola'])->assertOk();
+
+        // el otro taller no tiene la API activa
+        $this->comoTaller($this->adminB);
+        $this->postJson('/api/whatsapp/enviar', ['numero' => '5512345678', 'texto' => 'Hola'])->assertUnprocessable();
+    }
+
+    public function test_whatsapp_api_explica_los_errores_de_meta(): void
+    {
+        $this->comoTaller($this->adminA);
+        Http::fake(['graph.facebook.com/*' => Http::response(['error' => ['code' => 190, 'message' => 'Invalid OAuth access token']], 401)]);
+
+        // no se activa si Meta no reconoce el token
+        $r = $this->putJson('/api/whatsapp-api', ['numero_id' => '123456789', 'token' => 'EAAG'.str_repeat('y', 40), 'encendida' => true])
+            ->assertUnprocessable();
+        $this->assertStringContainsString('token no es válido', $r->json('message'));
+        $this->assertFalse($this->getJson('/api/whatsapp-api')->json('activa'));
     }
 
     public function test_saldo_a_favor_deposito_aplicar_devolver_y_eliminar(): void
