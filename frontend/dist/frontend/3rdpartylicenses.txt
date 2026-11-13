@@ -91,7 +91,7 @@ THE SOFTWARE.
 ```
 
 --------------------------------------------------------------------------------
-Package: @angular/common
+Package: @angular/core
 License: "MIT"
 
 The MIT License
@@ -117,7 +117,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 --------------------------------------------------------------------------------
-Package: @angular/core
+Package: @angular/common
 License: "MIT"
 
 The MIT License

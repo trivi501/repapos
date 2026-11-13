@@ -572,10 +572,11 @@
         <div class="seccion-body">
           <div class="grid-2">
             <div class="form-field">
-              <label for="costo_refaccion">Costo de la refacción</label>
+              <label for="costo_refaccion">{{ esLiberacion() ? 'Costo del servidor / créditos' : 'Costo de la refacción' }}</label>
               <div class="input-moneda">
                 <span>$</span>
-                <input id="costo_refaccion" type="number" min="0" step="0.01" formControlName="costo_refaccion" placeholder="Ej. pantalla" />
+                <input id="costo_refaccion" type="number" min="0" step="0.01" formControlName="costo_refaccion"
+                       [placeholder]="esLiberacion() ? 'Ej. créditos FRP, iCloud…' : 'Ej. pantalla'" />
               </div>
             </div>
             <div class="form-field">
@@ -589,7 +590,7 @@
           @if (ganancia(); as g) {
             <div class="desglose-ganancia">
               <div><span>Se le cobra al cliente</span><span>$ {{ g.ingreso.toFixed(2) }}</span></div>
-              <div><span>− Refacción</span><span>$ {{ g.refaccion.toFixed(2) }}</span></div>
+              <div><span>− {{ esLiberacion() ? 'Servidor / créditos' : 'Refacción' }}</span><span>$ {{ g.refaccion.toFixed(2) }}</span></div>
               <div><span>− Mano de obra</span><span>$ {{ g.manoObra.toFixed(2) }}</span></div>
               <div class="total" [class.perdida]="g.ganancia < 0">
                 <span>{{ g.ganancia < 0 ? 'Pérdida del local' : 'Ganancia del local' }}</span><span>$ {{ g.ganancia.toFixed(2) }}</span>
