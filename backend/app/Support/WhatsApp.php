@@ -73,6 +73,7 @@ class WhatsApp
             '{equipo}' => $o->equipo?->nombre ?? '',
             '{folio}' => (string) $o->folio,
             '{estatus}' => $o->estado_texto,
+            '{motivo}' => (string) $o->motivo_rechazo,
             '{saldo}' => $o->saldo > 0 ? "\nResta por pagar: ".dinero($o->saldo) : '',
             '{enlace}' => static::enlaceOrden($o),
             '{taller}' => $o->taller?->nombre ?? '',
@@ -111,6 +112,7 @@ class WhatsApp
         $plantilla = match ($o->estado) {
             OrdenReparacion::LISTO => Ajuste::valor('mensaje_orden_listo', Ajuste::MENSAJE_ORDEN_LISTO),
             OrdenReparacion::NO_QUEDO => Ajuste::valor('mensaje_orden_no_quedo', Ajuste::MENSAJE_ORDEN_NO_QUEDO),
+            OrdenReparacion::RECHAZADO => Ajuste::MENSAJE_ORDEN_RECHAZADO,
             default => Ajuste::valor('mensaje_orden_estatus', Ajuste::MENSAJE_ORDEN_ESTATUS),
         };
 

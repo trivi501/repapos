@@ -27,8 +27,8 @@ interface EstadoPublico {
 const PASOS = [
   { estados: ['recibido'], texto: 'Recibido' },
   { estados: ['diagnostico'], texto: 'Diagnóstico' },
-  { estados: ['en_reparacion', 'esperando_repuesto'], texto: 'En reparación' },
-  { estados: ['reparado', 'no_quedo'], texto: 'Listo' },
+  { estados: ['en_reparacion', 'esperando_repuesto', 'en_proceso'], texto: 'En reparación' },
+  { estados: ['reparado', 'no_quedo', 'rechazado'], texto: 'Listo' },
   { estados: ['entregado'], texto: 'Entregado' },
 ];
 

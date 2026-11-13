@@ -25,8 +25,16 @@ class OrdenReparacion extends Model
     public const NO_QUEDO = 'no_quedo';
     public const ENTREGADO = 'entregado';
     public const CANCELADO = 'cancelado';
+    // solo para liberaciones
+    public const EN_PROCESO = 'en_proceso';
+    public const RECHAZADO = 'rechazado';
 
-    public const ESTADOS = [self::RECIBIDO, self::DIAGNOSTICO, self::REPARACION, self::REFACCION, self::LISTO, self::NO_QUEDO, self::ENTREGADO, self::CANCELADO];
+    /** Estatus de una reparación normal. */
+    public const ESTADOS_REPARACION = [self::RECIBIDO, self::DIAGNOSTICO, self::REPARACION, self::REFACCION, self::LISTO, self::NO_QUEDO, self::ENTREGADO, self::CANCELADO];
+    /** Una liberación (la orden trae bloqueo de operador, FRP, iCloud, MDM o Knox) solo tiene estos 4. */
+    public const ESTADOS_LIBERACION = [self::RECIBIDO, self::EN_PROCESO, self::LISTO, self::RECHAZADO];
+
+    public const ESTADOS = [...self::ESTADOS_REPARACION, self::EN_PROCESO, self::RECHAZADO];
 
     /** Texto para el cliente, en mensajes y documentos. */
     public const ESTADOS_TEXTO = [
@@ -38,6 +46,8 @@ class OrdenReparacion extends Model
         self::NO_QUEDO => 'NO QUEDÓ',
         self::ENTREGADO => 'ENTREGADO',
         self::CANCELADO => 'CANCELADO',
+        self::EN_PROCESO => 'EN PROCESO',
+        self::RECHAZADO => 'RECHAZADO',
     ];
 
     /** Revisión al recibir el equipo: cada punto se marca Sí o No (igual que la nota de recepción en papel). */
@@ -64,6 +74,7 @@ class OrdenReparacion extends Model
         'sucursal_id',
         'user_id',
         'estado',
+        'motivo_rechazo',
         'prioridad',
         'tipo_servicio',
         'bloqueo_tipo',
@@ -93,7 +104,7 @@ class OrdenReparacion extends Model
     // el PIN y el patrón solo se exponen al abrir la orden (makeVisible en el controlador)
     protected $hidden = ['bloqueo_valor', 'bloqueo_pin'];
 
-    protected $appends = ['total', 'saldo'];
+    protected $appends = ['total', 'saldo', 'es_liberacion'];
 
     protected function casts(): array
     {
@@ -156,16 +167,33 @@ class OrdenReparacion extends Model
         return self::ESTADOS_TEXTO[$this->estado] ?? mb_strtoupper((string) $this->estado);
     }
 
+    /** Con algún bloqueo marcado (operador, FRP, iCloud, MDM, Knox) la orden es una liberación. */
+    public static function esLiberacion(?array $bloqueos): bool
+    {
+        return ! empty(array_filter($bloqueos ?? []));
+    }
+
+    public function getEsLiberacionAttribute(): bool
+    {
+        return self::esLiberacion($this->bloqueos);
+    }
+
+    /** Estatus que se le pueden poner, según sea liberación o reparación. */
+    public static function estadosPara(?array $bloqueos): array
+    {
+        return self::esLiberacion($bloqueos) ? self::ESTADOS_LIBERACION : self::ESTADOS_REPARACION;
+    }
+
     /** Lo que se le cobra: el costo final si ya se fijó, si no el estimado. */
     public function getTotalAttribute(): float
     {
         return (float) ($this->costo_final ?? $this->costo_estimado ?? 0);
     }
 
-    /** Lo que debe. Si no quedó, no se cobra. */
+    /** Lo que debe. Si no quedó (o se rechazó la liberación), no se cobra. */
     public function getSaldoAttribute(): float
     {
-        if (in_array($this->estado, [self::NO_QUEDO, self::CANCELADO], true)) {
+        if (in_array($this->estado, [self::NO_QUEDO, self::CANCELADO, self::RECHAZADO], true)) {
             return 0.0;
         }
 

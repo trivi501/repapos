@@ -40,7 +40,10 @@ export type EstadoOrden =
   | 'reparado'
   | 'no_quedo'
   | 'entregado'
-  | 'cancelado';
+  | 'cancelado'
+  // solo liberaciones
+  | 'en_proceso'
+  | 'rechazado';
 
 export interface OrdenReparacion {
   id: number;
@@ -61,6 +64,9 @@ export interface OrdenReparacion {
   bloqueo_valor?: string | null;
   bloqueo_pin?: string | null;
   bloqueos?: string[] | null;
+  /** Trae algún bloqueo (operador, FRP, iCloud, MDM, Knox): solo tiene los 4 estatus de liberación. */
+  es_liberacion?: boolean;
+  motivo_rechazo?: string | null;
   estado_fisico?: Record<string, string> | null;
   revision?: Record<string, string> | null;
   observaciones?: string | null;
@@ -150,7 +156,8 @@ export const REVISION_ORDEN = [
   { clave: 'mojado', texto: 'Mojado' },
 ];
 
-export const ESTADOS_ORDEN: { valor: EstadoOrden; etiqueta: string }[] = [
+/** Estatus de una reparación normal. */
+export const ESTADOS_REPARACION: { valor: EstadoOrden; etiqueta: string }[] = [
   { valor: 'recibido', etiqueta: 'Recibido' },
   { valor: 'diagnostico', etiqueta: 'En diagnóstico' },
   { valor: 'en_reparacion', etiqueta: 'En reparación' },
@@ -160,3 +167,23 @@ export const ESTADOS_ORDEN: { valor: EstadoOrden; etiqueta: string }[] = [
   { valor: 'entregado', etiqueta: 'Entregado' },
   { valor: 'cancelado', etiqueta: 'Cancelado' },
 ];
+
+/** Una liberación (orden con bloqueo de operador, FRP, iCloud, MDM o Knox) solo tiene estos 4. */
+export const ESTADOS_LIBERACION: { valor: EstadoOrden; etiqueta: string }[] = [
+  { valor: 'recibido', etiqueta: 'Recibido' },
+  { valor: 'en_proceso', etiqueta: 'En proceso' },
+  { valor: 'reparado', etiqueta: 'Listo' },
+  { valor: 'rechazado', etiqueta: 'Rechazado' },
+];
+
+/** Todos (para filtros y para mostrar el nombre de cualquier estatus). */
+export const ESTADOS_ORDEN: { valor: EstadoOrden; etiqueta: string }[] = [
+  ...ESTADOS_REPARACION,
+  { valor: 'en_proceso', etiqueta: 'En proceso (liberación)' },
+  { valor: 'rechazado', etiqueta: 'Rechazado (liberación)' },
+];
+
+/** Estatus que se le pueden poner a una orden según sus bloqueos. */
+export function estadosPara(bloqueos: string[] | null | undefined) {
+  return bloqueos?.length ? ESTADOS_LIBERACION : ESTADOS_REPARACION;
+}

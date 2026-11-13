@@ -86,6 +86,10 @@ const COLORES: Record<string, string> = {
   'EN TALLER': 'badge-warning',
   LISTO: 'badge-success',
   'NO QUEDÓ': 'badge-danger',
+  // liberaciones
+  RECIBIDO: 'badge-warning',
+  'EN PROCESO': 'badge-primary',
+  RECHAZADO: 'badge-danger',
   ENTREGADO: 'badge-primary',
   DIAGNÓSTICO: 'badge-primary',
   'EN REPARACIÓN': 'badge-warning',

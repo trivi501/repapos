@@ -140,13 +140,30 @@
       @if (auth.tieneAlgunPermiso(['ordenes.cambiar_estado', 'ordenes.editar'])) {
         <div class="card contenido">
           <h2>Cambiar estatus</h2>
+          @if (x.es_liberacion) {
+            <p class="ayuda">Liberación ({{ nombresBloqueos(x) }}): solo Recibido, En proceso, Listo o Rechazado.</p>
+          }
           <div class="acciones-fila">
-            @for (e of estados; track e.valor) {
+            @for (e of estadosDe(x); track e.valor) {
               <button class="btn btn-sm" [class.btn-primary]="x.estado === e.valor" [class.btn-secondary]="x.estado !== e.valor" [disabled]="x.estado === e.valor" (click)="cambiarEstado(x, e.valor)">
                 {{ e.etiqueta }}
               </button>
             }
           </div>
+          @if (rechazando()) {
+            <div class="form-field separado">
+              <label for="motivo_rechazo">¿Por qué se rechaza? *</label>
+              <textarea id="motivo_rechazo" rows="2" maxlength="255" [(ngModel)]="motivo"
+                        placeholder="Ej. Reportado por robo, no hay servidor para este modelo, el cliente no tiene la factura…"></textarea>
+            </div>
+            <div class="acciones-fila">
+              <button class="btn btn-danger btn-sm" (click)="confirmarRechazo()" [disabled]="!motivo.trim()">Rechazar</button>
+              <button class="btn btn-secondary btn-sm" (click)="rechazando.set(false)">Cancelar</button>
+            </div>
+          }
+          @if (x.estado === 'rechazado' && x.motivo_rechazo) {
+            <p class="separado"><span class="etiqueta-campo">Motivo del rechazo</span><br /><strong class="debe">{{ x.motivo_rechazo }}</strong></p>
+          }
         </div>
       }
 

@@ -1,11 +1,12 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { AvisosService, AvisoWhatsapp } from '../../core/services/avisos.service';
 import { DineroPipe, Estatus, FechaPipe, dinero, fechaISO } from '../../shared/ui';
+import { TelefonoForm } from './telefono-form';
 
 export interface Telefono {
   id: number;
@@ -37,13 +38,14 @@ interface Respuesta {
 
 @Component({
   selector: 'app-telefonos',
-  imports: [FormsModule, RouterLink, DineroPipe, FechaPipe, Estatus],
+  imports: [FormsModule, DineroPipe, FechaPipe, Estatus, TelefonoForm],
   templateUrl: './telefonos.html',
 })
 export class Telefonos implements OnInit {
   private readonly api = inject(ApiService);
   private readonly avisos = inject(AvisosService);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   readonly auth = inject(AuthService);
 
   readonly estados = [
@@ -64,12 +66,27 @@ export class Telefonos implements OnInit {
   readonly ultimaPagina = signal(1);
   readonly menu = signal<{ t: Telefono; x: number; y: number } | null>(null);
 
+  /** Ventana de alta / edición: id null = teléfono nuevo. */
+  readonly formulario = signal<{ id: number | null; eliminar: boolean } | null>(null);
+
   filtros = { locatario: '', estado: '', prioridad: '', q: '', urgentes: false };
   montoAbono: number | null = null;
 
   ngOnInit(): void {
-    this.filtros.locatario = this.route.snapshot.queryParamMap.get('locatario') ?? '';
+    const q = this.route.snapshot.queryParamMap;
+    this.filtros.locatario = q.get('locatario') ?? '';
+    // las direcciones viejas (/telefonos/nuevo y /telefonos/:id/editar) llegan aquí y abren la ventana
+    if (q.has('nuevo')) this.abrirFormulario(null);
+    else if (q.get('editar')) this.abrirFormulario(Number(q.get('editar')));
+    if (q.has('nuevo') || q.has('editar')) {
+      this.router.navigate([], { queryParams: { nuevo: null, editar: null }, queryParamsHandling: 'merge', replaceUrl: true });
+    }
     this.cargar();
+  }
+
+  abrirFormulario(id: number | null, eliminar = false): void {
+    this.menu.set(null);
+    this.formulario.set({ id, eliminar });
   }
 
   cargar(): void {

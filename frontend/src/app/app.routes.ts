@@ -70,8 +70,12 @@ export const routes: Routes = [
 
       // locatarios
       { path: 'telefonos', ...conPermiso('telefonos.ver'), loadComponent: () => import('./features/telefonos/telefonos').then((m) => m.Telefonos) },
-      { path: 'telefonos/nuevo', ...conPermiso('telefonos.crear'), loadComponent: () => import('./features/telefonos/telefono-form').then((m) => m.TelefonoForm) },
-      { path: 'telefonos/:id/editar', ...conPermiso('telefonos.editar'), loadComponent: () => import('./features/telefonos/telefono-form').then((m) => m.TelefonoForm) },
+      // el alta y la edición ahora son una ventana sobre la lista; las direcciones viejas la abren
+      { path: 'telefonos/nuevo', redirectTo: () => inject(Router).createUrlTree(['/telefonos'], { queryParams: { nuevo: 1 } }) },
+      {
+        path: 'telefonos/:id/editar',
+        redirectTo: ({ params }) => inject(Router).createUrlTree(['/telefonos'], { queryParams: { editar: params['id'] } }),
+      },
       { path: 'resumen', ...conPermiso('resumen.ver'), loadComponent: () => import('./features/resumen/resumen').then((m) => m.Resumen) },
       { path: 'saldos', ...conPermiso('saldos.ver'), loadComponent: () => import('./features/saldos/saldos').then((m) => m.Saldos) },
 

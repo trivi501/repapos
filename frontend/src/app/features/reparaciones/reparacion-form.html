@@ -457,13 +457,20 @@
         </div>
         @if (esEdicion()) {
           <div class="form-field">
-            <label for="estado">Estado</label>
+            <label for="estado">Estado{{ esLiberacion() ? ' (liberación)' : '' }}</label>
             <select id="estado" formControlName="estado">
-              @for (estado of estados; track estado.valor) {
+              @for (estado of estados(); track estado.valor) {
                 <option [value]="estado.valor">{{ estado.etiqueta }}</option>
               }
             </select>
           </div>
+          @if (valores().estado === 'rechazado') {
+            <div class="form-field">
+              <label for="motivo_rechazo">¿Por qué se rechazó? <span class="req">*</span></label>
+              <textarea id="motivo_rechazo" rows="2" maxlength="255" formControlName="motivo_rechazo"
+                        placeholder="Ej. Reportado por robo, no hay servidor para este modelo…"></textarea>
+            </div>
+          }
         }
         <div class="form-field">
           <label for="tecnico_id">Técnico</label>

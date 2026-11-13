@@ -3,7 +3,7 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { CategoriaFoto, Cliente, ESTADOS_ORDEN, Equipo, FotoOrden, REVISION_ORDEN, Sucursal } from '../../core/models/taller.model';
+import { CategoriaFoto, Cliente, Equipo, FotoOrden, REVISION_ORDEN, Sucursal, estadosPara } from '../../core/models/taller.model';
 import { AvisosService } from '../../core/services/avisos.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ClienteService } from '../../core/services/cliente.service';
@@ -127,7 +127,6 @@ export class ReparacionForm implements OnInit {
   readonly fallasComunes = FALLAS_COMUNES;
   readonly componentesFisicos = COMPONENTES_FISICOS;
   readonly nivelesFisicos = NIVELES_FISICOS;
-  readonly estados = ESTADOS_ORDEN;
   readonly tiposEquipo = ['celular', 'tablet', 'laptop', 'otro'];
 
   readonly clientes = signal<Cliente[]>([]);
@@ -194,6 +193,7 @@ export class ReparacionForm implements OnInit {
     anticipo: [0 as number | null],
     metodo_pago: ['efectivo'],
     estado: ['recibido'],
+    motivo_rechazo: [''],
     diagnostico: [''],
     solucion: [''],
     costo_final: [null as number | null],
@@ -203,7 +203,11 @@ export class ReparacionForm implements OnInit {
     visibilidad: this.fb.control<string[]>(SECCIONES_VISIBLES.map((s) => s.clave)),
   });
 
-  private readonly valores = toSignal(this.formulario.valueChanges, { initialValue: this.formulario.getRawValue() });
+  readonly valores = toSignal(this.formulario.valueChanges, { initialValue: this.formulario.getRawValue() });
+
+  /** Con algún bloqueo (operador, FRP, iCloud, MDM, Knox) la orden es liberación: solo 4 estatus. */
+  readonly esLiberacion = computed(() => (this.valores().bloqueos ?? []).length > 0);
+  readonly estados = computed(() => estadosPara(this.valores().bloqueos));
 
   readonly saldo = computed(() => {
     const v = this.valores();
@@ -313,6 +317,7 @@ export class ReparacionForm implements OnInit {
           anticipo: Number(orden.pagado ?? 0),
           metodo_pago: orden.metodo_pago ?? 'efectivo',
           estado: orden.estado,
+          motivo_rechazo: orden.motivo_rechazo ?? '',
           diagnostico: orden.diagnostico ?? '',
           solucion: orden.solucion ?? '',
           costo_final: orden.costo_final ? Number(orden.costo_final) : null,
@@ -357,7 +362,16 @@ export class ReparacionForm implements OnInit {
   alternarBloqueo(clave: string, activo: boolean): void {
     const control = this.formulario.controls.bloqueos;
     const actuales = control.value ?? [];
+    const antes = actuales.length > 0;
     control.setValue(activo ? [...actuales, clave] : actuales.filter((b) => b !== clave));
+    const ahora = (control.value ?? []).length > 0;
+    // al pasar de reparación a liberación (o al revés) el estatus tiene que ser uno de los permitidos
+    if (antes !== ahora && !this.estados().some((e) => e.valor === this.formulario.controls.estado.value)) {
+      const equivalente: Record<string, string> = ahora
+        ? { no_quedo: 'rechazado', diagnostico: 'en_proceso', en_reparacion: 'en_proceso', esperando_repuesto: 'en_proceso' }
+        : { en_proceso: 'en_reparacion', rechazado: 'no_quedo' };
+      this.formulario.controls.estado.setValue(equivalente[this.formulario.controls.estado.value ?? ''] ?? 'recibido');
+    }
   }
 
   cambiarMetodo(tipo: string): void {
@@ -414,6 +428,9 @@ export class ReparacionForm implements OnInit {
       }
     }
     if (!v.falla_reportada?.trim()) errores.push('Describe el problema reportado.');
+    if (this.esEdicion() && v.estado === 'rechazado' && !v.motivo_rechazo?.trim()) {
+      errores.push('Escribe por qué se rechazó la liberación.');
+    }
 
     this.errores.set(errores);
     if (errores.length) return null;
@@ -446,6 +463,7 @@ export class ReparacionForm implements OnInit {
       return {
         ...base,
         estado: v.estado,
+        motivo_rechazo: v.estado === 'rechazado' ? v.motivo_rechazo?.trim() || null : null,
         diagnostico: v.diagnostico || null,
         solucion: v.solucion || null,
         costo_final: v.costo_final,

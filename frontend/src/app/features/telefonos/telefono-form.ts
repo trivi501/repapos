@@ -1,12 +1,11 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { AfterViewInit, Component, OnInit, inject, signal } from '@angular/core';
+import { AfterViewInit, ChangeDetectorRef, Component, ElementRef, OnInit, inject, input, output, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { AvisosService, AvisoWhatsapp } from '../../core/services/avisos.service';
 import { DineroPipe, FechaPipe, fechaISO } from '../../shared/ui';
-import { Telefono } from './telefonos';
+import type { Telefono } from './telefonos';
 
 const ULTIMO_LOCATARIO = 'taller_ultimo_locatario';
 
@@ -17,23 +16,38 @@ function vacio(locatario = '') {
   };
 }
 
+/** Alta y edición de un teléfono de locatario, en una ventana sobre la lista. */
 @Component({
   selector: 'app-telefono-form',
-  imports: [FormsModule, RouterLink, DineroPipe, FechaPipe],
+  imports: [FormsModule, DineroPipe, FechaPipe],
   templateUrl: './telefono-form.html',
+  host: { '(document:keydown.escape)': 'cerrar.emit()' },
+  styles: `
+    .modal-telefono { max-width: 760px; }
+  `,
 })
 export class TelefonoForm implements OnInit, AfterViewInit {
   private readonly api = inject(ApiService);
   private readonly avisos = inject(AvisosService);
-  private readonly route = inject(ActivatedRoute);
-  private readonly router = inject(Router);
+  // la app no usa zone.js: al cambiar `m` desde una respuesta del servidor hay que pedir que se redibuje
+  private readonly cdr = inject(ChangeDetectorRef);
   readonly auth = inject(AuthService);
 
-  readonly id = signal<number | null>(null);
+  /** null = alta de un teléfono nuevo. */
+  readonly telefonoId = input<number | null>(null);
+  /** Abrir directo en la parte de eliminar. */
+  readonly irAEliminar = input(false);
+  readonly cerrar = output<void>();
+  /** Se guardó algo: la lista se tiene que recargar. */
+  readonly guardado = output<void>();
+
   readonly locatarios = signal<{ id: number; nombre: string; whatsapp: string | null }[]>([]);
   readonly guardando = signal(false);
   readonly fechaEntrega = signal<string | null>(null);
   readonly cobros = signal(0);
+  readonly errores = signal<string[]>([]);
+  private readonly zonaEliminar = viewChild<ElementRef<HTMLElement>>('zonaEliminar');
+  private readonly campoLocatario = viewChild<ElementRef<HTMLInputElement>>('campoLocatario');
 
   m = vacio(sessionStorage.getItem(ULTIMO_LOCATARIO) ?? '');
   destinoCobros = '';
@@ -41,12 +55,12 @@ export class TelefonoForm implements OnInit, AfterViewInit {
   ngOnInit(): void {
     this.api.get<{ locatarios: { id: number; nombre: string; whatsapp: string | null }[] }>('telefonos', { por_pagina: 1 }).subscribe((r) => {
       this.locatarios.set(r.locatarios);
-      this.alCambiarLocatario();
+      if (!this.telefonoId()) this.alCambiarLocatario();
+      this.cdr.markForCheck();
     });
 
-    const id = Number(this.route.snapshot.paramMap.get('id'));
+    const id = this.telefonoId();
     if (id) {
-      this.id.set(id);
       this.api.get<Telefono>(`telefonos/${id}`).subscribe({
         next: (t) => {
           this.m = {
@@ -56,16 +70,21 @@ export class TelefonoForm implements OnInit, AfterViewInit {
           };
           this.fechaEntrega.set(t.fecha_entrega);
           this.cobros.set(t.cobros_total ?? 0);
+          this.cdr.markForCheck();
+          if (this.irAEliminar()) {
+            setTimeout(() => this.zonaEliminar()?.nativeElement.scrollIntoView({ behavior: 'smooth' }), 100);
+          }
         },
-        error: (e: HttpErrorResponse) => this.avisos.fallo(e),
+        error: (e: HttpErrorResponse) => {
+          this.avisos.fallo(e);
+          this.cerrar.emit();
+        },
       });
     }
   }
 
   ngAfterViewInit(): void {
-    if (this.route.snapshot.fragment === 'eliminar') {
-      setTimeout(() => document.getElementById('eliminar')?.scrollIntoView({ behavior: 'smooth' }), 400);
-    }
+    if (!this.telefonoId()) this.campoLocatario()?.nativeElement.focus();
   }
 
   /** Al escribir un locatario conocido se llena su WhatsApp. */
@@ -75,8 +94,9 @@ export class TelefonoForm implements OnInit, AfterViewInit {
   }
 
   guardar(): void {
+    this.errores.set([]);
     this.guardando.set(true);
-    const id = this.id();
+    const id = this.telefonoId();
     const peticion = id
       ? this.api.put<{ message: string; aviso: AvisoWhatsapp | null }>(`telefonos/${id}`, this.m)
       : this.api.post<{ message: string; aviso: AvisoWhatsapp | null }>('telefonos', this.m);
@@ -84,20 +104,23 @@ export class TelefonoForm implements OnInit, AfterViewInit {
     peticion.subscribe({
       next: (r) => {
         this.guardando.set(false);
+        this.avisos.ok(r.message, r.aviso);
+        this.guardado.emit();
         if (id) {
-          this.router.navigate(['/telefonos']).then(() => this.avisos.ok(r.message, r.aviso));
+          this.cerrar.emit();
         } else {
-          // se queda en la pantalla para capturar varios seguidos del mismo locatario
+          // la ventana sigue abierta para capturar varios seguidos del mismo locatario
           sessionStorage.setItem(ULTIMO_LOCATARIO, this.m.locatario);
-          const locatario = this.m.locatario;
-          const whatsapp = this.m.whatsapp;
+          const { locatario, whatsapp } = this.m;
           this.m = { ...vacio(locatario), whatsapp };
-          this.avisos.ok(r.message, r.aviso);
+          this.cdr.markForCheck();
         }
       },
       error: (e: HttpErrorResponse) => {
         this.guardando.set(false);
-        this.avisos.fallo(e);
+        const errores = e.error?.errors ? (Object.values(e.error.errors) as string[][]).flat() : [];
+        if (errores.length) this.errores.set(errores);
+        else this.avisos.fallo(e);
       },
     });
   }
@@ -106,12 +129,18 @@ export class TelefonoForm implements OnInit, AfterViewInit {
     if (!confirm('¿Limpiar el formulario?')) return;
     sessionStorage.removeItem(ULTIMO_LOCATARIO);
     this.m = vacio();
+    this.errores.set([]);
   }
 
   eliminar(): void {
-    if (!confirm(`¿Eliminar el teléfono #${this.id()} (${this.m.modelo})? No se puede deshacer.`)) return;
-    this.api.delete(`telefonos/${this.id()}`, { cobros: this.destinoCobros }).subscribe({
-      next: () => this.router.navigate(['/telefonos']).then(() => this.avisos.ok(`Teléfono #${this.id()} eliminado.`)),
+    const id = this.telefonoId();
+    if (!confirm(`¿Eliminar el teléfono #${id} (${this.m.modelo})? No se puede deshacer.`)) return;
+    this.api.delete(`telefonos/${id}`, { cobros: this.destinoCobros }).subscribe({
+      next: () => {
+        this.avisos.ok(`Teléfono #${id} eliminado.`);
+        this.guardado.emit();
+        this.cerrar.emit();
+      },
       error: (e: HttpErrorResponse) => this.avisos.fallo(e),
     });
   }

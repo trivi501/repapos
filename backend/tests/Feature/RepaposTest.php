@@ -504,6 +504,57 @@ class RepaposTest extends TestCase
         $this->assertEquals(0.0, OrdenReparacion::find($o2['id'])->saldo, 'Si no quedó, no se cobra');
     }
 
+    public function test_liberacion_solo_tiene_4_estatus_y_el_rechazo_pide_motivo(): void
+    {
+        $o = $this->ordenNueva(['bloqueos' => ['frp', 'icloud']]);
+        $id = $o['id'];
+        $this->assertTrue($o['es_liberacion']);
+        $this->assertSame('recibido', $o['estado']);
+
+        // los estatus de reparación no se permiten en una liberación
+        foreach (['diagnostico', 'en_reparacion', 'esperando_repuesto', 'no_quedo', 'entregado', 'cancelado'] as $estado) {
+            $this->postJson("/api/ordenes/{$id}/accion", ['accion' => 'estatus', 'estado' => $estado])
+                ->assertUnprocessable()->assertJsonValidationErrors('estado');
+        }
+
+        $this->postJson("/api/ordenes/{$id}/accion", ['accion' => 'estatus', 'estado' => 'en_proceso'])->assertOk()
+            ->assertJsonPath('orden.estado_texto', 'EN PROCESO');
+
+        // rechazar sin motivo no pasa; con motivo se guarda, no se cobra y el aviso lo lleva
+        $this->postJson("/api/ordenes/{$id}/accion", ['accion' => 'estatus', 'estado' => 'rechazado'])
+            ->assertUnprocessable()->assertJsonValidationErrors('motivo');
+        $r = $this->postJson("/api/ordenes/{$id}/accion", ['accion' => 'estatus', 'estado' => 'rechazado', 'motivo' => 'Reportado por robo'])
+            ->assertOk()->assertJsonPath('orden.motivo_rechazo', 'Reportado por robo');
+        $this->assertEquals(0.0, OrdenReparacion::find($id)->saldo, 'Si se rechazó, no se cobra');
+        $this->assertStringContainsString('Motivo: Reportado por robo', rawurldecode($r->json('aviso.url')));
+
+        // al salir de rechazado el motivo se borra
+        $this->postJson("/api/ordenes/{$id}/accion", ['accion' => 'estatus', 'estado' => 'reparado'])->assertOk();
+        $this->assertNull(OrdenReparacion::find($id)->motivo_rechazo);
+
+        // una reparación normal no acepta los estatus de liberación
+        $normal = $this->ordenNueva();
+        $this->postJson("/api/ordenes/{$normal['id']}/accion", ['accion' => 'estatus', 'estado' => 'en_proceso'])->assertUnprocessable();
+        $this->postJson("/api/ordenes/{$normal['id']}/accion", ['accion' => 'estatus', 'estado' => 'rechazado', 'motivo' => 'x'])->assertUnprocessable();
+    }
+
+    public function test_al_editar_una_liberacion_se_valida_el_estatus_y_el_motivo(): void
+    {
+        $o = $this->ordenNueva(['bloqueos' => ['mdm']]);
+        $base = ['falla_reportada' => 'MDM Telcel', 'bloqueos' => ['mdm']];
+
+        $this->putJson("/api/ordenes/{$o['id']}", $base + ['estado' => 'diagnostico'])->assertUnprocessable()->assertJsonValidationErrors('estado');
+        $this->putJson("/api/ordenes/{$o['id']}", $base + ['estado' => 'rechazado'])->assertUnprocessable()->assertJsonValidationErrors('motivo_rechazo');
+        $this->putJson("/api/ordenes/{$o['id']}", $base + ['estado' => 'rechazado', 'motivo_rechazo' => 'Sin servidor'])->assertOk()
+            ->assertJsonPath('motivo_rechazo', 'Sin servidor');
+
+        // quitarle los bloqueos la vuelve reparación normal: ya no acepta "rechazado"
+        $this->putJson("/api/ordenes/{$o['id']}", ['falla_reportada' => 'MDM Telcel', 'bloqueos' => [], 'estado' => 'rechazado', 'motivo_rechazo' => 'x'])
+            ->assertUnprocessable()->assertJsonValidationErrors('estado');
+        $this->putJson("/api/ordenes/{$o['id']}", ['falla_reportada' => 'MDM Telcel', 'bloqueos' => [], 'estado' => 'no_quedo'])->assertOk()
+            ->assertJsonPath('motivo_rechazo', null);
+    }
+
     public function test_editar_no_cambia_lo_pagado_sin_pasar_por_la_caja(): void
     {
         $o = $this->ordenNueva();

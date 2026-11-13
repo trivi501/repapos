@@ -2,7 +2,7 @@
   <h1>Teléfonos de locatarios</h1>
   <div class="acciones-fila">
     @if (auth.tienePermiso('telefonos.crear')) {
-      <a class="btn btn-primary" routerLink="/telefonos/nuevo">+ Alta de teléfono</a>
+      <button class="btn btn-primary" type="button" (click)="abrirFormulario(null)">+ Alta de teléfono</button>
     }
     <button class="btn btn-secondary" (click)="exportar()">Exportar a Excel</button>
   </div>
@@ -86,7 +86,7 @@
           <td class="sin-salto">
             <div class="iconos">
               @if (auth.tienePermiso('telefonos.editar')) {
-                <a class="icono-btn" [routerLink]="['/telefonos', t.id, 'editar']" title="Editar" aria-label="Editar">✏️</a>
+                <button class="icono-btn" type="button" (click)="abrirFormulario(t.id)" title="Editar" aria-label="Editar">✏️</button>
                 <button class="icono-btn" [class.encendido]="t.resultado === 'LISTO'" (click)="accion(t, 'listo')"
                         [title]="t.resultado === 'LISTO' ? 'Está LISTO (clic = regresar a En taller)' : 'Marcar como LISTO'" aria-label="Listo">✅</button>
                 <button class="icono-btn" [class.encendido]="t.entregado" (click)="entregar(t)"
@@ -117,7 +117,7 @@
   <div class="menu-flotante" role="menu" [style.top.px]="m.y" [style.left.px]="m.x" (keydown.escape)="menu.set(null)">
     <div class="menu-titulo">#{{ m.t.id }} · {{ m.t.locatario?.nombre }} · {{ m.t.modelo }}</div>
     @if (auth.tienePermiso('telefonos.editar')) {
-      <a class="menu-item" [routerLink]="['/telefonos', m.t.id, 'editar']">✏️ Editar</a>
+      <button class="menu-item" (click)="abrirFormulario(m.t.id)">✏️ Editar</button>
       <button class="menu-item" (click)="accion(m.t, 'listo')">{{ m.t.resultado === 'LISTO' ? '↩️ Regresar a En taller' : '✅ Marcar como Listo' }}</button>
       <button class="menu-item" (click)="accion(m.t, 'noquedo')">{{ m.t.resultado === 'NO QUEDÓ' ? '↩️ Regresar a En taller' : '❌ Marcar como No quedó' }}</button>
       <button class="menu-item" (click)="entregar(m.t)">{{ m.t.entregado ? '↩️ Quitar entrega' : '📦 Marcar como entregado' }}</button>
@@ -135,7 +135,11 @@
       <a class="menu-item" [href]="m.t.aviso_url" target="_blank" rel="noopener" (click)="menu.set(null)">💬 Avisar por WhatsApp</a>
     }
     @if (auth.tienePermiso('telefonos.eliminar')) {
-      <a class="menu-item peligro" [routerLink]="['/telefonos', m.t.id, 'editar']" fragment="eliminar">🗑️ Eliminar…</a>
+      <button class="menu-item peligro" (click)="abrirFormulario(m.t.id, true)">🗑️ Eliminar…</button>
     }
   </div>
+}
+
+@if (formulario(); as f) {
+  <app-telefono-form [telefonoId]="f.id" [irAEliminar]="f.eliminar" (cerrar)="formulario.set(null)" (guardado)="cargar()" />
 }

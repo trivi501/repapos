@@ -1,96 +1,108 @@
-<div class="encabezado">
-  <h1>{{ id() ? 'Editar teléfono #' + id() : 'Alta de teléfono' }}</h1>
-  <a class="btn btn-secondary" routerLink="/telefonos">← Volver a la lista</a>
+<div class="modal-backdrop" (click)="cerrar.emit()">
+  <div class="modal modal-telefono" role="dialog" aria-modal="true" aria-labelledby="titulo-telefono" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2 id="titulo-telefono">{{ telefonoId() ? 'Editar teléfono #' + telefonoId() : 'Alta de teléfono' }}</h2>
+      <button class="btn btn-secondary" type="button" (click)="cerrar.emit()" aria-label="Cerrar">✕</button>
+    </div>
+
+    @if (errores().length) {
+      <div class="alert alert-error">
+        @for (e of errores(); track e) {
+          <div>{{ e }}</div>
+        }
+      </div>
+    }
+
+    <form (ngSubmit)="guardar()">
+      <div class="rejilla-2">
+        <div class="rejilla-3-1">
+          <div class="form-field">
+            <label for="locatario">Locatario *</label>
+            <input id="locatario" name="locatario" list="lista-locatarios" autocomplete="off" required
+                   [(ngModel)]="m.locatario" (ngModelChange)="alCambiarLocatario()" #campoLocatario />
+            <datalist id="lista-locatarios">
+              @for (l of locatarios(); track l.id) {
+                <option [value]="l.nombre"></option>
+              }
+            </datalist>
+          </div>
+          <div class="form-field">
+            <label for="whatsapp">WhatsApp</label>
+            <input id="whatsapp" name="whatsapp" inputmode="tel" placeholder="10 dígitos" [(ngModel)]="m.whatsapp" />
+          </div>
+        </div>
+        <div class="rejilla-2">
+          <div class="form-field">
+            <label for="fecha_recibido">Fecha recibido *</label>
+            <input id="fecha_recibido" name="fecha_recibido" type="date" required [(ngModel)]="m.fecha_recibido" />
+          </div>
+          <div class="form-field">
+            <label for="prioridad">Prioridad</label>
+            <select id="prioridad" name="prioridad" [(ngModel)]="m.prioridad">
+              <option value="ALTA">Alta</option>
+              <option value="MEDIA">Media</option>
+              <option value="BAJA">Baja</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-field">
+          <label for="modelo">Modelo *</label>
+          <input id="modelo" name="modelo" required [(ngModel)]="m.modelo" />
+        </div>
+        <div class="form-field">
+          <label for="trabajo">Trabajo a realizar</label>
+          <input id="trabajo" name="trabajo" [(ngModel)]="m.trabajo" />
+        </div>
+        <div class="form-field">
+          <label for="total">Monto total $</label>
+          <input id="total" name="total" type="number" step="0.01" min="0" [(ngModel)]="m.total" (focus)="$any($event.target).select()" />
+        </div>
+        <div class="form-field">
+          <label for="pagado">Monto pagado $</label>
+          <input id="pagado" name="pagado" type="number" step="0.01" min="0" [(ngModel)]="m.pagado" (focus)="$any($event.target).select()" />
+          <span class="ayuda">Lo que cambie aquí se registra en la caja de hoy.</span>
+        </div>
+        <div class="form-field">
+          <label for="notas">Notas / IMEI</label>
+          <input id="notas" name="notas" [(ngModel)]="m.notas" />
+        </div>
+        <div class="form-field">
+          <label for="resultado">Estatus</label>
+          <select id="resultado" name="resultado" [(ngModel)]="m.resultado">
+            <option value="EN TALLER">En taller</option>
+            <option value="LISTO">Listo</option>
+            <option value="NO QUEDÓ">No quedó (no se cobra)</option>
+          </select>
+        </div>
+      </div>
+
+      <label class="check-linea">
+        <input type="checkbox" name="entregado" [(ngModel)]="m.entregado" />
+        Ya se entregó al locatario
+        @if (fechaEntrega()) {
+          <small class="tenue">({{ fechaEntrega() | fecha: true }})</small>
+        }
+      </label>
+
+      <div class="modal-actions">
+        @if (!telefonoId()) {
+          <button class="btn btn-secondary" type="button" (click)="limpiar()">Limpiar</button>
+        }
+        <button class="btn btn-secondary" type="button" (click)="cerrar.emit()">{{ telefonoId() ? 'Cancelar' : 'Cerrar' }}</button>
+        <button class="btn btn-primary" type="submit" [disabled]="guardando()">{{ telefonoId() ? 'Guardar cambios' : 'Guardar nuevo' }}</button>
+      </div>
+    </form>
+
+    @if (telefonoId() && auth.tienePermiso('telefonos.eliminar')) {
+      <div class="zona-peligro separado" #zonaEliminar>
+        <h3>Eliminar este teléfono</h3>
+        @if (cobros() > 0) {
+          <p>Tiene {{ cobros() | dinero }} en cobros registrados en la caja. ¿Qué hago con ellos?</p>
+          <label class="check-linea"><input type="radio" name="cobros" value="quitar" [(ngModel)]="destinoCobros" /> Fue un error de captura: quitarlos de la caja</label>
+          <label class="check-linea"><input type="radio" name="cobros" value="conservar" [(ngModel)]="destinoCobros" /> El dinero sí se cobró: dejarlos en los cortes</label>
+        }
+        <button class="btn btn-danger separado" type="button" (click)="eliminar()" [disabled]="cobros() > 0 && !destinoCobros">Eliminar</button>
+      </div>
+    }
+  </div>
 </div>
-
-<form class="card contenido ancho-5xl" (ngSubmit)="guardar()">
-  <div class="rejilla-2">
-    <div class="rejilla-3-1">
-      <div class="form-field">
-        <label for="locatario">Locatario *</label>
-        <input id="locatario" name="locatario" list="lista-locatarios" autocomplete="off" required
-               [(ngModel)]="m.locatario" (ngModelChange)="alCambiarLocatario()" />
-        <datalist id="lista-locatarios">
-          @for (l of locatarios(); track l.id) {
-            <option [value]="l.nombre"></option>
-          }
-        </datalist>
-      </div>
-      <div class="form-field">
-        <label for="whatsapp">WhatsApp</label>
-        <input id="whatsapp" name="whatsapp" inputmode="tel" placeholder="10 dígitos" [(ngModel)]="m.whatsapp" />
-      </div>
-    </div>
-    <div class="rejilla-2">
-      <div class="form-field">
-        <label for="fecha_recibido">Fecha recibido *</label>
-        <input id="fecha_recibido" name="fecha_recibido" type="date" required [(ngModel)]="m.fecha_recibido" />
-      </div>
-      <div class="form-field">
-        <label for="prioridad">Prioridad</label>
-        <select id="prioridad" name="prioridad" [(ngModel)]="m.prioridad">
-          <option value="ALTA">Alta</option>
-          <option value="MEDIA">Media</option>
-          <option value="BAJA">Baja</option>
-        </select>
-      </div>
-    </div>
-    <div class="form-field">
-      <label for="modelo">Modelo *</label>
-      <input id="modelo" name="modelo" required [(ngModel)]="m.modelo" />
-    </div>
-    <div class="form-field">
-      <label for="trabajo">Trabajo a realizar</label>
-      <input id="trabajo" name="trabajo" [(ngModel)]="m.trabajo" />
-    </div>
-    <div class="rejilla-2">
-      <div class="form-field">
-        <label for="total">Monto total $</label>
-        <input id="total" name="total" type="number" step="0.01" min="0" [(ngModel)]="m.total" (focus)="$any($event.target).select()" />
-      </div>
-      <div class="form-field">
-        <label for="pagado">Monto pagado $</label>
-        <input id="pagado" name="pagado" type="number" step="0.01" min="0" [(ngModel)]="m.pagado" (focus)="$any($event.target).select()" />
-        <span class="ayuda">Lo que cambie aquí se registra en la caja de hoy.</span>
-      </div>
-    </div>
-    <div class="form-field">
-      <label for="notas">Notas / IMEI</label>
-      <input id="notas" name="notas" [(ngModel)]="m.notas" />
-    </div>
-    <div class="form-field">
-      <label for="resultado">Estatus</label>
-      <select id="resultado" name="resultado" [(ngModel)]="m.resultado">
-        <option value="EN TALLER">En taller</option>
-        <option value="LISTO">Listo</option>
-        <option value="NO QUEDÓ">No quedó (no se cobra)</option>
-      </select>
-    </div>
-    <label class="check-linea">
-      <input type="checkbox" name="entregado" [(ngModel)]="m.entregado" />
-      Ya se entregó al locatario
-      @if (fechaEntrega()) {
-        <small class="tenue">({{ fechaEntrega() | fecha: true }})</small>
-      }
-    </label>
-  </div>
-
-  <div class="acciones-fila separado">
-    <button class="btn btn-primary" type="submit" [disabled]="guardando()">{{ id() ? 'Guardar cambios' : 'Guardar nuevo' }}</button>
-    @if (!id()) {
-      <button class="btn btn-secondary" type="button" (click)="limpiar()">Nuevo / limpiar</button>
-    }
-  </div>
-</form>
-
-@if (id() && auth.tienePermiso('telefonos.eliminar')) {
-  <div class="card contenido ancho-5xl zona-peligro" id="eliminar">
-    <h2>Eliminar este teléfono</h2>
-    @if (cobros() > 0) {
-      <p>Tiene {{ cobros() | dinero }} en cobros registrados en la caja. ¿Qué hago con ellos?</p>
-      <label class="check-linea"><input type="radio" name="cobros" value="quitar" [(ngModel)]="destinoCobros" /> Fue un error de captura: quitarlos de la caja</label>
-      <label class="check-linea"><input type="radio" name="cobros" value="conservar" [(ngModel)]="destinoCobros" /> El dinero sí se cobró: dejarlos en los cortes</label>
-    }
-    <button class="btn btn-danger separado" type="button" (click)="eliminar()" [disabled]="cobros() > 0 && !destinoCobros">Eliminar</button>
-  </div>
-}

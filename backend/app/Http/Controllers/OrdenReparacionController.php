@@ -225,16 +225,20 @@ class OrdenReparacionController extends Controller
 
     public function update(Request $request, OrdenReparacion $orden)
     {
+        // si trae bloqueos es liberación: solo recibido, en proceso, listo o rechazado
+        $bloqueos = $request->has('bloqueos') ? (array) $request->input('bloqueos') : $orden->bloqueos;
         $datos = $request->validate($this->camposComunes($request) + [
-            'estado' => ['required', Rule::in(OrdenReparacion::ESTADOS)],
+            'estado' => ['required', Rule::in(OrdenReparacion::estadosPara($bloqueos))],
+            'motivo_rechazo' => ['nullable', 'required_if:estado,'.OrdenReparacion::RECHAZADO, 'string', 'max:255'],
             'solucion' => ['nullable', 'string', 'max:2000'],
             'costo_final' => ['nullable', 'numeric', 'min:0'],
-        ]);
+        ], $this->mensajesEstado($bloqueos));
 
         $antes = $orden->estado;
         DB::transaction(function () use ($orden, $datos) {
             // lo pagado solo cambia con abonos: así cada peso queda registrado en la caja
             $campos = $this->camposOrden($datos);
+            $campos['motivo_rechazo'] = $datos['estado'] === OrdenReparacion::RECHAZADO ? trim($datos['motivo_rechazo']) : null;
             $campos['fecha_entrega_real'] = $datos['estado'] === OrdenReparacion::ENTREGADO ? ($orden->fecha_entrega_real ?? now()) : null;
             $orden->update($campos);
             $this->asociarFotos($orden, $datos['lote'] ?? null);
@@ -252,9 +256,17 @@ class OrdenReparacionController extends Controller
         switch ($request->input('accion')) {
             case 'estatus':
                 abort_unless($usuario->can('ordenes.cambiar_estado') || $usuario->can('ordenes.editar'), 403);
-                $nuevo = $request->validate(['estado' => ['required', Rule::in(OrdenReparacion::ESTADOS)]])['estado'];
+                $d = $request->validate([
+                    'estado' => ['required', Rule::in(OrdenReparacion::estadosPara($orden->bloqueos))],
+                    'motivo' => ['nullable', 'required_if:estado,'.OrdenReparacion::RECHAZADO, 'string', 'max:255'],
+                ], $this->mensajesEstado($orden->bloqueos, 'motivo'));
+                $nuevo = $d['estado'];
                 $antes = $orden->estado;
-                $orden->update(['estado' => $nuevo, 'fecha_entrega_real' => $nuevo === OrdenReparacion::ENTREGADO ? now() : null]);
+                $orden->update([
+                    'estado' => $nuevo,
+                    'motivo_rechazo' => $nuevo === OrdenReparacion::RECHAZADO ? trim($d['motivo']) : null,
+                    'fecha_entrega_real' => $nuevo === OrdenReparacion::ENTREGADO ? now() : null,
+                ]);
                 $aviso = $this->aviso($orden, $antes);
                 $mensaje = "Folio {$orden->folio}: ahora está {$orden->estado_texto}."
                     .($nuevo === OrdenReparacion::ENTREGADO && $orden->saldo > 0 ? ' Ojo: aún debe '.dinero($orden->saldo).'.' : '');
@@ -282,16 +294,33 @@ class OrdenReparacionController extends Controller
         return response()->json(['message' => $mensaje, 'aviso' => $aviso, 'orden' => $this->conEnlaces($orden)]);
     }
 
-    /** Si acaba de quedar lista o no quedó, deja listo el botón para avisar por WhatsApp. */
+    /** Mensajes de error del estatus: dicen cuáles se permiten (liberación o reparación). */
+    private function mensajesEstado(?array $bloqueos, string $campoMotivo = 'motivo_rechazo'): array
+    {
+        return [
+            'estado.in' => OrdenReparacion::esLiberacion($bloqueos)
+                ? 'Una liberación solo puede estar Recibido, En proceso, Listo o Rechazado.'
+                : 'En proceso y Rechazado son solo para liberaciones (órdenes con bloqueo).',
+            "{$campoMotivo}.required_if" => 'Escribe por qué se rechazó la liberación.',
+        ];
+    }
+
+    /** Si acaba de quedar lista, no quedó o se rechazó, deja listo el botón para avisar por WhatsApp. */
     private function aviso(OrdenReparacion $o, ?string $antes): ?array
     {
-        if (! in_array($o->estado, [OrdenReparacion::LISTO, OrdenReparacion::NO_QUEDO], true) || $antes === $o->estado) {
+        $avisables = [OrdenReparacion::LISTO, OrdenReparacion::NO_QUEDO, OrdenReparacion::RECHAZADO];
+        if (! in_array($o->estado, $avisables, true) || $antes === $o->estado) {
             return null;
         }
         $o->loadMissing('cliente', 'equipo');
+        $que = match ($o->estado) {
+            OrdenReparacion::LISTO => 'ya está listo?',
+            OrdenReparacion::RECHAZADO => 'no se pudo liberar?',
+            default => 'no quedó?',
+        };
 
         return [
-            'texto' => "¿Avisar a {$o->cliente->nombre_completo} que su {$o->equipo?->nombre} ".($o->estado === OrdenReparacion::LISTO ? 'ya está listo?' : 'no quedó?'),
+            'texto' => "¿Avisar a {$o->cliente->nombre_completo} que su {$o->equipo?->nombre} {$que}",
             'url' => WhatsApp::avisoOrden($o),
             'sin_numero' => ! $o->cliente->telefono,
         ];

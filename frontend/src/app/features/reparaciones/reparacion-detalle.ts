@@ -2,7 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { ESTADOS_ORDEN, OrdenReparacion, REVISION_ORDEN } from '../../core/models/taller.model';
+import { OrdenReparacion, REVISION_ORDEN, estadosPara } from '../../core/models/taller.model';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { AvisosService, AvisoWhatsapp } from '../../core/services/avisos.service';
@@ -31,11 +31,13 @@ export class ReparacionDetalle implements OnInit {
   readonly auth = inject(AuthService);
 
   readonly o = signal<Ficha | null>(null);
-  readonly estados = ESTADOS_ORDEN;
   readonly revision = REVISION_ORDEN;
   readonly metodoTexto = metodoTexto;
+  /** Se está escribiendo el motivo para rechazar la liberación. */
+  readonly rechazando = signal(false);
 
   monto: number | null = null;
+  motivo = '';
   metodo = 'EFECTIVO';
   destinoCobros = '';
 
@@ -52,7 +54,19 @@ export class ReparacionDetalle implements OnInit {
 
   private mostrar(o: Ficha): void {
     this.monto = o.saldo > 0 ? o.saldo : null;
+    this.rechazando.set(false);
+    this.motivo = '';
     this.o.set(o);
+  }
+
+  /** Una liberación solo tiene Recibido, En proceso, Listo y Rechazado. */
+  estadosDe(x: Ficha) {
+    return estadosPara(x.bloqueos);
+  }
+
+  nombresBloqueos(x: Ficha): string {
+    const nombres: Record<string, string> = { operador: 'Operador', frp: 'FRP', icloud: 'iCloud', mdm: 'MDM', knox: 'Knox' };
+    return (x.bloqueos ?? []).map((b) => nombres[b] ?? b).join(', ');
   }
 
   nombreCliente(x: Ficha): string {
@@ -83,7 +97,18 @@ export class ReparacionDetalle implements OnInit {
 
   cambiarEstado(x: Ficha, estado: string): void {
     if (estado === 'entregado' && x.saldo > 0 && !confirm(`Aún debe ${dinero(x.saldo)}. ¿Entregar de todos modos?`)) return;
+    // rechazar siempre lleva el motivo: primero se escribe
+    if (estado === 'rechazado') {
+      this.rechazando.set(true);
+      return;
+    }
     this.accion({ accion: 'estatus', estado });
+  }
+
+  confirmarRechazo(): void {
+    const motivo = this.motivo.trim();
+    if (!motivo) return;
+    this.accion({ accion: 'estatus', estado: 'rechazado', motivo });
   }
 
   eliminar(x: Ficha): void {
