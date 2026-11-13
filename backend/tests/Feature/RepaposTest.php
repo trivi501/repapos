@@ -440,6 +440,24 @@ class RepaposTest extends TestCase
         $this->assertFalse($this->getJson('/api/whatsapp-api')->json('activa'));
     }
 
+    public function test_whatsapp_api_avisa_si_pegaron_el_id_de_la_cuenta_y_sugiere_el_del_numero(): void
+    {
+        $this->comoTaller($this->adminA);
+        Http::fake([
+            'graph.facebook.com/*/999888777/phone_numbers*' => Http::response(['data' => [
+                ['id' => '555444333', 'display_phone_number' => '+52 55 1111 2222', 'verified_name' => 'Mi Taller'],
+            ]]),
+            'graph.facebook.com/*/999888777*' => Http::response(['error' => [
+                'code' => 100, 'message' => '(#100) Tried accessing nonexisting field (display_phone_number)',
+            ]], 400),
+        ]);
+
+        $r = $this->putJson('/api/whatsapp-api', ['numero_id' => '999888777', 'token' => 'EAAG'.str_repeat('z', 40), 'encendida' => true])
+            ->assertUnprocessable();
+        $this->assertStringContainsString('no es el de un número de teléfono', $r->json('message'));
+        $this->assertStringContainsString('ID 555444333', $r->json('message'));
+    }
+
     public function test_saldo_a_favor_deposito_aplicar_devolver_y_eliminar(): void
     {
         $t = $this->telefonoDe($this->adminA, ['pagado' => 0]);   // debe 500

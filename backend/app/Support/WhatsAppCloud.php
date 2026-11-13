@@ -88,6 +88,10 @@ class WhatsAppCloud
             throw new RuntimeException('No se pudo conectar con WhatsApp. Revisa el internet del servidor.');
         }
         if ($r->failed()) {
+            // pegaron el ID de la cuenta de WhatsApp Business (o de la app) en vez del ID del número
+            if ((int) $r->json('error.code') === 100 && str_contains((string) $r->json('error.message'), 'nonexisting field')) {
+                throw new RuntimeException(static::sugerirNumero($token, $numeroId));
+            }
             throw new RuntimeException(static::error($r));
         }
 
@@ -96,6 +100,25 @@ class WhatsAppCloud
             'nombre' => $r->json('verified_name'),
             'calidad' => $r->json('quality_rating'),
         ];
+    }
+
+    /** Si el ID es de una cuenta de WhatsApp Business, le pregunta a Meta qué números tiene y cuál es su ID. */
+    private static function sugerirNumero(string $token, string $id): string
+    {
+        $base = 'Ese ID no es el de un número de teléfono: parece el de tu cuenta de WhatsApp Business o el de la app.';
+        try {
+            $r = Http::withToken($token)->acceptJson()->timeout(15)
+                ->get(static::url($id).'/phone_numbers', ['fields' => 'id,display_phone_number,verified_name']);
+        } catch (ConnectionException) {
+            $r = null;
+        }
+        $numeros = $r?->successful() ? (array) $r->json('data', []) : [];
+        if (! $numeros) {
+            return $base.' Copia el "Identificador del número de teléfono" (Phone number ID) que aparece en Meta → WhatsApp → Configuración de la API, debajo del número.';
+        }
+        $lista = collect($numeros)->map(fn ($n) => ($n['display_phone_number'] ?? '?').' ('.($n['verified_name'] ?? 'sin nombre').') → ID '.($n['id'] ?? '?'))->implode('; ');
+
+        return $base.' Tus números en esa cuenta: '.$lista.'. Pega ese ID en "ID del número de teléfono" y guarda otra vez.';
     }
 
     /** Manda el mensaje y lo registra, haya salido o no. */
