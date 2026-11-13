@@ -6,6 +6,7 @@ use App\Models\Ajuste;
 use App\Models\Cliente;
 use App\Models\Equipo;
 use App\Models\FotoOrden;
+use App\Models\OrdenRefaccion;
 use App\Models\OrdenReparacion;
 use App\Models\Sucursal;
 use App\Models\User;
@@ -21,7 +22,7 @@ use Illuminate\Validation\ValidationException;
 /** Órdenes de servicio de clientes finales (mostrador). */
 class OrdenReparacionController extends Controller
 {
-    private const RELACIONES = ['cliente', 'equipo', 'tecnico', 'fotos', 'pagos'];
+    private const RELACIONES = ['cliente', 'equipo', 'tecnico', 'fotos', 'pagos', 'refacciones'];
 
     /** Reglas con los catálogos limitados al taller del usuario: no se puede apuntar a datos de otro taller. */
     private function camposComunes(Request $request): array
@@ -49,6 +50,8 @@ class OrdenReparacionController extends Controller
             // costos internos (solo el dueño): se descartan si el usuario no tiene "ordenes.ver_costos"
             'costo_refaccion' => ['nullable', 'numeric', 'min:0'],
             'costo_mano_obra' => ['nullable', 'numeric', 'min:0'],
+            'costo_mano_externa' => ['nullable', 'numeric', 'min:0'],
+            'mano_externa_detalle' => ['nullable', 'string', 'max:255'],
             'anticipo' => ['nullable', 'numeric', 'min:0'],
             'metodo_pago' => ['nullable', 'in:efectivo,tarjeta,transferencia'],
             'estimado_listo_at' => ['nullable', 'date'],
@@ -214,13 +217,14 @@ class OrdenReparacionController extends Controller
     }
 
     /** La orden con todo lo que necesita su ficha: relaciones, PIN/patrón y enlaces de WhatsApp. */
-    private function conEnlaces(OrdenReparacion $orden): array
+    public function conEnlaces(OrdenReparacion $orden): array
     {
         $orden->load(self::RELACIONES);
         $orden->makeVisible(['bloqueo_valor', 'bloqueo_pin']);
         $costos = [];
         if (auth()->user()?->can('ordenes.ver_costos')) {
             $orden->makeVisible(OrdenReparacion::COSTOS_INTERNOS);
+            $orden->refacciones->each->makeVisible(OrdenRefaccion::COSTOS);
             $costos = ['ganancia' => $orden->ganancia];
         }
 
@@ -250,6 +254,10 @@ class OrdenReparacionController extends Controller
         DB::transaction(function () use ($orden, $datos) {
             // lo pagado solo cambia con abonos: así cada peso queda registrado en la caja
             $campos = $this->camposOrden($datos);
+            // con refacciones en la lista, su costo es la suma de ellas: no se captura a mano
+            if ($orden->refacciones()->exists()) {
+                unset($campos['costo_refaccion']);
+            }
             $campos['motivo_rechazo'] = $datos['estado'] === OrdenReparacion::RECHAZADO ? trim($datos['motivo_rechazo']) : null;
             $campos['fecha_entrega_real'] = $datos['estado'] === OrdenReparacion::ENTREGADO ? ($orden->fecha_entrega_real ?? now()) : null;
             $orden->update($campos);
@@ -345,6 +353,10 @@ class OrdenReparacionController extends Controller
                 $orden->pagos()->delete(); // fue un error de captura
             }
             $orden->fotos->each->delete(); // también borra los archivos
+            // las piezas del inventario que se habían usado regresan
+            foreach ($orden->refacciones as $refaccion) {   // foreach: ->each se detendría en la primera comprada fuera
+                $refaccion->regresarAlInventario("Se eliminó la orden N° {$orden->folio}");
+            }
             $orden->delete();
         });
 

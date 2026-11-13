@@ -578,6 +578,9 @@
                 <input id="costo_refaccion" type="number" min="0" step="0.01" formControlName="costo_refaccion"
                        [placeholder]="esLiberacion() ? 'Ej. créditos FRP, iCloud…' : 'Ej. pantalla'" />
               </div>
+              @if (refaccionesEnLista()) {
+                <p class="sub">Es la suma de las {{ refaccionesEnLista() }} refacción(es) de la orden. Se agregan o quitan en la ficha.</p>
+              }
             </div>
             <div class="form-field">
               <label for="costo_mano_obra">Mano de obra</label>
@@ -586,12 +589,25 @@
                 <input id="costo_mano_obra" type="number" min="0" step="0.01" formControlName="costo_mano_obra" placeholder="Pago al técnico" />
               </div>
             </div>
+            <div class="form-field">
+              <label for="costo_mano_externa">Mano externa</label>
+              <div class="input-moneda">
+                <span>$</span>
+                <input id="costo_mano_externa" type="number" min="0" step="0.01" formControlName="costo_mano_externa"
+                       placeholder="Si se mandó a otro taller o técnico" />
+              </div>
+            </div>
+            <div class="form-field">
+              <label for="mano_externa_detalle">¿A quién se mandó y qué hizo?</label>
+              <input id="mano_externa_detalle" maxlength="255" formControlName="mano_externa_detalle" placeholder="Ej. Reballing con Juan (Plaza Tecno)" />
+            </div>
           </div>
           @if (ganancia(); as g) {
             <div class="desglose-ganancia">
               <div><span>Se le cobra al cliente</span><span>$ {{ g.ingreso.toFixed(2) }}</span></div>
               <div><span>− {{ esLiberacion() ? 'Servidor / créditos' : 'Refacción' }}</span><span>$ {{ g.refaccion.toFixed(2) }}</span></div>
               <div><span>− Mano de obra</span><span>$ {{ g.manoObra.toFixed(2) }}</span></div>
+              <div><span>− Mano externa</span><span>$ {{ g.manoExterna.toFixed(2) }}</span></div>
               <div class="total" [class.perdida]="g.ganancia < 0">
                 <span>{{ g.ganancia < 0 ? 'Pérdida del local' : 'Ganancia del local' }}</span><span>$ {{ g.ganancia.toFixed(2) }}</span>
               </div>

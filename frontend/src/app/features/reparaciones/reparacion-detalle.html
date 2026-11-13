@@ -73,6 +73,103 @@
         </div>
       </div>
 
+      @if (x.refacciones?.length || auth.tienePermiso('ordenes.editar')) {
+        <div class="card tabla-scroll">
+          <div class="titulo-tarjeta">
+            <h2>Refacciones</h2>
+            @if (auth.tienePermiso('ordenes.editar') && !agregandoRefaccion()) {
+              <button class="btn btn-primary btn-sm" (click)="abrirRefaccion()">+ Agregar refacción</button>
+            }
+          </div>
+
+          @if (agregandoRefaccion()) {
+            <div class="contenido form-refaccion">
+              <div class="acciones-fila">
+                <label class="check-linea"><input type="radio" name="origen" value="inventario" [(ngModel)]="origenRefaccion" /> Del inventario</label>
+                <label class="check-linea"><input type="radio" name="origen" value="fuera" [(ngModel)]="origenRefaccion" /> Comprada fuera</label>
+              </div>
+
+              @if (origenRefaccion === 'inventario') {
+                <div class="form-field buscador">
+                  <label for="ref-producto">Producto (nombre o código)</label>
+                  <input id="ref-producto" autocomplete="off" placeholder="Ej. pantalla, batería…"
+                         [ngModel]="textoProducto" (ngModelChange)="buscarProducto($event)" />
+                  @if (productos().length && !productoElegido) {
+                    <div class="resultados resultados-refaccion">
+                      @for (p of productos(); track p.id) {
+                        <button type="button" class="menu-item entre" (click)="elegirProducto(p)" [disabled]="p.hay <= 0">
+                          <span><strong>{{ p.nombre }}</strong> <small class="tenue">{{ p.codigo }}</small></span>
+                          <span class="sin-salto">
+                            @if (p.costo !== undefined) { {{ p.costo | dinero }} · }
+                            <span [class.debe]="p.hay <= 0">hay {{ p.hay }}</span>
+                          </span>
+                        </button>
+                      }
+                    </div>
+                  }
+                </div>
+                @if (productoElegido; as p) {
+                  <p class="ayuda">Se descontará{{ refCantidad > 1 ? 'n' : '' }} del inventario de esta sucursal (hay {{ p.hay }}).
+                    @if (refCantidad > p.hay) { <strong class="debe">No alcanza.</strong> }
+                  </p>
+                }
+              } @else {
+                <div class="form-field">
+                  <label for="ref-descripcion">¿Qué refacción es?</label>
+                  <input id="ref-descripcion" maxlength="255" placeholder="Ej. Flex de carga comprado en la plaza" [(ngModel)]="refDescripcion" />
+                </div>
+              }
+
+              <div class="grupo-en-linea">
+                <div class="form-field">
+                  <label for="ref-cantidad">Cantidad</label>
+                  <input id="ref-cantidad" class="input-corto" type="number" min="1" step="1" [(ngModel)]="refCantidad" />
+                </div>
+                @if (verCostos && origenRefaccion === 'fuera') {
+                  <div class="form-field">
+                    <label for="ref-costo">Costo de cada una</label>
+                    <input id="ref-costo" class="input-corto" type="number" min="0" step="0.01" placeholder="$" [(ngModel)]="refCosto" />
+                  </div>
+                }
+              </div>
+
+              <div class="acciones-fila">
+                <button class="btn btn-primary btn-sm" (click)="guardarRefaccion()" [disabled]="!puedeGuardarRefaccion()">Agregar</button>
+                <button class="btn btn-secondary btn-sm" (click)="agregandoRefaccion.set(false)">Cancelar</button>
+              </div>
+            </div>
+          }
+
+          <table>
+            <thead>
+              <tr>
+                <th>Refacción</th>
+                <th class="der">Cant.</th>
+                @if (verCostos) { <th class="der">Costo</th><th class="der">Importe</th> }
+                @if (auth.tienePermiso('ordenes.editar')) { <th></th> }
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of x.refacciones; track r.id) {
+                <tr>
+                  <td>{{ r.descripcion }} <small class="tenue">{{ r.del_inventario ? '· inventario' : '· comprada fuera' }}</small></td>
+                  <td class="der">{{ r.cantidad }}</td>
+                  @if (verCostos) {
+                    <td class="der">{{ r.costo_unitario | dinero }}</td>
+                    <td class="der">{{ r.importe | dinero }}</td>
+                  }
+                  @if (auth.tienePermiso('ordenes.editar')) {
+                    <td class="der"><button class="btn btn-secondary btn-sm" (click)="quitarRefaccion(r)" title="Quitar">Quitar</button></td>
+                  }
+                </tr>
+              } @empty {
+                <tr><td [attr.colspan]="5"><div class="empty-state">Sin refacciones</div></td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+
       @if (x.fotos?.length) {
         <div class="card contenido">
           <h2>Fotografías</h2>
@@ -143,12 +240,16 @@
           <div class="linea-monto"><span>Se le cobra al cliente</span><span>{{ ingreso(x) | dinero }}</span></div>
           <div class="linea-monto"><span>− {{ x.es_liberacion ? 'Servidor / créditos' : 'Refacción' }}</span><span>{{ x.costo_refaccion ?? 0 | dinero }}</span></div>
           <div class="linea-monto"><span>− Mano de obra</span><span>{{ x.costo_mano_obra ?? 0 | dinero }}</span></div>
+          <div class="linea-monto">
+            <span>− Mano externa @if (x.mano_externa_detalle) { <small class="tenue">({{ x.mano_externa_detalle }})</small> }</span>
+            <span>{{ x.costo_mano_externa ?? 0 | dinero }}</span>
+          </div>
           <div class="linea-monto separador-superior">
             <b>{{ x.ganancia < 0 ? 'Pérdida del local' : 'Ganancia del local' }}</b>
             <b [class.a-favor]="x.ganancia >= 0" [class.debe]="x.ganancia < 0">{{ x.ganancia | dinero }}</b>
           </div>
-          @if (x.costo_refaccion == null && x.costo_mano_obra == null) {
-            <p class="ayuda">Captura el costo {{ x.es_liberacion ? 'del servidor o créditos' : 'de la refacción' }} y la mano de obra en Editar para ver la ganancia real.</p>
+          @if (x.costo_refaccion == null && x.costo_mano_obra == null && x.costo_mano_externa == null) {
+            <p class="ayuda">Agrega las refacciones arriba y captura la mano de obra (y la externa, si la mandaste fuera) en Editar para ver la ganancia real.</p>
           }
         </div>
       }
@@ -205,6 +306,14 @@
       <div class="card contenido">
         <label class="etiqueta-campo" for="enlace">Enlace para que el cliente consulte su orden:</label>
         <input id="enlace" readonly [value]="x.enlaces.publico" (click)="$any($event.target).select()" />
+        <div class="consultas-cliente separado">
+          @if (x.consultas_cliente) {
+            <span>El cliente ha revisado su estatus <b>{{ x.consultas_cliente }} {{ x.consultas_cliente === 1 ? 'vez' : 'veces' }}</b></span>
+            <small class="tenue">Última: {{ x.ultima_consulta_at | fecha: true }}</small>
+          } @else {
+            <span class="tenue">El cliente todavía no ha revisado su estatus.</span>
+          }
+        </div>
       </div>
     </div>
   </div>

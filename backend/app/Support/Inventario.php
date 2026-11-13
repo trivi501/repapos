@@ -272,6 +272,23 @@ class Inventario
         });
     }
 
+    /** Saca piezas del inventario de la sucursal de la orden para usarlas en una reparación. */
+    public static function usarEnReparacion(Producto $p, int $piezas, int $sucursalId, string $nota): Movimiento
+    {
+        return DB::transaction(function () use ($p, $piezas, $sucursalId, $nota) {
+            static::validarQueAlcance($p, $sucursalId, $piezas);
+
+            return static::registrar($p, $sucursalId, Movimiento::REPARACION, -$piezas,
+                ['importe' => round($piezas * (float) $p->costo, 2), 'nota' => $nota]);
+        });
+    }
+
+    /** Regresa al inventario las piezas de una refacción que se quitó de la orden. */
+    public static function regresarDeReparacion(Producto $p, int $piezas, int $sucursalId, string $nota): Movimiento
+    {
+        return DB::transaction(fn () => static::registrar($p, $sucursalId, Movimiento::REPARACION, $piezas, ['nota' => $nota]));
+    }
+
     public static function traspaso(Producto $p, int $piezas, Sucursal $destino, string $nota = ''): void
     {
         DB::transaction(function () use ($p, $piezas, $destino, $nota) {

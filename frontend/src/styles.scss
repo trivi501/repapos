@@ -1743,3 +1743,22 @@ app-grafica-barras {
     display: none !important;
   }
 }
+
+// ---- refacciones de una reparación (ficha de la orden)
+.form-refaccion {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.resultados.resultados-refaccion {
+  left: 0;
+  right: 0;
+}
+
+.consultas-cliente {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}

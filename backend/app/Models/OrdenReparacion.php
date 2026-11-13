@@ -94,6 +94,8 @@ class OrdenReparacion extends Model
         'costo_final',
         'costo_refaccion',
         'costo_mano_obra',
+        'costo_mano_externa',
+        'mano_externa_detalle',
         'fecha_recepcion',
         'fecha_entrega_estimada',
         'fecha_entrega_real',
@@ -104,10 +106,10 @@ class OrdenReparacion extends Model
     ];
 
     /** Costos internos: solo los ve quien tiene "ordenes.ver_costos". */
-    public const COSTOS_INTERNOS = ['costo_refaccion', 'costo_mano_obra'];
+    public const COSTOS_INTERNOS = ['costo_refaccion', 'costo_mano_obra', 'costo_mano_externa', 'mano_externa_detalle'];
 
     // el PIN, el patrón y los costos internos solo se exponen al abrir la orden (makeVisible en el controlador)
-    protected $hidden = ['bloqueo_valor', 'bloqueo_pin', 'costo_refaccion', 'costo_mano_obra'];
+    protected $hidden = ['bloqueo_valor', 'bloqueo_pin', 'costo_refaccion', 'costo_mano_obra', 'costo_mano_externa', 'mano_externa_detalle'];
 
     protected $appends = ['total', 'saldo', 'es_liberacion'];
 
@@ -120,6 +122,9 @@ class OrdenReparacion extends Model
             'costo_final' => 'decimal:2',
             'costo_refaccion' => 'decimal:2',
             'costo_mano_obra' => 'decimal:2',
+            'costo_mano_externa' => 'decimal:2',
+            'consultas_cliente' => 'integer',
+            'ultima_consulta_at' => 'datetime',
             'anticipo' => 'decimal:2',
             'pagado' => 'decimal:2',
             'estado_fisico' => 'array',
@@ -185,6 +190,28 @@ class OrdenReparacion extends Model
         return $this->hasMany(Pago::class, 'orden_id');
     }
 
+    public function refacciones(): HasMany
+    {
+        return $this->hasMany(OrdenRefaccion::class, 'orden_reparacion_id')->orderBy('id');
+    }
+
+    /** Con refacciones en la lista, el costo de refacción es su suma; sin ninguna, queda vacío para capturarlo a mano. */
+    public function recalcularCostoRefaccion(): void
+    {
+        $refacciones = $this->refacciones()->get();
+        $this->costo_refaccion = $refacciones->isEmpty() ? null : round($refacciones->sum('importe'), 2);
+        $this->saveQuietly();
+    }
+
+    /** El cliente abrió el enlace de su comprobante o buscó su folio. No cambia la fecha de "actualizado". */
+    public function registrarConsulta(): void
+    {
+        DB::table($this->getTable())->where('id', $this->id)->update([
+            'consultas_cliente' => DB::raw('consultas_cliente + 1'),
+            'ultima_consulta_at' => now(),
+        ]);
+    }
+
     public function getEstadoTextoAttribute(): string
     {
         return self::ESTADOS_TEXTO[$this->estado] ?? mb_strtoupper((string) $this->estado);
@@ -214,14 +241,14 @@ class OrdenReparacion extends Model
     }
 
     /**
-     * Ganancia del local: lo que se le cobra al cliente menos la refacción y la mano de obra.
+     * Ganancia del local: lo que se le cobra al cliente menos la refacción, la mano de obra y la mano externa.
      * Si no quedó, se rechazó o se canceló no entra nada, y la ganancia es negativa si se gastó algo.
      */
     public function getGananciaAttribute(): float
     {
         $ingreso = in_array($this->estado, [self::NO_QUEDO, self::CANCELADO, self::RECHAZADO], true) ? 0.0 : $this->total;
 
-        return round($ingreso - (float) $this->costo_refaccion - (float) $this->costo_mano_obra, 2);
+        return round($ingreso - (float) $this->costo_refaccion - (float) $this->costo_mano_obra - (float) $this->costo_mano_externa, 2);
     }
 
     /** Lo que debe. Si no quedó (o se rechazó la liberación), no se cobra. */

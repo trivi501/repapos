@@ -801,6 +801,102 @@ class RepaposTest extends TestCase
         $this->assertFalse($this->usuario($this->tallerA, 'Empleado')->can('ordenes.ver_costos'));
     }
 
+    public function test_refacciones_del_inventario_y_compradas_fuera_suman_el_costo(): void
+    {
+        $pantalla = $this->productoDe($this->adminA, hay: 5, costo: 300);
+        $hay = fn () => (int) DB::table('existencias')->where('producto_id', $pantalla->id)->sum('cantidad');
+        $o = $this->ordenNueva(['costo_refaccion' => 999]);
+        $id = $o['id'];
+
+        // del inventario: descuenta las piezas y toma el costo del producto (la suma reemplaza lo capturado a mano)
+        $r = $this->postJson("/api/ordenes/{$id}/refacciones", ['producto_id' => $pantalla->id, 'cantidad' => 2])->assertOk();
+        $this->assertSame(3, $hay());
+        $r->assertJsonPath('orden.costo_refaccion', '600.00')->assertJsonPath('orden.ganancia', 400)
+            ->assertJsonPath('orden.refacciones.0.descripcion', 'Mica')->assertJsonPath('orden.refacciones.0.del_inventario', true);
+        $this->assertSame('REPARACIÓN', DB::table('movimientos')->where('producto_id', $pantalla->id)->latest('id')->value('tipo'));
+
+        // comprada fuera: nombre y costo, sin tocar el inventario
+        $r = $this->postJson("/api/ordenes/{$id}/refacciones", ['descripcion' => 'Flex comprado en la plaza', 'cantidad' => 1, 'costo_unitario' => 150])
+            ->assertOk()->assertJsonPath('orden.costo_refaccion', '750.00');
+        $this->assertSame(3, $hay());
+
+        // si no alcanza no se agrega; y sin nombre ni producto tampoco
+        $this->postJson("/api/ordenes/{$id}/refacciones", ['producto_id' => $pantalla->id, 'cantidad' => 10])->assertUnprocessable();
+        $this->postJson("/api/ordenes/{$id}/refacciones", ['cantidad' => 1])->assertUnprocessable()->assertJsonValidationErrors('descripcion');
+        $this->assertSame(3, $hay());
+
+        // con refacciones en la lista, el costo de refacción no se captura a mano
+        $this->putJson("/api/ordenes/{$id}", ['falla_reportada' => 'Pantalla rota', 'estado' => 'en_reparacion', 'costo_refaccion' => 1])->assertOk();
+        $this->assertEquals(750.0, (float) OrdenReparacion::find($id)->costo_refaccion);
+
+        // el técnico ve la lista y agrega piezas, pero no ve costos ni puede ponerlos
+        $tecnico = $this->usuario($this->tallerA, 'Tecnico');
+        $this->comoTaller($tecnico);
+        $ficha = $this->getJson("/api/ordenes/{$id}")->assertOk()->json();
+        $this->assertCount(2, $ficha['refacciones']);
+        $this->assertArrayNotHasKey('costo_unitario', $ficha['refacciones'][0]);
+        $this->assertArrayNotHasKey('costo', $this->getJson('/api/ordenes-refacciones/productos?q=mic')->assertOk()->json('0'));
+        $this->postJson("/api/ordenes/{$id}/refacciones", ['descripcion' => 'Tornillos', 'cantidad' => 1, 'costo_unitario' => 9999])->assertOk();
+        $this->assertEquals(750.0, (float) OrdenReparacion::find($id)->costo_refaccion, 'Sin permiso de costos, la pieza de fuera va en $0');
+
+        // otro taller no puede tocar la orden
+        $this->comoTaller($this->adminB);
+        $this->postJson("/api/ordenes/{$id}/refacciones", ['descripcion' => 'X', 'cantidad' => 1])->assertNotFound();
+
+        // al quitar la del inventario, la pieza regresa y el costo baja
+        $this->comoTaller($this->adminA);
+        $delInventario = $ficha['refacciones'][0]['id'];
+        $this->deleteJson("/api/ordenes/{$id}/refacciones/{$delInventario}")->assertOk()->assertJsonPath('orden.costo_refaccion', '150.00');
+        $this->assertSame(5, $hay(), 'Al quitarla regresa la pieza');
+
+        // al eliminar la orden, las piezas del inventario que usaba también regresan
+        $this->postJson("/api/ordenes/{$id}/refacciones", ['producto_id' => $pantalla->id, 'cantidad' => 1])->assertOk();
+        $this->assertSame(4, $hay());
+        $this->deleteJson("/api/ordenes/{$id}")->assertNoContent();
+        $this->assertSame(5, $hay(), 'Regresan aunque antes en la lista haya piezas compradas fuera');
+        $this->assertSame(0, DB::table('orden_refacciones')->count());
+    }
+
+    public function test_mano_externa_resta_de_la_ganancia_y_entra_al_corte(): void
+    {
+        $o = $this->ordenNueva(['costo_refaccion' => 300, 'costo_mano_obra' => 100, 'costo_mano_externa' => 250,
+            'mano_externa_detalle' => 'Reballing con Juan']);
+        $this->assertEquals(350.0, $o['ganancia'], '1000 - 300 - 100 - 250');
+        $this->assertSame('Reballing con Juan', $o['mano_externa_detalle']);
+
+        $this->postJson("/api/ordenes/{$o['id']}/accion", ['accion' => 'estatus', 'estado' => 'reparado'])->assertOk();
+        $g = $this->getJson('/api/cortes?fecha='.today()->toDateString())->json('ganancia.reparaciones');
+        $this->assertEquals(250, $g['mano_externa']);
+        $this->assertEquals(1000, $g['cobrado']);
+        $this->assertEquals(350, $g['ganancia']);
+
+        // es un costo interno: el técnico no lo ve
+        $this->comoTaller($this->usuario($this->tallerA, 'Tecnico'));
+        $ficha = $this->getJson("/api/ordenes/{$o['id']}")->json();
+        $this->assertArrayNotHasKey('costo_mano_externa', $ficha);
+        $this->assertArrayNotHasKey('mano_externa_detalle', $ficha);
+    }
+
+    public function test_se_cuentan_las_veces_que_el_cliente_consulta_su_estatus(): void
+    {
+        $o = $this->ordenNueva();
+        $this->assertSame(0, $this->getJson("/api/ordenes/{$o['id']}")->json('consultas_cliente'));
+        $actualizada = DB::table('ordenes_reparacion')->where('id', $o['id'])->value('updated_at');
+
+        $this->getJson("/api/publico/orden/{$o['token']}")->assertOk()->assertJsonMissingPath('consultas_cliente');
+        $this->getJson("/api/publico/orden/{$o['token']}")->assertOk();
+        $this->getJson('/api/consulta/'.$o['numero_orden'])->assertOk();
+        $this->getJson('/api/publico/orden/'.str_repeat('x', 32))->assertNotFound();
+
+        $this->comoTaller($this->adminA);
+        $ficha = $this->getJson("/api/ordenes/{$o['id']}")->json();
+        $this->assertSame(3, $ficha['consultas_cliente']);
+        $this->assertNotNull($ficha['ultima_consulta_at']);
+        $this->assertSame(3, $this->getJson('/api/ordenes')->json('data.0.consultas_cliente'));
+        $this->assertSame($actualizada, DB::table('ordenes_reparacion')->where('id', $o['id'])->value('updated_at'),
+            'Contar la consulta no cambia la fecha de actualizado');
+    }
+
     public function test_al_editar_una_liberacion_se_valida_el_estatus_y_el_motivo(): void
     {
         $o = $this->ordenNueva(['bloqueos' => ['mdm']]);

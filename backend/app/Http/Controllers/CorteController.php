@@ -259,6 +259,7 @@ class CorteController extends Controller
         $ordenes = OrdenReparacion::where('terminado_at', '>=', $desde)->where('terminado_at', '<', $hasta)->get();
         $refaccion = round((float) $ordenes->sum('costo_refaccion'), 2);
         $manoObra = round((float) $ordenes->sum('costo_mano_obra'), 2);
+        $manoExterna = round((float) $ordenes->sum('costo_mano_externa'), 2);
         $gananciaOrdenes = round($ordenes->sum(fn (OrdenReparacion $o) => $o->ganancia), 2);
 
         $ventas = Venta::with('detalles')->where('created_at', '>=', $desde)->where('created_at', '<', $hasta)
@@ -274,12 +275,14 @@ class CorteController extends Controller
         return [
             'reparaciones' => [
                 'cantidad' => $ordenes->count(),
-                'cobrado' => round($gananciaOrdenes + $refaccion + $manoObra, 2),
+                'cobrado' => round($gananciaOrdenes + $refaccion + $manoObra + $manoExterna, 2),
                 'refaccion' => $refaccion,
                 'mano_obra' => $manoObra,
+                'mano_externa' => $manoExterna,
                 'ganancia' => $gananciaOrdenes,
                 // sin costos capturados la ganancia sale igual a lo cobrado: hay que avisar
-                'sin_costos' => $ordenes->filter(fn ($o) => $o->costo_refaccion === null && $o->costo_mano_obra === null)->count(),
+                'sin_costos' => $ordenes->filter(fn ($o) => $o->costo_refaccion === null && $o->costo_mano_obra === null
+                    && $o->costo_mano_externa === null)->count(),
             ],
             'ventas' => [
                 'cantidad' => $ventas->count(),

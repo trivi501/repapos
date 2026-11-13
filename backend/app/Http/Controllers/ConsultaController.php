@@ -24,6 +24,7 @@ class ConsultaController extends Controller
         if (! $orden) {
             return response()->json(['message' => 'No encontramos una reparación con ese folio.'], 404);
         }
+        $orden->registrarConsulta();
 
         $digitos = preg_replace('/\D/', '', (string) $request->query('telefono'));
         $telefono = preg_replace('/\D/', '', (string) $orden->cliente?->telefono);
@@ -37,6 +38,7 @@ class ConsultaController extends Controller
     {
         $orden = $this->buscar('token', $token);
         abort_unless($orden, 404);
+        $orden->registrarConsulta();
 
         return response()->json($this->datos($orden, true) + [
             'enlace_pdf' => route('orden.pdf', $orden->token),

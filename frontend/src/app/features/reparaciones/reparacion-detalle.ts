@@ -1,8 +1,10 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { OrdenReparacion, REVISION_ORDEN, estadosPara } from '../../core/models/taller.model';
+import { Subject, debounceTime, distinctUntilChanged, switchMap } from 'rxjs';
+import { OrdenReparacion, ProductoRefaccion, REVISION_ORDEN, RefaccionOrden, estadosPara } from '../../core/models/taller.model';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { AvisosService, AvisoWhatsapp } from '../../core/services/avisos.service';
@@ -41,13 +43,104 @@ export class ReparacionDetalle implements OnInit {
   metodo = 'EFECTIVO';
   destinoCobros = '';
 
+  // ---- agregar refacción: del inventario (descuenta la pieza) o comprada fuera
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly busqueda = new Subject<string>();
+  readonly agregandoRefaccion = signal(false);
+  readonly productos = signal<ProductoRefaccion[]>([]);
+  readonly guardandoRefaccion = signal(false);
+  origenRefaccion: 'inventario' | 'fuera' = 'inventario';
+  textoProducto = '';
+  productoElegido: ProductoRefaccion | null = null;
+  refDescripcion = '';
+  refCantidad = 1;
+  refCosto: number | null = null;
+
   private get id(): number {
     return Number(this.route.snapshot.paramMap.get('id'));
+  }
+
+  /** Costos de las refacciones, mano de obra, mano externa y ganancia: solo el dueño. */
+  get verCostos(): boolean {
+    return this.auth.tienePermiso('ordenes.ver_costos');
   }
 
   ngOnInit(): void {
     this.api.get<Ficha>(`ordenes/${this.id}`).subscribe({
       next: (o) => this.mostrar(o),
+      error: (e: HttpErrorResponse) => this.avisos.fallo(e),
+    });
+    this.busqueda
+      .pipe(
+        debounceTime(250),
+        distinctUntilChanged(),
+        switchMap((q) => this.api.get<ProductoRefaccion[]>('ordenes-refacciones/productos', { q })),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({ next: (p) => this.productos.set(p), error: (e: HttpErrorResponse) => this.avisos.fallo(e) });
+  }
+
+  abrirRefaccion(): void {
+    this.origenRefaccion = 'inventario';
+    this.textoProducto = '';
+    this.productoElegido = null;
+    this.refDescripcion = '';
+    this.refCantidad = 1;
+    this.refCosto = null;
+    this.productos.set([]);
+    this.agregandoRefaccion.set(true);
+    this.busqueda.next(' '); // trae los primeros productos para elegir sin escribir
+  }
+
+  buscarProducto(texto: string): void {
+    this.textoProducto = texto;
+    this.productoElegido = null;
+    this.busqueda.next(texto.trim() || ' ');
+  }
+
+  elegirProducto(p: ProductoRefaccion): void {
+    this.productoElegido = p;
+    this.textoProducto = p.nombre;
+    this.productos.set([]);
+  }
+
+  /** Listo para guardar: un producto con piezas suficientes, o el nombre de la que se compró fuera. */
+  puedeGuardarRefaccion(): boolean {
+    if (!(this.refCantidad >= 1) || this.guardandoRefaccion()) return false;
+    if (this.origenRefaccion === 'fuera') return this.refDescripcion.trim() !== '';
+    return !!this.productoElegido && this.refCantidad <= this.productoElegido.hay;
+  }
+
+  guardarRefaccion(): void {
+    if (!this.puedeGuardarRefaccion()) return;
+    const cuerpo: Record<string, unknown> =
+      this.origenRefaccion === 'inventario'
+        ? { producto_id: this.productoElegido!.id, cantidad: this.refCantidad }
+        : { descripcion: this.refDescripcion.trim(), cantidad: this.refCantidad };
+    if (this.verCostos && this.origenRefaccion === 'fuera' && this.refCosto != null) cuerpo['costo_unitario'] = this.refCosto;
+    this.guardandoRefaccion.set(true);
+    this.api.post<{ message: string; orden: Ficha }>(`ordenes/${this.id}/refacciones`, cuerpo).subscribe({
+      next: (r) => {
+        this.guardandoRefaccion.set(false);
+        this.agregandoRefaccion.set(false);
+        this.avisos.ok(r.message);
+        this.mostrar(r.orden);
+      },
+      error: (e: HttpErrorResponse) => {
+        this.guardandoRefaccion.set(false);
+        this.avisos.fallo(e);
+      },
+    });
+  }
+
+  quitarRefaccion(r: RefaccionOrden): void {
+    const aviso = r.del_inventario ? ' La pieza regresa al inventario.' : '';
+    if (!confirm(`¿Quitar "${r.descripcion}" de la orden?${aviso}`)) return;
+    this.api.delete<{ message: string; orden: Ficha }>(`ordenes/${this.id}/refacciones/${r.id}`).subscribe({
+      next: (res) => {
+        this.avisos.ok(res.message);
+        this.mostrar(res.orden);
+      },
       error: (e: HttpErrorResponse) => this.avisos.fallo(e),
     });
   }

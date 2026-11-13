@@ -22,7 +22,7 @@ export interface CorteDatos {
   por_empleado: { nombre: string; cobros: number; efectivo: number; otros: number; salidas: number }[];
   /** Solo llega al dueño (permiso ordenes.ver_costos). */
   ganancia?: {
-    reparaciones: { cantidad: number; cobrado: number; refaccion: number; mano_obra: number; ganancia: number; sin_costos: number };
+    reparaciones: { cantidad: number; cobrado: number; refaccion: number; mano_obra: number; mano_externa: number; ganancia: number; sin_costos: number };
     ventas: { cantidad: number; vendido: number; costo: number; ganancia: number };
     telefonos: { cantidad: number; cobrado: number; gasto: number; ganancia: number; sin_gasto: number };
     total: number;

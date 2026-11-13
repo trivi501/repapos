@@ -70,7 +70,15 @@ export interface OrdenReparacion {
   /** Costos internos y ganancia: solo llegan si el usuario tiene "ordenes.ver_costos". */
   costo_refaccion?: string | null;
   costo_mano_obra?: string | null;
+  /** Lo que se paga a otro taller o técnico cuando el equipo se manda fuera, y a quién. */
+  costo_mano_externa?: string | null;
+  mano_externa_detalle?: string | null;
   ganancia?: number;
+  /** Refacciones usadas: del inventario o compradas fuera. Su suma es el costo de refacción. */
+  refacciones?: RefaccionOrden[];
+  /** Veces que el cliente abrió su enlace o buscó su folio, y la última vez. */
+  consultas_cliente?: number;
+  ultima_consulta_at?: string | null;
   estado_fisico?: Record<string, string> | null;
   revision?: Record<string, string> | null;
   observaciones?: string | null;
@@ -94,6 +102,27 @@ export interface OrdenReparacion {
   visible_cliente?: boolean;
   visibilidad?: string[] | null;
   fotos?: FotoOrden[];
+}
+
+export interface RefaccionOrden {
+  id: number;
+  producto_id: number | null;
+  descripcion: string;
+  cantidad: number;
+  del_inventario: boolean;
+  /** Solo llegan con el permiso "ordenes.ver_costos". */
+  costo_unitario?: string;
+  importe?: number;
+}
+
+/** Producto para elegir como refacción (el costo solo llega con "ordenes.ver_costos"). */
+export interface ProductoRefaccion {
+  id: number;
+  nombre: string;
+  codigo: string | null;
+  categoria: string | null;
+  hay: number;
+  costo?: number;
 }
 
 export type CategoriaFoto = 'antes' | 'proceso' | 'despues';

@@ -106,6 +106,7 @@
           <div class="linea-monto"><span>Se cobra</span><span>{{ g.reparaciones.cobrado | dinero }}</span></div>
           <div class="linea-monto"><span>− Refacciones / créditos</span><span>{{ g.reparaciones.refaccion | dinero }}</span></div>
           <div class="linea-monto"><span>− Mano de obra</span><span>{{ g.reparaciones.mano_obra | dinero }}</span></div>
+          <div class="linea-monto"><span>− Mano externa</span><span>{{ g.reparaciones.mano_externa | dinero }}</span></div>
           <div class="linea-monto separador-superior"><b>Ganancia</b><b>{{ g.reparaciones.ganancia | dinero }}</b></div>
           @if (g.reparaciones.sin_costos) {
             <p class="ayuda aviso-naranja">{{ g.reparaciones.sin_costos }} sin costos capturados: su ganancia sale igual a lo que se cobra.</p>

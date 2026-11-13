@@ -18,6 +18,8 @@ class Movimiento extends Model
     public const TRASPASO = 'TRASPASO';
     public const CANCELACION = 'CANCELACIÓN';
     public const DEVOLUCION = 'DEVOLUCIÓN';
+    /** Pieza usada en una reparación (negativa) o regresada al quitarla de la orden (positiva). */
+    public const REPARACION = 'REPARACIÓN';
 
     protected $fillable = ['producto_id', 'tipo', 'cantidad', 'existencia', 'importe', 'nota', 'pago_id', 'salida_id', 'venta_id', 'user_id'];
 

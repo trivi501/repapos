@@ -9,6 +9,7 @@ use App\Http\Controllers\CorteController;
 use App\Http\Controllers\EquipoController;
 use App\Http\Controllers\FotoOrdenController;
 use App\Http\Controllers\InventarioController;
+use App\Http\Controllers\OrdenRefaccionController;
 use App\Http\Controllers\OrdenReparacionController;
 use App\Http\Controllers\PanelController;
 use App\Http\Controllers\PerfilController;
@@ -91,6 +92,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('ordenes/{orden}/accion', [OrdenReparacionController::class, 'accion'])->middleware('permission:ordenes.editar|ordenes.cambiar_estado|ordenes.cobrar');
         Route::put('ordenes/{orden}', [OrdenReparacionController::class, 'update'])->middleware('permission:ordenes.editar|ordenes.cambiar_estado');
         Route::delete('ordenes/{orden}', [OrdenReparacionController::class, 'destroy'])->middleware('permission:ordenes.eliminar');
+        // refacciones de cada reparación (del inventario o compradas fuera)
+        Route::get('ordenes-refacciones/productos', [OrdenRefaccionController::class, 'productos'])->middleware('permission:ordenes.editar');
+        Route::post('ordenes/{orden}/refacciones', [OrdenRefaccionController::class, 'store'])->middleware('permission:ordenes.editar');
+        Route::delete('ordenes/{orden}/refacciones/{refaccion}', [OrdenRefaccionController::class, 'destroy'])->middleware('permission:ordenes.editar');
 
         // teléfonos de locatarios
         Route::get('telefonos/exportar', [TelefonoController::class, 'exportar'])->middleware('permission:telefonos.ver');

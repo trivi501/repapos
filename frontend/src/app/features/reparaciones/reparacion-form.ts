@@ -199,6 +199,8 @@ export class ReparacionForm implements OnInit {
     costo_final: [null as number | null],
     costo_refaccion: [null as number | null],
     costo_mano_obra: [null as number | null],
+    costo_mano_externa: [null as number | null],
+    mano_externa_detalle: [''],
     notas: [''],
     notas_cliente: [''],
     visible_cliente: [true],
@@ -222,14 +224,18 @@ export class ReparacionForm implements OnInit {
     return this.authService.tienePermiso('ordenes.ver_costos');
   }
 
+  /** Refacciones que ya tiene la orden: con alguna, el costo de refacción es su suma y no se escribe a mano. */
+  readonly refaccionesEnLista = signal(0);
+
   /** Ganancia del local, con el mismo cálculo que el backend. */
   readonly ganancia = computed(() => {
     const v = this.valores();
     const sinCobro = this.esEdicion() && ['no_quedo', 'cancelado', 'rechazado'].includes(v.estado ?? '');
     const ingreso = sinCobro ? 0 : Number(v.costo_final ?? v.costo_estimado ?? 0);
-    const refaccion = Number(v.costo_refaccion ?? 0);
+    const refaccion = Number(this.formulario.controls.costo_refaccion.value ?? 0);
     const manoObra = Number(v.costo_mano_obra ?? 0);
-    return { ingreso, refaccion, manoObra, ganancia: ingreso - refaccion - manoObra, sinCobro };
+    const manoExterna = Number(v.costo_mano_externa ?? 0);
+    return { ingreso, refaccion, manoObra, manoExterna, ganancia: ingreso - refaccion - manoObra - manoExterna, sinCobro };
   });
 
   readonly comprobante = computed(() => {
@@ -340,6 +346,8 @@ export class ReparacionForm implements OnInit {
           costo_final: orden.costo_final ? Number(orden.costo_final) : null,
           costo_refaccion: orden.costo_refaccion != null ? Number(orden.costo_refaccion) : null,
           costo_mano_obra: orden.costo_mano_obra != null ? Number(orden.costo_mano_obra) : null,
+          costo_mano_externa: orden.costo_mano_externa != null ? Number(orden.costo_mano_externa) : null,
+          mano_externa_detalle: orden.mano_externa_detalle ?? '',
           notas: orden.notas ?? '',
           notas_cliente: orden.notas_cliente ?? '',
           visible_cliente: orden.visible_cliente ?? true,
@@ -347,6 +355,9 @@ export class ReparacionForm implements OnInit {
         },
         { emitEvent: false },
       );
+      // con refacciones en la lista, el costo es su suma: se ve pero no se escribe (se cambia en la ficha)
+      this.refaccionesEnLista.set(orden.refacciones?.length ?? 0);
+      if (this.refaccionesEnLista()) this.formulario.controls.costo_refaccion.disable({ emitEvent: false });
       this.formulario.updateValueAndValidity();
     });
   }
@@ -479,8 +490,11 @@ export class ReparacionForm implements OnInit {
     };
     // sin permiso no se mandan: el backend los ignoraría y no se deben pisar
     if (this.verCostos) {
-      base['costo_refaccion'] = v.costo_refaccion;
+      // con refacciones en la lista el backend calcula el costo de refacción: no se manda
+      if (!this.refaccionesEnLista()) base['costo_refaccion'] = v.costo_refaccion;
       base['costo_mano_obra'] = v.costo_mano_obra;
+      base['costo_mano_externa'] = v.costo_mano_externa;
+      base['mano_externa_detalle'] = v.mano_externa_detalle?.trim() || null;
     }
 
     if (this.esEdicion()) {
