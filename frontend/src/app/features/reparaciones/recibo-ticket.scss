@@ -1,0 +1,104 @@
+/* Ticket de 80 mm: siempre negro sobre blanco, sea cual sea el tema. También se ve bien en 58 mm. */
+:host {
+  display: block;
+  min-height: 100vh;
+  background: #fff;
+  color: #000;
+}
+
+.botones {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.75rem;
+}
+
+.ticket {
+  width: 72mm;
+  margin: 0 auto;
+  padding: 4mm 0;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.35;
+  word-wrap: break-word;
+}
+
+.centro {
+  text-align: center;
+}
+
+.logo {
+  max-height: 22mm;
+  max-width: 50mm;
+}
+
+.grande {
+  font-size: 15px;
+  font-weight: bold;
+}
+
+.folio {
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.chico {
+  font-size: 10px;
+}
+
+.linea {
+  border-top: 1px dashed #000;
+  margin: 6px 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: inherit;
+}
+
+td {
+  padding: 1px 0;
+  border: 0;
+  vertical-align: top;
+}
+
+.der {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.qr {
+  width: 32mm;
+  height: 32mm;
+}
+
+.clausulas {
+  margin: 2px 0 0;
+  padding-left: 14px;
+  font-size: 9px;
+  line-height: 1.3;
+}
+
+.firma {
+  margin-top: 9mm;
+  border-top: 1px solid #000;
+  padding-top: 2px;
+  text-align: center;
+  font-size: 10px;
+}
+
+.separado {
+  margin-top: 4mm;
+}
+
+@page {
+  margin: 3mm;
+}
+
+@media print {
+  .no-imprimir {
+    display: none;
+  }
+}

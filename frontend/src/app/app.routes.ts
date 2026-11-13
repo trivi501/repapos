@@ -46,7 +46,14 @@ export const routes: Routes = [
 
   // ---- para imprimir: sin el menú del sistema
   {
+    // el comprobante se imprime en ticket de 80 mm; la hoja carta queda como opción
     path: 'reparaciones/:id/recibo',
+    canActivate: [authGuard, permissionGuard],
+    data: { permisos: ['ordenes.ver'] },
+    loadComponent: () => import('./features/reparaciones/recibo-ticket').then((m) => m.ReciboTicket),
+  },
+  {
+    path: 'reparaciones/:id/recibo-hoja',
     canActivate: [authGuard, permissionGuard],
     data: { permisos: ['ordenes.ver'] },
     loadComponent: () => import('./features/reparaciones/recibo').then((m) => m.Recibo),

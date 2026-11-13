@@ -2,6 +2,7 @@
   <div class="recibo">
     <div class="botones no-imprimir">
       <button class="btn btn-primary" (click)="imprimir()">Imprimir</button>
+      <a class="btn btn-secondary" [routerLink]="['/reparaciones', r.orden.id, 'recibo']">Ver como ticket</a>
       <a class="btn btn-secondary" [routerLink]="['/reparaciones', r.orden.id]">← Regresar a la orden</a>
     </div>
 

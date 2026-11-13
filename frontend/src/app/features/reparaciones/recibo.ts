@@ -5,7 +5,7 @@ import { OrdenReparacion } from '../../core/models/taller.model';
 import { ApiService } from '../../core/services/api.service';
 import { DineroPipe, FechaPipe } from '../../shared/ui';
 
-interface DatosRecibo {
+export interface DatosRecibo {
   orden: OrdenReparacion & {
     tiene_password: boolean;
     total: number;
