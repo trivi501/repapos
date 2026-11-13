@@ -544,6 +544,36 @@ class RepaposTest extends TestCase
         $this->postJson("/api/ordenes/{$normal['id']}/accion", ['accion' => 'estatus', 'estado' => 'rechazado', 'motivo' => 'x'])->assertUnprocessable();
     }
 
+    public function test_costos_internos_y_ganancia_solo_los_ve_el_dueno(): void
+    {
+        // el administrador captura refacción y mano de obra y ve la ganancia
+        $o = $this->ordenNueva(['costo_refaccion' => 450, 'costo_mano_obra' => 150]);
+        $this->assertEquals(450, $o['costo_refaccion']);
+        $this->assertEquals(400.0, $o['ganancia'], '1000 cobrado - 450 refacción - 150 mano de obra');
+
+        // al editar cambia la ganancia; si no quedó, no entra nada y es pérdida
+        $this->putJson("/api/ordenes/{$o['id']}", [
+            'falla_reportada' => 'Pantalla rota', 'estado' => 'no_quedo', 'costo_refaccion' => 450, 'costo_mano_obra' => 0,
+        ])->assertOk()->assertJsonPath('ganancia', -450);
+
+        // el técnico no los ve en la ficha, ni en la lista, ni puede cambiarlos
+        $tecnico = $this->usuario($this->tallerA, 'Tecnico');
+        $this->comoTaller($tecnico);
+        $ficha = $this->getJson("/api/ordenes/{$o['id']}")->assertOk()->json();
+        $this->assertArrayNotHasKey('costo_refaccion', $ficha);
+        $this->assertArrayNotHasKey('costo_mano_obra', $ficha);
+        $this->assertArrayNotHasKey('ganancia', $ficha);
+        $this->assertArrayNotHasKey('costo_refaccion', $this->getJson('/api/ordenes')->json('data.0'));
+
+        $this->putJson("/api/ordenes/{$o['id']}", [
+            'falla_reportada' => 'Pantalla rota', 'estado' => 'reparado', 'costo_refaccion' => 1, 'costo_mano_obra' => 1,
+        ])->assertOk();
+        $this->assertEquals(450.0, (float) OrdenReparacion::find($o['id'])->costo_refaccion, 'El técnico no cambia los costos');
+
+        // el empleado tampoco los tiene por su rol
+        $this->assertFalse($this->usuario($this->tallerA, 'Empleado')->can('ordenes.ver_costos'));
+    }
+
     public function test_al_editar_una_liberacion_se_valida_el_estatus_y_el_motivo(): void
     {
         $o = $this->ordenNueva(['bloqueos' => ['mdm']]);

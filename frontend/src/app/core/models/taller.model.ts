@@ -67,6 +67,10 @@ export interface OrdenReparacion {
   /** Trae algún bloqueo (operador, FRP, iCloud, MDM, Knox): solo tiene los 4 estatus de liberación. */
   es_liberacion?: boolean;
   motivo_rechazo?: string | null;
+  /** Costos internos y ganancia: solo llegan si el usuario tiene "ordenes.ver_costos". */
+  costo_refaccion?: string | null;
+  costo_mano_obra?: string | null;
+  ganancia?: number;
   estado_fisico?: Record<string, string> | null;
   revision?: Record<string, string> | null;
   observaciones?: string | null;

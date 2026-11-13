@@ -508,3 +508,29 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+// Costos y ganancia (solo el dueño)
+.desglose-ganancia {
+  margin-top: 0.75rem;
+  border-top: 1px dashed var(--color-border);
+  padding-top: 0.6rem;
+
+  > div {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.15rem 0;
+  }
+
+  .total {
+    margin-top: 0.35rem;
+    padding-top: 0.45rem;
+    border-top: 1px solid var(--color-border);
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--color-success);
+  }
+
+  .total.perdida {
+    color: var(--color-danger);
+  }
+}

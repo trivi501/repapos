@@ -197,6 +197,8 @@ export class ReparacionForm implements OnInit {
     diagnostico: [''],
     solucion: [''],
     costo_final: [null as number | null],
+    costo_refaccion: [null as number | null],
+    costo_mano_obra: [null as number | null],
     notas: [''],
     notas_cliente: [''],
     visible_cliente: [true],
@@ -213,6 +215,21 @@ export class ReparacionForm implements OnInit {
     const v = this.valores();
     // lo que se cobra es el costo final si ya se fijó (igual que en el backend)
     return Math.max(0, Number(v.costo_final ?? v.costo_estimado ?? 0) - Number(v.anticipo ?? 0));
+  });
+
+  /** Costo de refacción, mano de obra y ganancia: solo para el dueño. */
+  get verCostos(): boolean {
+    return this.authService.tienePermiso('ordenes.ver_costos');
+  }
+
+  /** Ganancia del local, con el mismo cálculo que el backend. */
+  readonly ganancia = computed(() => {
+    const v = this.valores();
+    const sinCobro = this.esEdicion() && ['no_quedo', 'cancelado', 'rechazado'].includes(v.estado ?? '');
+    const ingreso = sinCobro ? 0 : Number(v.costo_final ?? v.costo_estimado ?? 0);
+    const refaccion = Number(v.costo_refaccion ?? 0);
+    const manoObra = Number(v.costo_mano_obra ?? 0);
+    return { ingreso, refaccion, manoObra, ganancia: ingreso - refaccion - manoObra, sinCobro };
   });
 
   readonly comprobante = computed(() => {
@@ -321,6 +338,8 @@ export class ReparacionForm implements OnInit {
           diagnostico: orden.diagnostico ?? '',
           solucion: orden.solucion ?? '',
           costo_final: orden.costo_final ? Number(orden.costo_final) : null,
+          costo_refaccion: orden.costo_refaccion != null ? Number(orden.costo_refaccion) : null,
+          costo_mano_obra: orden.costo_mano_obra != null ? Number(orden.costo_mano_obra) : null,
           notas: orden.notas ?? '',
           notas_cliente: orden.notas_cliente ?? '',
           visible_cliente: orden.visible_cliente ?? true,
@@ -458,6 +477,11 @@ export class ReparacionForm implements OnInit {
       visibilidad: v.visibilidad ?? [],
       lote: this.lote(),
     };
+    // sin permiso no se mandan: el backend los ignoraría y no se deben pisar
+    if (this.verCostos) {
+      base['costo_refaccion'] = v.costo_refaccion;
+      base['costo_mano_obra'] = v.costo_mano_obra;
+    }
 
     if (this.esEdicion()) {
       return {

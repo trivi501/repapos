@@ -46,6 +46,9 @@ class OrdenReparacionController extends Controller
             'revision.*' => ['nullable', 'in:si,no'],
             'diagnostico' => ['nullable', 'string', 'max:2000'],
             'costo_estimado' => ['nullable', 'numeric', 'min:0'],
+            // costos internos (solo el dueño): se descartan si el usuario no tiene "ordenes.ver_costos"
+            'costo_refaccion' => ['nullable', 'numeric', 'min:0'],
+            'costo_mano_obra' => ['nullable', 'numeric', 'min:0'],
             'anticipo' => ['nullable', 'numeric', 'min:0'],
             'metodo_pago' => ['nullable', 'in:efectivo,tarjeta,transferencia'],
             'estimado_listo_at' => ['nullable', 'date'],
@@ -63,6 +66,10 @@ class OrdenReparacionController extends Controller
     private function camposOrden(array $datos): array
     {
         $campos = collect($datos)->except(['cliente_id', 'equipo_id', 'cliente_nuevo', 'equipo_nuevo', 'numero_orden', 'lote', 'anticipo'])->all();
+        // sin permiso, los costos internos ni se leen ni se tocan (se quedan como estaban)
+        if (! auth()->user()?->can('ordenes.ver_costos')) {
+            $campos = array_diff_key($campos, array_flip(OrdenReparacion::COSTOS_INTERNOS));
+        }
 
         if (array_key_exists('estimado_listo_at', $campos)) {
             // llega en UTC desde el navegador; se guarda en la hora del taller
@@ -211,8 +218,13 @@ class OrdenReparacionController extends Controller
     {
         $orden->load(self::RELACIONES);
         $orden->makeVisible(['bloqueo_valor', 'bloqueo_pin']);
+        $costos = [];
+        if (auth()->user()?->can('ordenes.ver_costos')) {
+            $orden->makeVisible(OrdenReparacion::COSTOS_INTERNOS);
+            $costos = ['ganancia' => $orden->ganancia];
+        }
 
-        return $orden->toArray() + [
+        return $orden->toArray() + $costos + [
             'estado_texto' => $orden->estado_texto,
             'enlaces' => [
                 'publico' => WhatsApp::enlaceOrden($orden),

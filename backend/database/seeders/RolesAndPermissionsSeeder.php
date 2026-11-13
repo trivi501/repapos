@@ -12,6 +12,7 @@ class RolesAndPermissionsSeeder extends Seeder
     /** Permisos sueltos, además del CRUD de cada módulo. */
     public const EXTRAS = [
         'ordenes.cambiar_estado', 'ordenes.cobrar',
+        'ordenes.ver_costos',   // costo de refacción, mano de obra y ganancia del local: solo el dueño
         'telefonos.cobrar',
         'resumen.ver',
         'saldos.ver', 'saldos.gestionar',
@@ -58,7 +59,7 @@ class RolesAndPermissionsSeeder extends Seeder
         Role::firstOrCreate(['name' => 'Empleado', 'guard_name' => 'web'])->syncPermissions(
             // las gráficas del panel se eligen usuario por usuario (solo los administradores las tienen por rol)
             $todos->reject(fn ($p) => str_starts_with($p, 'usuarios.') || str_starts_with($p, 'roles.') || str_starts_with($p, 'sucursales.') || str_starts_with($p, 'panel.'))
-                ->diff(['ventas.cancelar', 'taller.editar', 'respaldo.descargar', 'talleres.administrar'])
+                ->diff(['ventas.cancelar', 'taller.editar', 'respaldo.descargar', 'talleres.administrar', 'ordenes.ver_costos'])
         );
 
         Role::firstOrCreate(['name' => 'Recepcionista', 'guard_name' => 'web'])->syncPermissions([

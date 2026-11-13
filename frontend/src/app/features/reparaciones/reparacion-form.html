@@ -561,6 +561,47 @@
         </div>
       </div>
     </section>
+
+    <!-- Costos internos: solo el dueño (permiso ordenes.ver_costos) -->
+    @if (verCostos) {
+      <section class="card seccion">
+        <header class="seccion-header">
+          <h2 class="marcador">Costos y ganancia</h2>
+          <span class="sub">🔒 Solo lo ve el dueño. No sale en el comprobante del cliente.</span>
+        </header>
+        <div class="seccion-body">
+          <div class="grid-2">
+            <div class="form-field">
+              <label for="costo_refaccion">Costo de la refacción</label>
+              <div class="input-moneda">
+                <span>$</span>
+                <input id="costo_refaccion" type="number" min="0" step="0.01" formControlName="costo_refaccion" placeholder="Ej. pantalla" />
+              </div>
+            </div>
+            <div class="form-field">
+              <label for="costo_mano_obra">Mano de obra</label>
+              <div class="input-moneda">
+                <span>$</span>
+                <input id="costo_mano_obra" type="number" min="0" step="0.01" formControlName="costo_mano_obra" placeholder="Pago al técnico" />
+              </div>
+            </div>
+          </div>
+          @if (ganancia(); as g) {
+            <div class="desglose-ganancia">
+              <div><span>Se le cobra al cliente</span><span>$ {{ g.ingreso.toFixed(2) }}</span></div>
+              <div><span>− Refacción</span><span>$ {{ g.refaccion.toFixed(2) }}</span></div>
+              <div><span>− Mano de obra</span><span>$ {{ g.manoObra.toFixed(2) }}</span></div>
+              <div class="total" [class.perdida]="g.ganancia < 0">
+                <span>{{ g.ganancia < 0 ? 'Pérdida del local' : 'Ganancia del local' }}</span><span>$ {{ g.ganancia.toFixed(2) }}</span>
+              </div>
+              @if (g.sinCobro) {
+                <p class="sub">No quedó / rechazado / cancelado: no se le cobra al cliente.</p>
+              }
+            </div>
+          }
+        </div>
+      </section>
+    }
   </aside>
 
   <div class="barra-acciones">

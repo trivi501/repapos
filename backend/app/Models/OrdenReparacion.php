@@ -92,6 +92,8 @@ class OrdenReparacion extends Model
         'solucion',
         'costo_estimado',
         'costo_final',
+        'costo_refaccion',
+        'costo_mano_obra',
         'fecha_recepcion',
         'fecha_entrega_estimada',
         'fecha_entrega_real',
@@ -101,8 +103,11 @@ class OrdenReparacion extends Model
         'visibilidad',
     ];
 
-    // el PIN y el patrón solo se exponen al abrir la orden (makeVisible en el controlador)
-    protected $hidden = ['bloqueo_valor', 'bloqueo_pin'];
+    /** Costos internos: solo los ve quien tiene "ordenes.ver_costos". */
+    public const COSTOS_INTERNOS = ['costo_refaccion', 'costo_mano_obra'];
+
+    // el PIN, el patrón y los costos internos solo se exponen al abrir la orden (makeVisible en el controlador)
+    protected $hidden = ['bloqueo_valor', 'bloqueo_pin', 'costo_refaccion', 'costo_mano_obra'];
 
     protected $appends = ['total', 'saldo', 'es_liberacion'];
 
@@ -113,6 +118,8 @@ class OrdenReparacion extends Model
             'bloqueo_pin' => 'encrypted',
             'costo_estimado' => 'decimal:2',
             'costo_final' => 'decimal:2',
+            'costo_refaccion' => 'decimal:2',
+            'costo_mano_obra' => 'decimal:2',
             'anticipo' => 'decimal:2',
             'pagado' => 'decimal:2',
             'estado_fisico' => 'array',
@@ -188,6 +195,17 @@ class OrdenReparacion extends Model
     public function getTotalAttribute(): float
     {
         return (float) ($this->costo_final ?? $this->costo_estimado ?? 0);
+    }
+
+    /**
+     * Ganancia del local: lo que se le cobra al cliente menos la refacción y la mano de obra.
+     * Si no quedó, se rechazó o se canceló no entra nada, y la ganancia es negativa si se gastó algo.
+     */
+    public function getGananciaAttribute(): float
+    {
+        $ingreso = in_array($this->estado, [self::NO_QUEDO, self::CANCELADO, self::RECHAZADO], true) ? 0.0 : $this->total;
+
+        return round($ingreso - (float) $this->costo_refaccion - (float) $this->costo_mano_obra, 2);
     }
 
     /** Lo que debe. Si no quedó (o se rechazó la liberación), no se cobra. */

@@ -64,6 +64,11 @@ export class ReparacionDetalle implements OnInit {
     return estadosPara(x.bloqueos);
   }
 
+  /** Lo que entra por la orden: nada si no quedó, se rechazó o se canceló. */
+  ingreso(x: Ficha): number {
+    return ['no_quedo', 'cancelado', 'rechazado'].includes(x.estado) ? 0 : x.total;
+  }
+
   nombresBloqueos(x: Ficha): string {
     const nombres: Record<string, string> = { operador: 'Operador', frp: 'FRP', icloud: 'iCloud', mdm: 'MDM', knox: 'Knox' };
     return (x.bloqueos ?? []).map((b) => nombres[b] ?? b).join(', ');

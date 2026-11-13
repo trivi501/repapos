@@ -137,6 +137,22 @@
         }
       </div>
 
+      @if (x.ganancia !== undefined) {
+        <div class="card contenido">
+          <h2>Costos y ganancia <small class="tenue">🔒 solo el dueño</small></h2>
+          <div class="linea-monto"><span>Se le cobra al cliente</span><span>{{ ingreso(x) | dinero }}</span></div>
+          <div class="linea-monto"><span>− Refacción</span><span>{{ x.costo_refaccion ?? 0 | dinero }}</span></div>
+          <div class="linea-monto"><span>− Mano de obra</span><span>{{ x.costo_mano_obra ?? 0 | dinero }}</span></div>
+          <div class="linea-monto separador-superior">
+            <b>{{ x.ganancia < 0 ? 'Pérdida del local' : 'Ganancia del local' }}</b>
+            <b [class.a-favor]="x.ganancia >= 0" [class.debe]="x.ganancia < 0">{{ x.ganancia | dinero }}</b>
+          </div>
+          @if (x.costo_refaccion == null && x.costo_mano_obra == null) {
+            <p class="ayuda">Captura el costo de la refacción y la mano de obra en Editar para ver la ganancia real.</p>
+          }
+        </div>
+      }
+
       @if (auth.tieneAlgunPermiso(['ordenes.cambiar_estado', 'ordenes.editar'])) {
         <div class="card contenido">
           <h2>Cambiar estatus</h2>
