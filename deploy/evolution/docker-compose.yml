@@ -1,0 +1,43 @@
+# Evolution API (WhatsApp por código QR) para RepaPOS.
+# Corre aparte de RepaPOS y solo escucha en 127.0.0.1: no queda expuesta a internet.
+# Lo instala deploy/instalar-evolution.sh, que también genera el archivo .env de esta carpeta.
+name: repapos-evolution
+
+services:
+  evolution:
+    # Revisa la versión más nueva en https://hub.docker.com/r/atendai/evolution-api/tags y cámbiala en .env
+    image: ${EVOLUTION_IMAGE:-atendai/evolution-api:v2.1.1}
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    ports:
+      - "127.0.0.1:${EVOLUTION_PORT:-8085}:8080"
+    # lo que se descomente en .env (por ejemplo CONFIG_SESSION_PHONE_VERSION) también llega a Evolution
+    env_file: .env
+    environment:
+      SERVER_URL: http://127.0.0.1:${EVOLUTION_PORT:-8085}
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://evolution:${EVOLUTION_DB_PASSWORD}@postgres:5432/evolution?schema=public
+      DATABASE_CONNECTION_CLIENT_NAME: repapos
+      CACHE_REDIS_ENABLED: "false"
+      CACHE_LOCAL_ENABLED: "true"
+      LOG_LEVEL: ERROR,WARN
+      DEL_INSTANCE: "false"
+    volumes:
+      - evolution_instancias:/evolution/instances
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD: ${EVOLUTION_DB_PASSWORD}
+      POSTGRES_DB: evolution
+    volumes:
+      - evolution_postgres:/var/lib/postgresql/data
+
+volumes:
+  evolution_instancias:
+  evolution_postgres:

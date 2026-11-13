@@ -33,6 +33,12 @@ return [
         'version' => env('WHATSAPP_GRAPH_VERSION', 'v23.0'),
     ],
 
+    // Evolution API (open source, WhatsApp por QR) instalada en el mismo VPS. Ver deploy/EVOLUTION-API.md
+    'evolution' => [
+        'url' => env('EVOLUTION_URL'),            // ej. http://127.0.0.1:8080
+        'key' => env('EVOLUTION_API_KEY'),        // la AUTHENTICATION_API_KEY de Evolution
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

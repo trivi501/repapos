@@ -3,41 +3,70 @@
 namespace App\Support;
 
 use App\Models\Ajuste;
+use App\Models\Taller;
 use App\Models\WhatsappMensaje;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
 /**
- * Envío directo por la API de WhatsApp Cloud (Meta), con las credenciales de cada taller.
+ * Envío directo de WhatsApp desde el servidor, con uno de dos proveedores (cada taller elige):
  *
- * - Con plantilla: sirve para avisar en cualquier momento. La plantilla aprobada en Meta debe tener una
- *   variable {{1}} en el cuerpo: ahí va el mensaje completo (Meta no acepta saltos de línea en variables).
- * - Sin plantilla: texto libre, que Meta solo entrega si la persona escribió en las últimas 24 horas.
+ * - "evolution": Evolution API (open source, en el mismo VPS). Se vincula el número escaneando un QR, como
+ *   WhatsApp Web. No es oficial: WhatsApp puede bloquear el número si se abusa (mensajes masivos, reportes).
+ * - "meta": API oficial de WhatsApp Cloud. Con plantilla, el mensaje va en la variable {{1}} (Meta no acepta
+ *   saltos de línea ahí); sin plantilla solo llega a quien escribió en las últimas 24 horas.
  */
 class WhatsAppCloud
 {
+    public const PROVEEDOR = 'wa_proveedor';      // evolution o meta
+    public const ACTIVA = 'wa_api_activo';
+    public const DUENO = 'wa_api_dueno';           // recibe lo que no tiene destinatario (el corte de caja)
+    // Meta
     public const TOKEN = 'wa_api_token';           // cifrado con APP_KEY
     public const NUMERO_ID = 'wa_api_phone_id';
     public const PLANTILLA = 'wa_api_plantilla';
     public const IDIOMA = 'wa_api_idioma';
-    public const DUENO = 'wa_api_dueno';           // recibe lo que no tiene destinatario (el corte de caja)
-    public const ACTIVA = 'wa_api_activo';
+    // Evolution API
+    public const INSTANCIA = 'wa_evo_instancia';
+
+    public const EVOLUTION = 'evolution';
+    public const META = 'meta';
 
     public static function version(): string
     {
         return (string) config('services.whatsapp.version', 'v23.0');
     }
 
-    /** Credenciales del taller del usuario conectado; null si la API no está activa. */
+    /** El servidor tiene Evolution API instalada (EVOLUTION_URL y EVOLUTION_API_KEY en el .env). */
+    public static function evolutionDisponible(): bool
+    {
+        return filled(config('services.evolution.url')) && filled(config('services.evolution.key'));
+    }
+
+    public static function proveedor(): string
+    {
+        return Ajuste::valor(self::PROVEEDOR, self::META) === self::EVOLUTION ? self::EVOLUTION : self::META;
+    }
+
+    /** Credenciales del taller del usuario conectado; null si el envío directo no está activo. */
     public static function config(): ?array
     {
         if (Ajuste::valor(self::ACTIVA) !== '1') {
             return null;
         }
+        $dueno = Ajuste::valor(self::DUENO);
+
+        if (static::proveedor() === self::EVOLUTION) {
+            return static::evolutionDisponible()
+                ? ['proveedor' => self::EVOLUTION, 'instancia' => static::instancia(), 'dueno' => $dueno]
+                : null;
+        }
+
         $token = static::token(Ajuste::valor(self::TOKEN));
         $numeroId = Ajuste::valor(self::NUMERO_ID);
         if (! $token || $numeroId === '') {
@@ -45,19 +74,26 @@ class WhatsAppCloud
         }
 
         return [
+            'proveedor' => self::META,
             'token' => $token,
             'numero_id' => $numeroId,
             'plantilla' => Ajuste::valor(self::PLANTILLA),
             'idioma' => Ajuste::valor(self::IDIOMA, 'es_MX'),
-            'dueno' => Ajuste::valor(self::DUENO),
+            'dueno' => $dueno,
         ];
     }
 
     /** Para el inicio de sesión (todavía no hay taller elegido en las consultas). */
     public static function activaPara(int $tallerId): bool
     {
-        return Ajuste::valorDe($tallerId, self::ACTIVA) === '1'
-            && Ajuste::valorDe($tallerId, self::NUMERO_ID) !== ''
+        if (Ajuste::valorDe($tallerId, self::ACTIVA) !== '1') {
+            return false;
+        }
+        if (Ajuste::valorDe($tallerId, self::PROVEEDOR, self::META) === self::EVOLUTION) {
+            return static::evolutionDisponible();
+        }
+
+        return Ajuste::valorDe($tallerId, self::NUMERO_ID) !== ''
             && static::token(Ajuste::valorDe($tallerId, self::TOKEN)) !== null;
     }
 
@@ -78,13 +114,139 @@ class WhatsAppCloud
         return Crypt::encryptString($token);
     }
 
+    /** Manda el mensaje y lo registra, haya salido o no. */
+    public static function enviar(string $numero, string $texto): WhatsappMensaje
+    {
+        $c = static::config() ?? throw new RuntimeException('El envío directo de WhatsApp no está activo en este taller.');
+
+        return $c['proveedor'] === self::EVOLUTION
+            ? static::enviarEvolution($c, $numero, $texto)
+            : static::enviarMeta($c, $numero, $texto);
+    }
+
+    // ------------------------------------------------------------------ Evolution API
+
+    /** Nombre de la instancia de este taller en Evolution API (una por taller). */
+    public static function instancia(): string
+    {
+        $guardada = Ajuste::valor(self::INSTANCIA);
+        if ($guardada !== '') {
+            return $guardada;
+        }
+        $nombre = 'repapos-taller-'.Taller::actualId();
+        Ajuste::poner(self::INSTANCIA, $nombre);
+
+        return $nombre;
+    }
+
+    private static function evolution(): PendingRequest
+    {
+        return Http::baseUrl(rtrim((string) config('services.evolution.url'), '/'))
+            ->withHeaders(['apikey' => (string) config('services.evolution.key')])
+            ->acceptJson()->timeout(20);
+    }
+
+    /** open = conectado, connecting = esperando el QR, close = desconectado, no_existe = nunca se vinculó. */
+    public static function evolutionEstado(): string
+    {
+        try {
+            $r = static::evolution()->get('instance/connectionState/'.rawurlencode(static::instancia()));
+        } catch (ConnectionException) {
+            throw new RuntimeException('No se pudo conectar con Evolution API. Revisa que esté corriendo en el servidor.');
+        }
+        if ($r->status() === 404) {
+            return 'no_existe';
+        }
+        if ($r->failed()) {
+            throw new RuntimeException(static::errorEvolution($r));
+        }
+
+        return (string) ($r->json('instance.state') ?? $r->json('state') ?? 'close');
+    }
+
+    /** Crea la instancia si no existe y regresa el QR para escanear (null si ya está conectado). */
+    public static function evolutionQr(): array
+    {
+        $instancia = static::instancia();
+        $estado = static::evolutionEstado();
+        if ($estado === 'open') {
+            return ['estado' => 'open', 'qr' => null];
+        }
+        try {
+            if ($estado === 'no_existe') {
+                $creada = static::evolution()->post('instance/create', [
+                    'instanceName' => $instancia, 'qrcode' => true, 'integration' => 'WHATSAPP-BAILEYS',
+                ]);
+                if ($creada->failed()) {
+                    throw new RuntimeException(static::errorEvolution($creada));
+                }
+            }
+            $r = static::evolution()->get('instance/connect/'.rawurlencode($instancia));
+        } catch (ConnectionException) {
+            throw new RuntimeException('No se pudo conectar con Evolution API. Revisa que esté corriendo en el servidor.');
+        }
+        if ($r->failed()) {
+            throw new RuntimeException(static::errorEvolution($r));
+        }
+        $qr = $r->json('base64') ?? $r->json('qrcode.base64');
+
+        return ['estado' => 'connecting', 'qr' => $qr, 'codigo' => $r->json('pairingCode')];
+    }
+
+    /** Cierra la sesión de WhatsApp en Evolution (el número queda desvinculado). */
+    public static function evolutionDesconectar(): void
+    {
+        try {
+            static::evolution()->delete('instance/logout/'.rawurlencode(static::instancia()));
+        } catch (ConnectionException) {
+            throw new RuntimeException('No se pudo conectar con Evolution API. Revisa que esté corriendo en el servidor.');
+        }
+    }
+
+    private static function enviarEvolution(array $c, string $numero, string $texto): WhatsappMensaje
+    {
+        $mensaje = new WhatsappMensaje(['telefono' => $numero, 'texto' => $texto, 'user_id' => auth()->id(), 'tipo' => WhatsappMensaje::TEXTO]);
+        try {
+            $r = static::evolution()->post('message/sendText/'.rawurlencode($c['instancia']), ['number' => $numero, 'text' => $texto]);
+            if ($r->successful()) {
+                $mensaje->estado = WhatsappMensaje::ENVIADO;
+                $mensaje->meta_id = $r->json('key.id');
+            } else {
+                $mensaje->estado = WhatsappMensaje::FALLIDO;
+                $mensaje->error = mb_substr(static::errorEvolution($r), 0, 255);
+            }
+        } catch (ConnectionException) {
+            $mensaje->estado = WhatsappMensaje::FALLIDO;
+            $mensaje->error = 'No se pudo conectar con Evolution API. Revisa que esté corriendo en el servidor.';
+        }
+        $mensaje->save();
+
+        return $mensaje;
+    }
+
+    private static function errorEvolution(Response $r): string
+    {
+        $detalle = $r->json('response.message') ?? $r->json('message') ?? $r->json('error') ?? $r->body();
+        $texto = is_array($detalle) ? json_encode($detalle, JSON_UNESCAPED_UNICODE) : (string) $detalle;
+
+        return match (true) {
+            $r->status() === 401 => 'Evolution API rechazó la clave: revisa EVOLUTION_API_KEY en el .env del servidor.',
+            str_contains($texto, '"exists":false') => 'Ese número no tiene WhatsApp.',
+            str_contains(mb_strtolower($texto), 'connection closed') || str_contains(mb_strtolower($texto), 'not connected')
+                => 'El WhatsApp del taller se desconectó: escanea el QR otra vez en Configuración.',
+            default => 'Evolution API respondió: '.mb_substr($texto, 0, 180).' (código '.$r->status().')',
+        };
+    }
+
+    // ------------------------------------------------------------------ Meta (oficial)
+
     /** Le pregunta a Meta por el número: comprueba el token y el ID. */
     public static function probar(string $token, string $numeroId): array
     {
         try {
             $r = Http::withToken($token)->acceptJson()->timeout(15)
                 ->get(static::url($numeroId), ['fields' => 'display_phone_number,verified_name,quality_rating']);
-        } catch (ConnectionException $e) {
+        } catch (ConnectionException) {
             throw new RuntimeException('No se pudo conectar con WhatsApp. Revisa el internet del servidor.');
         }
         if ($r->failed()) {
@@ -121,10 +283,8 @@ class WhatsAppCloud
         return $base.' Tus números en esa cuenta: '.$lista.'. Pega ese ID en "ID del número de teléfono" y guarda otra vez.';
     }
 
-    /** Manda el mensaje y lo registra, haya salido o no. */
-    public static function enviar(string $numero, string $texto): WhatsappMensaje
+    private static function enviarMeta(array $c, string $numero, string $texto): WhatsappMensaje
     {
-        $c = static::config() ?? throw new RuntimeException('La API de WhatsApp no está activa en este taller.');
         $conPlantilla = $c['plantilla'] !== '';
 
         $payload = ['messaging_product' => 'whatsapp', 'to' => $numero];

@@ -150,6 +150,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('whatsapp-api', [WhatsAppApiController::class, 'show'])->middleware('permission:configuracion.ver');
         Route::put('whatsapp-api', [WhatsAppApiController::class, 'update'])->middleware('permission:configuracion.editar');
         Route::post('whatsapp-api/probar', [WhatsAppApiController::class, 'probar'])->middleware('permission:configuracion.ver');
+        Route::get('whatsapp-api/evolution/estado', [WhatsAppApiController::class, 'evolutionEstado'])->middleware('permission:configuracion.ver');
+        Route::post('whatsapp-api/evolution/conectar', [WhatsAppApiController::class, 'evolutionConectar'])->middleware('permission:configuracion.editar');
+        Route::post('whatsapp-api/evolution/desconectar', [WhatsAppApiController::class, 'evolutionDesconectar'])->middleware('permission:configuracion.editar');
         Route::post('whatsapp/enviar', [WhatsAppApiController::class, 'enviar'])->middleware('throttle:30,1');
 
         // administrador de cada taller

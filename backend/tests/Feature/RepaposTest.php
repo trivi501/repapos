@@ -395,7 +395,7 @@ class RepaposTest extends TestCase
         $this->putJson('/api/whatsapp-api', [
             'numero_id' => '123456789', 'token' => $token, 'plantilla' => 'aviso_taller', 'idioma' => 'es_MX',
             'dueno' => '55 9999 8888', 'encendida' => true,
-        ])->assertOk()->assertJsonPath('info.nombre', 'Taller A');
+        ])->assertOk()->assertJsonFragment(['message' => 'WhatsApp conectado: Taller A (+52 55 1111 2222). Los botones de WhatsApp ahora envían directo.']);
 
         // el token se guarda cifrado y nunca se regresa completo
         $this->assertNotSame($token, \App\Models\Ajuste::valor('wa_api_token'));
@@ -438,6 +438,50 @@ class RepaposTest extends TestCase
             ->assertUnprocessable();
         $this->assertStringContainsString('token no es válido', $r->json('message'));
         $this->assertFalse($this->getJson('/api/whatsapp-api')->json('activa'));
+    }
+
+    public function test_whatsapp_por_evolution_api_se_vincula_con_qr_y_envia(): void
+    {
+        config(['services.evolution.url' => 'http://evo.test', 'services.evolution.key' => 'clave-evo']);
+        Http::fake([
+            'evo.test/instance/connectionState/*' => Http::sequence()
+                ->push(['message' => 'not found'], 404)             // la primera vez no existe
+                ->push(['instance' => ['state' => 'open']])         // ya escanearon el QR
+                ->whenEmpty(Http::response(['instance' => ['state' => 'open']])),
+            'evo.test/instance/create' => Http::response(['instance' => ['instanceName' => 'x']], 201),
+            'evo.test/instance/connect/*' => Http::response(['base64' => 'data:image/png;base64,QRQR']),
+            'evo.test/message/sendText/*' => Http::response(['key' => ['id' => 'BAE5']], 201),
+            'evo.test/instance/logout/*' => Http::response(['status' => 'SUCCESS']),
+        ]);
+        $this->comoTaller($this->adminA);
+        $instancia = 'repapos-taller-'.$this->adminA->taller_id;
+
+        // sin QR escaneado no se puede activar
+        $this->getJson('/api/whatsapp-api')->assertJsonPath('evolution.disponible', true)->assertJsonPath('evolution.instancia', $instancia);
+        $this->postJson('/api/whatsapp-api/evolution/conectar')->assertOk()->assertJsonPath('qr', 'data:image/png;base64,QRQR');
+        Http::assertSent(fn (PeticionHttp $p) => str_ends_with($p->url(), '/instance/create') && $p['instanceName'] === $instancia);
+
+        $this->putJson('/api/whatsapp-api', ['proveedor' => 'evolution', 'dueno' => '5599998888', 'encendida' => true])->assertOk();
+        $this->assertTrue($this->getJson('/api/me')->json('taller.whatsapp_api'));
+
+        $this->postJson('/api/whatsapp/enviar', ['numero' => '5512345678', 'texto' => "Hola\nya está listo"])->assertOk();
+        Http::assertSent(fn (PeticionHttp $p) => str_contains($p->url(), "/message/sendText/{$instancia}")
+            && $p['number'] === '525512345678' && $p['text'] === "Hola\nya está listo"
+            && $p->hasHeader('apikey', 'clave-evo'));
+        $this->assertSame('BAE5', WhatsappMensaje::latest('id')->value('meta_id'));
+
+        // desvincular apaga el envío directo
+        $this->postJson('/api/whatsapp-api/evolution/desconectar')->assertOk();
+        $this->assertFalse($this->getJson('/api/whatsapp-api')->json('activa'));
+    }
+
+    public function test_whatsapp_por_evolution_sin_servidor_configurado_avisa(): void
+    {
+        config(['services.evolution.url' => null, 'services.evolution.key' => null]);
+        $this->comoTaller($this->adminA);
+        $this->postJson('/api/whatsapp-api/evolution/conectar')->assertUnprocessable();
+        $r = $this->putJson('/api/whatsapp-api', ['proveedor' => 'evolution', 'encendida' => true])->assertUnprocessable();
+        $this->assertStringContainsString('EVOLUTION_URL', $r->json('message'));
     }
 
     public function test_whatsapp_api_avisa_si_pegaron_el_id_de_la_cuenta_y_sugiere_el_del_numero(): void

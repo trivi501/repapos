@@ -2,3 +2,4 @@
 *.sh text eol=lf
 deploy/nginx.conf.plantilla text eol=lf
 deploy/env.produccion text eol=lf
+deploy/evolution/* text eol=lf
