@@ -150,6 +150,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('configuracion', [ConfiguracionController::class, 'edit'])->middleware('permission:configuracion.ver');
         Route::post('configuracion', [ConfiguracionController::class, 'update'])->middleware('permission:configuracion.editar');
+        Route::get('whatsapp/locatarios', [ConfiguracionController::class, 'whatsappLocatarios'])->middleware('permission:configuracion.ver');
+        Route::put('whatsapp/locatarios', [ConfiguracionController::class, 'guardarWhatsappLocatarios'])->middleware('permission:configuracion.editar');
 
         // API de WhatsApp Cloud (Meta)
         Route::get('whatsapp-api', [WhatsAppApiController::class, 'show'])->middleware('permission:configuracion.ver');

@@ -51,24 +51,10 @@
       }
     </div>
 
-    <div class="card tabla-scroll">
-      <div class="titulo-tarjeta"><h2>WhatsApp de cada locatario</h2></div>
-      <table>
-        <thead><tr><th>Locatario</th><th>WhatsApp</th></tr></thead>
-        <tbody>
-          @for (l of locatarios(); track l.id) {
-            <tr>
-              <td>{{ l.nombre }}</td>
-              <td><input inputmode="tel" placeholder="10 dígitos" [name]="'wa' + l.id" [attr.aria-label]="'WhatsApp de ' + l.nombre" [(ngModel)]="l.whatsapp" /></td>
-            </tr>
-          } @empty {
-            <tr><td colspan="2"><div class="empty-state">Todavía no hay locatarios.</div></td></tr>
-          }
-        </tbody>
-      </table>
-      @if (puedeEditar) {
-        <div class="contenido"><button class="btn btn-primary" type="submit">Guardar</button></div>
-      }
+    <div class="card contenido">
+      <h2>WhatsApp de cada locatario</h2>
+      <p class="ayuda">Los números de los locatarios ahora tienen su propia pestaña en Ajustes.</p>
+      <p><a routerLink="/whatsapp/locatarios">📇 Ir a WhatsApp de locatarios →</a></p>
     </div>
 
     <div class="card contenido ocupa-todo">

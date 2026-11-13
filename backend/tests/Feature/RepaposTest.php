@@ -547,6 +547,24 @@ class RepaposTest extends TestCase
         $this->assertEquals(100.0, (float) Salida::sum('monto'));
     }
 
+    public function test_whatsapp_de_locatarios_en_su_propia_pestana(): void
+    {
+        $t = $this->telefonoDe($this->adminA);
+        $id = $t->locatario_id;
+
+        $this->getJson('/api/whatsapp/locatarios')->assertOk()->assertJsonPath('0.nombre', 'Don Pepe');
+        $this->putJson('/api/whatsapp/locatarios', ['whatsapp' => [$id => '55 1234-5678']])->assertOk();
+        $this->assertSame('5512345678', Locatario::withoutGlobalScopes()->find($id)->whatsapp);
+        $this->putJson('/api/whatsapp/locatarios', ['whatsapp' => [$id => '123']])->assertUnprocessable()->assertJsonValidationErrors("whatsapp.{$id}");
+        $this->assertArrayNotHasKey('locatarios', $this->getJson('/api/configuracion')->json(), 'Ya no van en Configuración');
+
+        // otro taller no puede cambiar el número de un locatario ajeno
+        $this->comoTaller($this->adminB);
+        $this->assertSame([], $this->getJson('/api/whatsapp/locatarios')->json());
+        $this->putJson('/api/whatsapp/locatarios', ['whatsapp' => [$id => '5599999999']])->assertOk();
+        $this->assertSame('5512345678', Locatario::withoutGlobalScopes()->find($id)->whatsapp);
+    }
+
     public function test_resumen_por_locatario_y_estado_de_cuenta(): void
     {
         $t = $this->telefonoDe($this->adminA);

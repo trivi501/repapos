@@ -43,7 +43,6 @@ class ConfiguracionController extends Controller
             'lada' => Ajuste::valor('lada', '52'),
             'mensaje_listo' => Ajuste::valor('mensaje_listo', Ajuste::MENSAJE_LISTO),
             'mensaje_no_quedo' => Ajuste::valor('mensaje_no_quedo', Ajuste::MENSAJE_NO_QUEDO),
-            'locatarios' => Locatario::orderBy('nombre')->get(['id', 'nombre', 'whatsapp']),
             'textos' => $textos,
             'taller' => ['nombre' => $taller->nombre, 'logo_url' => $taller->logoUrl()],
         ]);
@@ -58,11 +57,9 @@ class ConfiguracionController extends Controller
             'lada' => ['required', 'regex:/^\d{1,4}$/'],
             'mensaje_listo' => ['required', 'string', 'max:2000'],
             'mensaje_no_quedo' => ['required', 'string', 'max:2000'],
-            'whatsapp' => ['array'],
-            'whatsapp.*' => ['nullable', 'regex:/^[\d\s\-\+\(\)]{10,20}$/'],
             'textos' => ['array'],
             'textos.*' => ['nullable', 'string', 'max:5000'],
-        ], ['whatsapp.*.regex' => 'Revisa los números: cada WhatsApp debe tener al menos 10 dígitos.']);
+        ]);
 
         foreach (self::TEXTOS_CLIENTES as $clave => [, $defecto]) {
             $texto = trim(str_replace("\r\n", "\n", (string) ($d['textos'][$clave] ?? '')));
@@ -90,11 +87,29 @@ class ConfiguracionController extends Controller
         Ajuste::poner('lada', $d['lada']);
         Ajuste::poner('mensaje_listo', str_replace("\r\n", "\n", $d['mensaje_listo']));
         Ajuste::poner('mensaje_no_quedo', str_replace("\r\n", "\n", $d['mensaje_no_quedo']));
-        foreach ($d['whatsapp'] ?? [] as $id => $numero) {
+
+        return response()->json(['message' => 'Configuración guardada.']);
+    }
+
+    /** Pestaña "WhatsApp de locatarios": el número de cada locatario del taller. */
+    public function whatsappLocatarios()
+    {
+        return response()->json(Locatario::orderBy('nombre')->get(['id', 'nombre', 'whatsapp']));
+    }
+
+    public function guardarWhatsappLocatarios(Request $r)
+    {
+        $d = $r->validate([
+            'whatsapp' => ['required', 'array'],
+            'whatsapp.*' => ['nullable', 'regex:/^[\d\s\-\+\(\)]{10,20}$/'],
+        ], ['whatsapp.*.regex' => 'Revisa los números: cada WhatsApp debe tener al menos 10 dígitos.']);
+
+        // solo locatarios de este taller (el modelo filtra por taller): un id ajeno no se toca
+        foreach ($d['whatsapp'] as $id => $numero) {
             $numero = preg_replace('/\D/', '', (string) $numero);
             Locatario::whereKey($id)->update(['whatsapp' => $numero === '' ? null : $numero]);
         }
 
-        return response()->json(['message' => 'Configuración guardada.']);
+        return response()->json(['message' => 'WhatsApp de los locatarios guardados.']);
     }
 }

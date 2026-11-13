@@ -1,6 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { AvisosService } from '../../core/services/avisos.service';
@@ -10,14 +11,13 @@ interface Datos {
   lada: string;
   mensaje_listo: string;
   mensaje_no_quedo: string;
-  locatarios: { id: number; nombre: string; whatsapp: string | null }[];
   textos: { clave: string; titulo: string; valor: string; renglones: number }[];
   taller: { nombre: string; logo_url: string | null };
 }
 
 @Component({
   selector: 'app-configuracion',
-  imports: [FormsModule, WhatsAppApi],
+  imports: [FormsModule, RouterLink, WhatsAppApi],
   templateUrl: './configuracion.html',
 })
 export class Configuracion implements OnInit {
@@ -26,7 +26,6 @@ export class Configuracion implements OnInit {
   readonly auth = inject(AuthService);
 
   readonly cargado = signal(false);
-  readonly locatarios = signal<Datos['locatarios']>([]);
   readonly textos = signal<Datos['textos']>([]);
   readonly logoUrl = signal<string | null>(null);
 
@@ -52,7 +51,6 @@ export class Configuracion implements OnInit {
         this.quitarLogo = false;
         this.logo = null;
         this.logoUrl.set(d.taller.logo_url);
-        this.locatarios.set(d.locatarios);
         this.textos.set(d.textos);
         this.cargado.set(true);
       },
@@ -77,7 +75,6 @@ export class Configuracion implements OnInit {
     f.append('mensaje_no_quedo', this.mensajeNoQuedo);
     if (this.quitarLogo) f.append('quitar_logo', '1');
     if (this.logo) f.append('logo', this.logo);
-    for (const l of this.locatarios()) f.append(`whatsapp[${l.id}]`, l.whatsapp ?? '');
     for (const t of this.textos()) f.append(`textos[${t.clave}]`, t.valor);
 
     this.api.post<{ message: string }>('configuracion', f).subscribe({
