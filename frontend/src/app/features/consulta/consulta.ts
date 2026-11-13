@@ -4,7 +4,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { environment } from '../../../environments/environment';
-import { ESTADOS_ORDEN } from '../../core/models/taller.model';
+import { ESTADOS_LIBERACION, ESTADOS_ORDEN } from '../../core/models/taller.model';
 import { AppLogo } from '../../shared/ui';
 
 interface ResultadoConsulta {
@@ -97,12 +97,13 @@ export class Consulta implements OnInit {
   }
 
   etiquetaEstado(estado: string): string {
-    return ESTADOS_ORDEN.find((e) => e.valor === estado)?.etiqueta ?? estado;
+    // el cliente ve "En proceso" / "Rechazado", sin la aclaración "(liberación)" de los filtros internos
+    return [...ESTADOS_LIBERACION, ...ESTADOS_ORDEN].find((e) => e.valor === estado)?.etiqueta ?? estado;
   }
 
   claseEstado(estado: string): string {
     if (estado === 'entregado' || estado === 'reparado') return 'badge-success';
-    if (estado === 'cancelado' || estado === 'no_quedo') return 'badge-danger';
+    if (estado === 'cancelado' || estado === 'no_quedo' || estado === 'rechazado') return 'badge-danger';
     if (estado === 'esperando_repuesto') return 'badge-warning';
     return 'badge-primary';
   }

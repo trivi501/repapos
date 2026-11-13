@@ -65,6 +65,8 @@ class ConsultaController extends Controller
             'numero' => $orden->folio,
             'estado' => $orden->estado,
             'estado_texto' => $orden->estado_texto,
+            // la liberación tiene sus propios pasos: recibido, en proceso, listo o rechazado
+            'es_liberacion' => $orden->es_liberacion,
             'taller' => $orden->taller?->nombre,
             'logo_url' => $orden->taller?->logoUrl(),
             'sucursal' => $orden->sucursal?->nombre,
@@ -76,6 +78,9 @@ class ConsultaController extends Controller
         }
 
         $respuesta['equipo'] = $orden->equipo?->nombre;
+        if ($orden->estado === OrdenReparacion::RECHAZADO) {
+            $respuesta['motivo_rechazo'] = $orden->motivo_rechazo; // el cliente debe saber por qué
+        }
 
         if (! $orden->visible_cliente) {
             return $respuesta;

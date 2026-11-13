@@ -528,6 +528,12 @@ class RepaposTest extends TestCase
         $this->assertEquals(0.0, OrdenReparacion::find($id)->saldo, 'Si se rechazó, no se cobra');
         $this->assertStringContainsString('Motivo: Reportado por robo', rawurldecode($r->json('aviso.url')));
 
+        // la página pública sabe que es liberación y le dice al cliente por qué se rechazó
+        $this->getJson("/api/publico/orden/{$o['token']}")->assertOk()
+            ->assertJsonPath('es_liberacion', true)
+            ->assertJsonPath('estado_texto', 'RECHAZADO')
+            ->assertJsonPath('motivo_rechazo', 'Reportado por robo');
+
         // al salir de rechazado el motivo se borra
         $this->postJson("/api/ordenes/{$id}/accion", ['accion' => 'estatus', 'estado' => 'reparado'])->assertOk();
         $this->assertNull(OrdenReparacion::find($id)->motivo_rechazo);

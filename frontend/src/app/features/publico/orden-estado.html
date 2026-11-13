@@ -43,7 +43,15 @@
         }
       </div>
 
-      @if (o.estado === 'reparado' || o.estado === 'no_quedo') {
+      @if (o.estado === 'rechazado') {
+        <p class="alert alert-error separado">
+          No se pudo liberar tu equipo.
+          @if (o.motivo_rechazo) {
+            <br /><b>Motivo:</b> {{ o.motivo_rechazo }}
+          }
+        </p>
+      }
+      @if (o.estado === 'reparado' || o.estado === 'no_quedo' || o.estado === 'rechazado') {
         <p class="alert alert-success separado">Ya puedes pasar por tu equipo. Recuerda traer tu nota.</p>
       }
 

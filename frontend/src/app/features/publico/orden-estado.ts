@@ -7,6 +7,8 @@ interface EstadoPublico {
   numero: number;
   estado: string;
   estado_texto: string;
+  es_liberacion?: boolean;
+  motivo_rechazo?: string | null;
   taller: string;
   logo_url: string | null;
   sucursal: string;
@@ -27,9 +29,16 @@ interface EstadoPublico {
 const PASOS = [
   { estados: ['recibido'], texto: 'Recibido' },
   { estados: ['diagnostico'], texto: 'Diagnóstico' },
-  { estados: ['en_reparacion', 'esperando_repuesto', 'en_proceso'], texto: 'En reparación' },
-  { estados: ['reparado', 'no_quedo', 'rechazado'], texto: 'Listo' },
+  { estados: ['en_reparacion', 'esperando_repuesto'], texto: 'En reparación' },
+  { estados: ['reparado', 'no_quedo'], texto: 'Listo' },
   { estados: ['entregado'], texto: 'Entregado' },
+];
+
+/** Una liberación (bloqueo de operador, FRP, iCloud, MDM o Knox) solo tiene estos pasos. */
+const PASOS_LIBERACION = [
+  { estados: ['recibido'], texto: 'Recibido' },
+  { estados: ['en_proceso'], texto: 'En proceso' },
+  { estados: ['reparado', 'rechazado'], texto: 'Listo' },
 ];
 
 /** Página a la que llega el cliente con el enlace de su comprobante o de WhatsApp (sin iniciar sesión). */
@@ -53,9 +62,10 @@ export class OrdenEstado implements OnInit {
   }
 
   pasos(o: EstadoPublico) {
-    const actual = PASOS.findIndex((p) => p.estados.includes(o.estado));
-    return PASOS.map((p, i) => ({
-      texto: p.texto === 'Listo' && o.estado === 'no_quedo' ? 'No se pudo reparar' : p.texto,
+    const lista = o.es_liberacion ? PASOS_LIBERACION : PASOS;
+    const actual = lista.findIndex((p) => p.estados.includes(o.estado));
+    return lista.map((p, i) => ({
+      texto: p.texto !== 'Listo' ? p.texto : o.estado === 'no_quedo' ? 'No se pudo reparar' : o.estado === 'rechazado' ? 'Rechazado' : p.texto,
       hecho: actual >= 0 && i <= actual,
     }));
   }
