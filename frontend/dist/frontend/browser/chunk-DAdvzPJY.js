@@ -1,1 +1,0 @@
-import"./chunk-Bg3dtm_q.js";import"./chunk-BwbUaHCc.js";import"./chunk-CWSLc83D.js";import"./chunk-CE8qgMuG.js";import"./main-AAK3OF3G.js";import"./chunk-Q5mdLa9p.js";import"./chunk-DR6GKY3g.js";import{n as z,t as G}from"./chunk-J6spmEli.js";export{G as Ventas};

@@ -62,7 +62,7 @@
 }
 
 <div class="card tabla-scroll">
-  <table>
+  <table class="tabla-compacta">
     <thead>
       <tr>
         <th>#</th><th>Prioridad</th><th>Recibido</th><th>Locatario</th><th>Modelo</th><th>Trabajo</th><th>Notas / IMEI</th>
@@ -70,7 +70,7 @@
         @if (verCostos) {
           <th class="der" title="Solo lo ve el dueño">Gasto</th><th class="der" title="Solo lo ve el dueño">Ganancia</th>
         }
-        <th>Pago</th><th>Estatus</th><th>Entrega</th><th>Entregado el</th><th>Acciones</th>
+        <th title="Pago · estatus · entrega">Estatus</th><th>Acciones</th>
       </tr>
     </thead>
     <tbody>
@@ -90,10 +90,16 @@
             <td class="der sin-salto tenue">{{ t.costo != null ? (t.costo | dinero) : '—' }}</td>
             <td class="der sin-salto" [class.a-favor]="(t.ganancia ?? 0) > 0" [class.debe]="(t.ganancia ?? 0) < 0">{{ t.ganancia | dinero }}</td>
           }
-          <td><app-estatus [valor]="t.estado_pago" /></td>
-          <td><app-estatus [valor]="t.resultado" /></td>
-          <td><app-estatus [valor]="t.entregado ? 'ENTREGADO' : 'POR ENTREGAR'" /></td>
-          <td class="sin-salto">{{ t.fecha_entrega | fecha }}</td>
+          <td>
+            <div class="estatus-apilados">
+              <app-estatus [valor]="t.estado_pago" />
+              <app-estatus [valor]="t.resultado" />
+              <app-estatus [valor]="t.entregado ? 'ENTREGADO' : 'POR ENTREGAR'" />
+              @if (t.fecha_entrega) {
+                <small class="tenue sin-salto">{{ t.fecha_entrega | fecha }}</small>
+              }
+            </div>
+          </td>
           <td class="sin-salto">
             <div class="iconos">
               @if (auth.tienePermiso('telefonos.editar')) {
@@ -111,7 +117,7 @@
           </td>
         </tr>
       } @empty {
-        <tr><td [attr.colspan]="verCostos ? 17 : 15"><div class="empty-state">{{ cargando() ? 'Cargando…' : 'No hay teléfonos con estos filtros.' }}</div></td></tr>
+        <tr><td [attr.colspan]="verCostos ? 14 : 12"><div class="empty-state">{{ cargando() ? 'Cargando…' : 'No hay teléfonos con estos filtros.' }}</div></td></tr>
       }
     </tbody>
   </table>

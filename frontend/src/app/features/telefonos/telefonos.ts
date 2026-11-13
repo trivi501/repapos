@@ -46,6 +46,17 @@ interface Respuesta {
   selector: 'app-telefonos',
   imports: [FormsModule, DineroPipe, FechaPipe, Estatus, TelefonoForm],
   templateUrl: './telefonos.html',
+  // tabla compacta: caben más teléfonos en pantalla sin desplazarse a los lados
+  styles: `
+    .tabla-compacta { font-size: 0.8rem; }
+    .tabla-compacta thead th { padding: 0.45rem 0.4rem; font-size: 0.68rem; }
+    .tabla-compacta tbody td { padding: 0.35rem 0.4rem; }
+    .tabla-compacta ::ng-deep .badge { padding: 0.1rem 0.45rem; font-size: 0.68rem; }
+    .tabla-compacta .icono-btn { width: 1.6rem; height: 1.6rem; font-size: 0.85rem; }
+    /* las acciones en dos renglones: ocupan lo mismo de alto que los tres estatus apilados */
+    .tabla-compacta .iconos { flex-wrap: wrap; width: 5rem; gap: 0.1rem; }
+    .estatus-apilados { display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem; }
+  `,
 })
 export class Telefonos implements OnInit {
   private readonly api = inject(ApiService);
