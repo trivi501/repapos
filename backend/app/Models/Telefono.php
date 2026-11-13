@@ -25,8 +25,11 @@ class Telefono extends Model
 
     protected $fillable = [
         'locatario_id', 'prioridad', 'fecha_recibido', 'modelo', 'trabajo', 'notas',
-        'total', 'pagado', 'resultado', 'entregado', 'fecha_entrega', 'user_id',
+        'total', 'costo', 'pagado', 'resultado', 'entregado', 'fecha_entrega', 'user_id',
     ];
+
+    // el gasto (créditos, servidor o pieza) solo lo ve quien tiene "ordenes.ver_costos" (makeVisible en el controlador)
+    protected $hidden = ['costo'];
 
     protected function casts(): array
     {
@@ -35,8 +38,17 @@ class Telefono extends Model
             'fecha_entrega' => 'datetime',
             'entregado' => 'boolean',
             'total' => 'decimal:2',
+            'costo' => 'decimal:2',
             'pagado' => 'decimal:2',
         ];
+    }
+
+    /** Ganancia: lo que se le cobra al locatario menos el gasto. Si no quedó, no entra nada. */
+    public function getGananciaAttribute(): float
+    {
+        $ingreso = $this->resultado === self::NO_QUEDO ? 0.0 : (float) $this->total;
+
+        return round($ingreso - (float) $this->costo, 2);
     }
 
     public function locatario(): BelongsTo

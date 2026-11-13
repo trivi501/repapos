@@ -24,6 +24,7 @@ export interface CorteDatos {
   ganancia?: {
     reparaciones: { cantidad: number; cobrado: number; refaccion: number; mano_obra: number; ganancia: number; sin_costos: number };
     ventas: { cantidad: number; vendido: number; costo: number; ganancia: number };
+    telefonos: { cantidad: number; cobrado: number; gasto: number; ganancia: number; sin_gasto: number };
     total: number;
   };
   corte: {
@@ -104,6 +105,7 @@ export function textoWhatsApp(x: CorteDatos, c: Cuadre, taller: string): string 
     l.push('', `*Ganancia: ${dinero(x.ganancia.total)}*`);
     l.push(`Reparaciones (${x.ganancia.reparaciones.cantidad}): ${dinero(x.ganancia.reparaciones.ganancia)}`);
     l.push(`Ventas (${x.ganancia.ventas.cantidad}): ${dinero(x.ganancia.ventas.ganancia)}`);
+    l.push(`Teléfonos entregados (${x.ganancia.telefonos.cantidad}): ${dinero(x.ganancia.telefonos.ganancia)}`);
   }
   return l.join('\n');
 }

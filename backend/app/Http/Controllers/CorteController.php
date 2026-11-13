@@ -6,6 +6,7 @@ use App\Models\Corte;
 use App\Models\OrdenReparacion;
 use App\Models\Pago;
 use App\Models\Salida;
+use App\Models\Telefono;
 use App\Models\User;
 use App\Models\Venta;
 use Carbon\Carbon;
@@ -252,7 +253,7 @@ class CorteController extends Controller
             ->sortByDesc(fn ($e) => $e['efectivo'] + $e['otros'])->values()->all();
     }
 
-    /** Ganancia de las reparaciones terminadas y de las ventas del periodo. */
+    /** Ganancia de las reparaciones terminadas, las ventas y los teléfonos entregados del periodo. */
     private function ganancia(CarbonInterface $desde, CarbonInterface $hasta): array
     {
         $ordenes = OrdenReparacion::where('terminado_at', '>=', $desde)->where('terminado_at', '<', $hasta)->get();
@@ -264,6 +265,11 @@ class CorteController extends Controller
             ->where('estatus', '!=', Venta::CANCELADA)->get();
         $netoVentas = round($ventas->sum(fn (Venta $v) => $v->neto), 2);
         $gananciaVentas = round($ventas->sum(fn (Venta $v) => $v->ganancia), 2);
+
+        // teléfonos de locatarios: cuentan cuando se entregan (no tienen fecha de "listo")
+        $telefonos = Telefono::where('entregado', true)->where('fecha_entrega', '>=', $desde)->where('fecha_entrega', '<', $hasta)->get();
+        $gastoTelefonos = round((float) $telefonos->sum('costo'), 2);
+        $gananciaTelefonos = round($telefonos->sum(fn (Telefono $t) => $t->ganancia), 2);
 
         return [
             'reparaciones' => [
@@ -281,7 +287,14 @@ class CorteController extends Controller
                 'costo' => round($netoVentas - $gananciaVentas, 2),
                 'ganancia' => $gananciaVentas,
             ],
-            'total' => round($gananciaOrdenes + $gananciaVentas, 2),
+            'telefonos' => [
+                'cantidad' => $telefonos->count(),
+                'cobrado' => round($gananciaTelefonos + $gastoTelefonos, 2),
+                'gasto' => $gastoTelefonos,
+                'ganancia' => $gananciaTelefonos,
+                'sin_gasto' => $telefonos->whereNull('costo')->count(),
+            ],
+            'total' => round($gananciaOrdenes + $gananciaVentas + $gananciaTelefonos, 2),
         ];
     }
 

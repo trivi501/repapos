@@ -250,6 +250,35 @@ class RepaposTest extends TestCase
         $this->assertStringContainsString('Saldo pendiente: $400.00', rawurldecode($url));
     }
 
+    public function test_gasto_de_telefono_y_ganancia_solo_para_el_dueno(): void
+    {
+        $t = $this->telefonoDe($this->adminA, ['costo' => 180]);   // total 500
+        $this->assertEquals(180.0, (float) $t->costo);
+        $r = $this->getJson("/api/telefonos/{$t->id}")->assertOk();
+        $this->assertEquals(320, $r->json('ganancia'));
+        $resumen = $this->getJson('/api/telefonos')->json('resumen');
+        $this->assertEquals(180, $resumen['gasto']);
+        $this->assertEquals(320, $resumen['ganancia']);
+
+        // al entregarlo, su ganancia entra al corte
+        $this->postJson("/api/telefonos/{$t->id}/accion", ['accion' => 'entregado'])->assertOk();
+        $g = $this->getJson('/api/cortes?fecha='.today()->toDateString())->json('ganancia.telefonos');
+        $this->assertEquals(1, $g['cantidad']);
+        $this->assertEquals(320, $g['ganancia']);
+
+        // la recepcionista no ve el gasto ni puede cambiarlo
+        $this->comoTaller($this->usuario($this->tallerA, 'Recepcionista'));
+        $r = $this->getJson("/api/telefonos/{$t->id}")->assertOk()->json();
+        $this->assertArrayNotHasKey('costo', $r);
+        $this->assertArrayNotHasKey('ganancia', $r);
+        $this->assertArrayNotHasKey('gasto', $this->getJson('/api/telefonos')->json('resumen'));
+        $this->putJson("/api/telefonos/{$t->id}", [
+            'locatario' => 'Don Pepe', 'prioridad' => 'MEDIA', 'fecha_recibido' => '2026-11-01', 'modelo' => 'MOTO G60',
+            'total' => 500, 'pagado' => 100, 'resultado' => 'LISTO', 'costo' => 1,
+        ])->assertOk();
+        $this->assertEquals(180.0, (float) $t->fresh()->costo, 'Sin permiso no cambia el gasto');
+    }
+
     public function test_al_eliminar_se_decide_que_pasa_con_los_cobros(): void
     {
         $conservar = $this->telefonoDe($this->adminA);

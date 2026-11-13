@@ -52,7 +52,13 @@ class TelefonoController extends Controller
     /** El teléfono como lo necesita la tabla: con saldo y enlace para avisar por WhatsApp. */
     private function formato(Telefono $t): array
     {
-        return $t->toArray() + ['saldo' => $t->saldo, 'estado_pago' => $t->estado_pago, 'aviso_url' => WhatsApp::aviso($t)];
+        $costos = [];
+        if (auth()->user()?->can('ordenes.ver_costos')) {
+            $t->makeVisible('costo');
+            $costos = ['ganancia' => $t->ganancia];
+        }
+
+        return $t->toArray() + $costos + ['saldo' => $t->saldo, 'estado_pago' => $t->estado_pago, 'aviso_url' => WhatsApp::aviso($t)];
     }
 
     public function index(Request $r)
@@ -67,8 +73,15 @@ class TelefonoController extends Controller
             SUM(CASE WHEN entregado = 0 AND resultado = ? THEN 1 ELSE 0 END) as no_quedaron,
             SUM(CASE WHEN resultado <> ? THEN total ELSE 0 END) as total,
             SUM(pagado) as cobrado,
-            SUM(CASE WHEN resultado <> ? AND total > pagado THEN total - pagado ELSE 0 END) as por_cobrar
+            SUM(CASE WHEN resultado <> ? AND total > pagado THEN total - pagado ELSE 0 END) as por_cobrar,
+            COALESCE(SUM(costo), 0) as gasto
         ", [$noQuedo, $noQuedo, $noQuedo])->first();
+        // gasto y ganancia solo para el dueño
+        if ($r->user()->can('ordenes.ver_costos')) {
+            $resumen->ganancia = round((float) $resumen->total - (float) $resumen->gasto, 2);
+        } else {
+            unset($resumen->gasto);
+        }
 
         $pagina = $q->paginate($r->integer('por_pagina', 50));
         $pagina->getCollection()->transform(fn (Telefono $t) => $this->formato($t));
@@ -97,6 +110,8 @@ class TelefonoController extends Controller
             'trabajo' => ['nullable', 'string', 'max:255'],
             'notas' => ['nullable', 'string', 'max:255'],
             'total' => ['required', 'numeric', 'min:0'],
+            // gasto (créditos, servidor o pieza): solo el dueño; sin permiso se ignora
+            'costo' => ['nullable', 'numeric', 'min:0'],
             'pagado' => ['required', 'numeric', 'min:0'],
             'resultado' => ['required', Rule::in(Telefono::RESULTADOS)],
             'entregado' => ['nullable', 'boolean'],
@@ -129,6 +144,9 @@ class TelefonoController extends Controller
                 'fecha_entrega' => $entregado ? ($t->entregado ? $t->fecha_entrega : now()) : null,
                 'entregado' => $entregado,
             ]);
+            if ($r->user()->can('ordenes.ver_costos') && $r->has('costo')) {
+                $t->costo = $d['costo'];
+            }
             if ($nuevo) {
                 $t->user_id = auth()->id();
                 $t->pagado = 0;
@@ -250,17 +268,18 @@ class TelefonoController extends Controller
     public function exportar(Request $r): StreamedResponse
     {
         $q = $this->filtrar($r);
+        $costos = $r->user()->can('ordenes.ver_costos');   // gasto y ganancia solo para el dueño
 
-        return response()->streamDownload(function () use ($q) {
+        return response()->streamDownload(function () use ($q, $costos) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // para que Excel lea bien los acentos
-            fputcsv($out, ['Id', 'Prioridad', 'Recibido', 'Locatario', 'Modelo', 'Trabajo', 'Notas', 'Total', 'Pagado',
-                'Saldo', 'Pago', 'Estatus', 'Entrega', 'Entregado el']);
+            fputcsv($out, array_merge(['Id', 'Prioridad', 'Recibido', 'Locatario', 'Modelo', 'Trabajo', 'Notas', 'Total', 'Pagado',
+                'Saldo', 'Pago', 'Estatus', 'Entrega', 'Entregado el'], $costos ? ['Gasto', 'Ganancia'] : []));
             foreach ($q->cursor() as $t) {
-                fputcsv($out, [$t->id, $t->prioridad, $t->fecha_recibido->format('d/m/Y'), $t->locatario->nombre,
+                fputcsv($out, array_merge([$t->id, $t->prioridad, $t->fecha_recibido->format('d/m/Y'), $t->locatario->nombre,
                     $t->modelo, $t->trabajo, $t->notas, $t->total, $t->pagado, number_format($t->saldo, 2, '.', ''),
                     $t->estado_pago, $t->resultado, $t->entregado ? 'ENTREGADO' : 'POR ENTREGAR',
-                    $t->fecha_entrega?->format('d/m/Y H:i')]);
+                    $t->fecha_entrega?->format('d/m/Y H:i')], $costos ? [$t->costo, number_format($t->ganancia, 2, '.', '')] : []));
             }
             fclose($out);
         }, 'telefonos_'.now()->format('Y-m-d').'.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);

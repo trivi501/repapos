@@ -12,7 +12,7 @@ const ULTIMO_LOCATARIO = 'taller_ultimo_locatario';
 function vacio(locatario = '') {
   return {
     locatario, whatsapp: '', fecha_recibido: fechaISO(), prioridad: 'MEDIA', modelo: '', trabajo: '', notas: '',
-    total: 0, pagado: 0, resultado: 'EN TALLER', entregado: false,
+    total: 0, costo: null as number | null, pagado: 0, resultado: 'EN TALLER', entregado: false,
   };
 }
 
@@ -65,8 +65,8 @@ export class TelefonoForm implements OnInit, AfterViewInit {
         next: (t) => {
           this.m = {
             locatario: t.locatario?.nombre ?? '', whatsapp: t.locatario?.whatsapp ?? '', fecha_recibido: t.fecha_recibido.slice(0, 10),
-            prioridad: t.prioridad, modelo: t.modelo, trabajo: t.trabajo, notas: t.notas, total: Number(t.total), pagado: Number(t.pagado),
-            resultado: t.resultado, entregado: t.entregado,
+            prioridad: t.prioridad, modelo: t.modelo, trabajo: t.trabajo, notas: t.notas, total: Number(t.total),
+            costo: t.costo != null ? Number(t.costo) : null, pagado: Number(t.pagado), resultado: t.resultado, entregado: t.entregado,
           };
           this.fechaEntrega.set(t.fecha_entrega);
           this.cobros.set(t.cobros_total ?? 0);
@@ -83,6 +83,16 @@ export class TelefonoForm implements OnInit, AfterViewInit {
     }
   }
 
+  /** Gasto (créditos, servidor o pieza) y ganancia: solo para el dueño. */
+  get verCostos(): boolean {
+    return this.auth.tienePermiso('ordenes.ver_costos');
+  }
+
+  ganancia(): number {
+    const ingreso = this.m.resultado === 'NO QUEDÓ' ? 0 : Number(this.m.total || 0);
+    return Math.round((ingreso - Number(this.m.costo || 0)) * 100) / 100;
+  }
+
   ngAfterViewInit(): void {
     if (!this.telefonoId()) this.campoLocatario()?.nativeElement.focus();
   }
@@ -97,9 +107,12 @@ export class TelefonoForm implements OnInit, AfterViewInit {
     this.errores.set([]);
     this.guardando.set(true);
     const id = this.telefonoId();
+    // sin permiso el gasto no se manda: no se debe pisar lo que capturó el dueño
+    const datos: Record<string, unknown> = { ...this.m };
+    if (!this.verCostos) delete datos['costo'];
     const peticion = id
-      ? this.api.put<{ message: string; aviso: AvisoWhatsapp | null }>(`telefonos/${id}`, this.m)
-      : this.api.post<{ message: string; aviso: AvisoWhatsapp | null }>('telefonos', this.m);
+      ? this.api.put<{ message: string; aviso: AvisoWhatsapp | null }>(`telefonos/${id}`, datos)
+      : this.api.post<{ message: string; aviso: AvisoWhatsapp | null }>('telefonos', datos);
 
     peticion.subscribe({
       next: (r) => {

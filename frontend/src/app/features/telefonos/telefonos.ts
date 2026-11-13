@@ -16,6 +16,9 @@ export interface Telefono {
   trabajo: string;
   notas: string;
   total: string;
+  /** Gasto y ganancia: solo llegan si el usuario tiene "ordenes.ver_costos". */
+  costo?: string | null;
+  ganancia?: number;
   pagado: string;
   saldo: number;
   estado_pago: string;
@@ -32,7 +35,10 @@ interface Respuesta {
   data: Telefono[];
   current_page: number;
   last_page: number;
-  resumen: { telefonos: number; en_taller: string; listos: string; no_quedaron: string; total: string; cobrado: string; por_cobrar: string };
+  resumen: {
+    telefonos: number; en_taller: string; listos: string; no_quedaron: string; total: string; cobrado: string; por_cobrar: string;
+    gasto?: string; ganancia?: number;
+  };
   locatarios: { id: number; nombre: string; whatsapp: string | null }[];
 }
 
@@ -82,6 +88,11 @@ export class Telefonos implements OnInit {
       this.router.navigate([], { queryParams: { nuevo: null, editar: null }, queryParamsHandling: 'merge', replaceUrl: true });
     }
     this.cargar();
+  }
+
+  /** Gasto y ganancia de cada teléfono: solo para el dueño. */
+  get verCostos(): boolean {
+    return this.auth.tienePermiso('ordenes.ver_costos');
   }
 
   abrirFormulario(id: number | null, eliminar = false): void {

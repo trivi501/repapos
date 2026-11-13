@@ -116,9 +116,17 @@
           <div class="linea-monto"><span>Vendido</span><span>{{ g.ventas.vendido | dinero }}</span></div>
           <div class="linea-monto"><span>− Costo de los productos</span><span>{{ g.ventas.costo | dinero }}</span></div>
           <div class="linea-monto separador-superior"><b>Ganancia</b><b>{{ g.ventas.ganancia | dinero }}</b></div>
+
+          <h3 class="separado">Teléfonos de locatarios entregados ({{ g.telefonos.cantidad }})</h3>
+          <div class="linea-monto"><span>Se cobra</span><span>{{ g.telefonos.cobrado | dinero }}</span></div>
+          <div class="linea-monto"><span>− Créditos / servidor / pieza</span><span>{{ g.telefonos.gasto | dinero }}</span></div>
+          <div class="linea-monto separador-superior"><b>Ganancia</b><b>{{ g.telefonos.ganancia | dinero }}</b></div>
+          @if (g.telefonos.sin_gasto) {
+            <p class="ayuda aviso-naranja">{{ g.telefonos.sin_gasto }} sin gasto capturado: su ganancia sale igual a lo que se cobra.</p>
+          }
         </div>
       </div>
-      <p class="ayuda">Los teléfonos de locatarios no tienen costos capturados, por eso no entran aquí. Las salidas de dinero no se restan.</p>
+      <p class="ayuda">Los teléfonos de locatarios cuentan cuando se entregan. Las salidas de dinero no se restan.</p>
     </div>
   }
 

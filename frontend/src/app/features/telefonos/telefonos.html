@@ -54,6 +54,10 @@
     <span>Total: {{ r.total | dinero }}</span>
     <span>Cobrado: {{ r.cobrado | dinero }}</span>
     <span class="resaltado">Por cobrar: {{ r.por_cobrar | dinero }}</span>
+    @if (r.ganancia !== undefined) {
+      <span title="Solo lo ve el dueño">🔒 Gasto: {{ r.gasto | dinero }}</span>
+      <span title="Solo lo ve el dueño">🔒 Ganancia: {{ r.ganancia | dinero }}</span>
+    }
   </div>
 }
 
@@ -63,6 +67,9 @@
       <tr>
         <th>#</th><th>Prioridad</th><th>Recibido</th><th>Locatario</th><th>Modelo</th><th>Trabajo</th><th>Notas / IMEI</th>
         <th class="der">Total</th><th class="der">Pagado</th><th class="der">Saldo</th>
+        @if (verCostos) {
+          <th class="der" title="Solo lo ve el dueño">Gasto</th><th class="der" title="Solo lo ve el dueño">Ganancia</th>
+        }
         <th>Pago</th><th>Estatus</th><th>Entrega</th><th>Entregado el</th><th>Acciones</th>
       </tr>
     </thead>
@@ -79,6 +86,10 @@
           <td class="der sin-salto">{{ t.total | dinero }}</td>
           <td class="der sin-salto">{{ t.pagado | dinero }}</td>
           <td class="der sin-salto" [class.debe]="t.saldo > 0">{{ t.saldo | dinero }}</td>
+          @if (verCostos) {
+            <td class="der sin-salto tenue">{{ t.costo != null ? (t.costo | dinero) : '—' }}</td>
+            <td class="der sin-salto" [class.a-favor]="(t.ganancia ?? 0) > 0" [class.debe]="(t.ganancia ?? 0) < 0">{{ t.ganancia | dinero }}</td>
+          }
           <td><app-estatus [valor]="t.estado_pago" /></td>
           <td><app-estatus [valor]="t.resultado" /></td>
           <td><app-estatus [valor]="t.entregado ? 'ENTREGADO' : 'POR ENTREGAR'" /></td>
@@ -100,7 +111,7 @@
           </td>
         </tr>
       } @empty {
-        <tr><td colspan="15"><div class="empty-state">{{ cargando() ? 'Cargando…' : 'No hay teléfonos con estos filtros.' }}</div></td></tr>
+        <tr><td [attr.colspan]="verCostos ? 17 : 15"><div class="empty-state">{{ cargando() ? 'Cargando…' : 'No hay teléfonos con estos filtros.' }}</div></td></tr>
       }
     </tbody>
   </table>
