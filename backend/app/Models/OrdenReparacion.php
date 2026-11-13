@@ -131,8 +131,12 @@ class OrdenReparacion extends Model
             'fecha_recepcion' => 'datetime',
             'fecha_entrega_estimada' => 'date',
             'fecha_entrega_real' => 'datetime',
+            'terminado_at' => 'datetime',
         ];
     }
+
+    /** Estatus en que el trabajo ya se terminó (bien o mal): su ganancia cuenta en el corte de ese día. */
+    public const TERMINADOS = [self::LISTO, self::NO_QUEDO, self::RECHAZADO, self::ENTREGADO, self::CANCELADO];
 
     protected static function booted(): void
     {
@@ -141,6 +145,18 @@ class OrdenReparacion extends Model
             // folio consecutivo por taller
             $o->folio ??= (int) DB::table('ordenes_reparacion')->where('taller_id', $o->taller_id ?? Taller::actualId())->max('folio') + 1;
             $o->numero_orden ??= 'REP-'.now()->format('ymd').'-'.Str::upper(Str::random(4));
+        });
+
+        // cuándo se terminó: la primera vez que llega a un estatus final; si regresa a trabajo, se borra
+        static::saving(function (OrdenReparacion $o) {
+            if (! $o->isDirty('estado')) {
+                return;
+            }
+            if (! in_array($o->estado, self::TERMINADOS, true)) {
+                $o->terminado_at = null;
+            } elseif ($o->terminado_at === null) {
+                $o->terminado_at = now();
+            }
         });
     }
 

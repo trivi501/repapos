@@ -290,6 +290,64 @@ class RepaposTest extends TestCase
         $this->assertEquals(200.0, $this->getJson('/api/cortes?fecha='.$mañana)->json('fondo'));
     }
 
+    public function test_corte_por_turnos_con_retiro_desglose_y_ganancia(): void
+    {
+        $this->travelTo(today()->setTime(10, 0));
+        $this->telefonoDe($this->adminA);   // 100 en efectivo (teléfonos)
+        $o = $this->ordenNueva(['costo_refaccion' => 300, 'costo_mano_obra' => 100]);   // anticipo 300 con tarjeta
+        $hoy = today()->toDateString();
+
+        $r = $this->getJson('/api/cortes?fecha='.$hoy)->assertOk();
+        $r->assertJsonPath('turno', 1)->assertJsonPath('abierto', true);
+        $desglose = collect($r->json('desglose'))->keyBy('area');
+        $this->assertEquals(100, $desglose['telefonos']['EFECTIVO']);
+        $this->assertEquals(300, $desglose['reparaciones']['TARJETA']);
+        $this->assertCount(1, $r->json('por_empleado'));
+        $this->assertEquals(400, $r->json('por_empleado.0.efectivo') + $r->json('por_empleado.0.otros'));
+
+        // cierra el turno 1: contó 600 (fondo 500 + 100), retira 400 y deja 200 de fondo
+        $this->travelTo(today()->setTime(15, 0));
+        $this->postJson('/api/cortes', ['fecha' => $hoy, 'turno' => 1, 'fondo' => 500, 'contado' => 600, 'retiro' => 400])
+            ->assertOk()->assertJsonPath('corte.fondo_siguiente', '200.00');
+        $this->postJson('/api/cortes', ['fecha' => $hoy, 'turno' => 1, 'fondo' => 500, 'contado' => 600, 'retiro' => 700])
+            ->assertUnprocessable()->assertJsonValidationErrors('retiro');
+
+        // lo de la tarde entra al turno 2, que arranca con el fondo que dejó el 1
+        $this->travelTo(today()->setTime(17, 0));
+        $this->postJson("/api/ordenes/{$o['id']}/accion", ['accion' => 'estatus', 'estado' => 'reparado'])->assertOk();
+        $this->postJson("/api/ordenes/{$o['id']}/accion", ['accion' => 'abono', 'monto' => 700])->assertOk();
+        $t2 = $this->getJson('/api/cortes?fecha='.$hoy)->assertOk();
+        $t2->assertJsonPath('turno', 2)->assertJsonPath('fondo', 200)->assertJsonPath('entradas', 700);
+        $this->assertCount(1, $t2->json('turnos'));
+
+        // la ganancia del turno 2 es la reparación que se terminó en él: 1000 - 300 - 100
+        $t2->assertJsonPath('ganancia.reparaciones.cantidad', 1)->assertJsonPath('ganancia.reparaciones.ganancia', 600);
+
+        // el turno 1 sigue con lo suyo
+        $this->getJson("/api/cortes?fecha={$hoy}&turno=1")->assertJsonPath('entradas', 100)->assertJsonPath('abierto', false);
+
+        // no se puede saltar un turno
+        $this->postJson('/api/cortes', ['fecha' => $hoy, 'turno' => 5, 'fondo' => 200, 'contado' => 900])->assertUnprocessable();
+        $this->postJson('/api/cortes', ['fecha' => $hoy, 'turno' => 2, 'fondo' => 200, 'contado' => 900])->assertOk();
+        $this->assertSame(2, Corte::count());
+
+        // la recepcionista (sin permiso de costos) no ve la ganancia
+        $recepcion = $this->usuario($this->tallerA, 'Recepcionista');
+        $this->comoTaller($recepcion);
+        $this->assertArrayNotHasKey('ganancia', $this->getJson('/api/cortes?fecha='.$hoy)->json());
+
+        // resumen por semana y exportar
+        $this->comoTaller($this->adminA);
+        $fila = $this->getJson('/api/cortes/resumen?agrupar=semana')->assertOk()->json('filas.0');
+        $this->assertEquals(800, $fila['efectivo']);
+        $this->assertEquals(300, $fila['tarjeta']);
+        $this->assertEquals(2, $fila['cortes']);
+        $this->assertEquals(1100, $fila['retiros']);   // 400 del turno 1 + 700 del 2 (sin retiro: deja el mismo fondo)
+        $this->getJson('/api/cortes/resumen?agrupar=mes')->assertOk()->assertJsonCount(1, 'filas');
+        $csv = $this->get('/api/cortes/exportar?agrupar=mes')->assertOk()->streamedContent();
+        $this->assertStringContainsString('Detalle de cortes', $csv);
+    }
+
     public function test_saldo_a_favor_deposito_aplicar_devolver_y_eliminar(): void
     {
         $t = $this->telefonoDe($this->adminA, ['pagado' => 0]);   // debe 500

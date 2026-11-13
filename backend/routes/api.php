@@ -138,6 +138,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('cortes', [CorteController::class, 'index'])->middleware('permission:cortes.ver');
         Route::get('cortes/historial', [CorteController::class, 'historial'])->middleware('permission:cortes.ver');
+        Route::get('cortes/resumen', [CorteController::class, 'resumen'])->middleware('permission:cortes.ver');
+        Route::get('cortes/exportar', [CorteController::class, 'exportar'])->middleware('permission:cortes.ver');
         Route::post('cortes', [CorteController::class, 'store'])->middleware('permission:cortes.guardar');
 
         Route::get('configuracion', [ConfiguracionController::class, 'edit'])->middleware('permission:configuracion.ver');

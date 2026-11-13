@@ -57,6 +57,12 @@ export const routes: Routes = [
     data: { permisos: ['ventas.ver'] },
     loadComponent: () => import('./features/ventas/venta-ticket').then((m) => m.VentaTicket),
   },
+  {
+    path: 'corte/ticket',
+    canActivate: [authGuard, permissionGuard],
+    data: { permisos: ['cortes.ver'] },
+    loadComponent: () => import('./features/corte/corte-ticket').then((m) => m.CorteTicket),
+  },
 
   // ---- sistema
   {

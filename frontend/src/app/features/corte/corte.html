@@ -5,22 +5,124 @@
     <input type="date" aria-label="Día del corte" [ngModel]="dia()" (ngModelChange)="ir($event)" />
     <button class="btn btn-secondary" (click)="mover(1)" aria-label="Día siguiente">▶</button>
     <button class="btn btn-secondary" (click)="ir(hoy)">Hoy</button>
-    <a class="btn btn-secondary" routerLink="/corte/historial">Historial de cortes</a>
+    <a class="btn btn-secondary" routerLink="/corte/historial">Historial y resumen</a>
   </div>
 </div>
 
 @if (d(); as x) {
+  <!-- turnos del día -->
+  <div class="turnos no-imprimir" role="tablist" aria-label="Turnos del día">
+    @for (t of x.turnos; track t.turno) {
+      <button class="btn" role="tab" [class.btn-primary]="!x.abierto && x.turno === t.turno" [class.btn-secondary]="x.abierto || x.turno !== t.turno"
+              [attr.aria-selected]="!x.abierto && x.turno === t.turno" (click)="verTurno(t.turno)">
+        Turno {{ t.turno }} ✓
+        <small>{{ horario(t) }}{{ t.user ? ' · ' + t.user : '' }}</small>
+      </button>
+    }
+    @if (x.hay_abierto) {
+      <button class="btn" role="tab" [class.btn-primary]="x.abierto" [class.btn-secondary]="!x.abierto" [attr.aria-selected]="x.abierto" (click)="verTurno(null)">
+        Turno {{ x.turnos.length + 1 }} (abierto)
+        <small>{{ x.turnos.length ? 'desde ' + hora(x.turnos[x.turnos.length - 1].hasta) : 'todo el día' }}</small>
+      </button>
+    }
+  </div>
+
   <p class="ayuda no-imprimir" [class.aviso-naranja]="x.cambios_despues">
     @if (x.corte) {
-      Este día ya tiene corte guardado ({{ x.corte.updated_at | fecha: true }}{{ x.corte.user ? ' por ' + x.corte.user.name : '' }}).
+      Turno {{ x.turno }} ({{ horario(x) }}) guardado el {{ x.corte.updated_at | fecha: true }}{{ x.corte.user ? ' por ' + x.corte.user.name : '' }}.
       @if (x.cambios_despues) {
         ⚠ Hubo movimientos después del corte: guárdalo otra vez.
       }
     } @else {
-      Este día todavía no tiene corte guardado.
+      Turno {{ x.turno }} abierto: entra lo que se cobre desde {{ x.turnos.length ? hora(x.desde) : 'las 00:00' }} hasta que lo cierres.
     }
   </p>
 
+  <!-- desglose por área y forma de pago -->
+  <div class="rejilla-2 separado-abajo">
+    <div class="card tabla-scroll">
+      <div class="titulo-tarjeta"><h2>Cobros por área</h2></div>
+      <table class="tabla-desglose">
+        <thead><tr><th>Área</th><th class="der">Efectivo</th><th class="der">Tarjeta</th><th class="der">Transferencia</th><th class="der">Total</th></tr></thead>
+        <tbody>
+          @for (a of x.desglose; track a.area) {
+            <tr>
+              <td>{{ a.texto }} <small class="tenue">({{ a.cobros }})</small></td>
+              <td class="der">{{ a.EFECTIVO | dinero }}</td>
+              <td class="der">{{ a.TARJETA | dinero }}</td>
+              <td class="der">{{ a.TRANSFERENCIA | dinero }}</td>
+              <td class="der"><b>{{ a.total | dinero }}</b></td>
+            </tr>
+          } @empty {
+            <tr><td colspan="5"><div class="empty-state">Sin cobros</div></td></tr>
+          }
+        </tbody>
+        @if (x.desglose.length > 1) {
+          @let t = totalDesglose(x);
+          <tfoot>
+            <tr>
+              <td>Total</td>
+              <td class="der">{{ t.EFECTIVO | dinero }}</td>
+              <td class="der">{{ t.TARJETA | dinero }}</td>
+              <td class="der">{{ t.TRANSFERENCIA | dinero }}</td>
+              <td class="der">{{ t.total | dinero }}</td>
+            </tr>
+          </tfoot>
+        }
+      </table>
+    </div>
+
+    <div class="card tabla-scroll">
+      <div class="titulo-tarjeta"><h2>Por empleado</h2></div>
+      <table>
+        <thead><tr><th>Quién</th><th class="der">Cobros</th><th class="der">Efectivo</th><th class="der">Tarjeta / transf.</th><th class="der">Salidas</th></tr></thead>
+        <tbody>
+          @for (e of x.por_empleado; track e.nombre) {
+            <tr>
+              <td>{{ e.nombre }}</td>
+              <td class="der">{{ e.cobros }}</td>
+              <td class="der">{{ e.efectivo | dinero }}</td>
+              <td class="der">{{ e.otros | dinero }}</td>
+              <td class="der" [class.debe]="e.salidas > 0">{{ e.salidas | dinero }}</td>
+            </tr>
+          } @empty {
+            <tr><td colspan="5"><div class="empty-state">Sin movimientos</div></td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ganancia: solo el dueño -->
+  @if (x.ganancia; as g) {
+    <div class="card contenido separado-abajo">
+      <div class="titulo-tarjeta">
+        <h2>Ganancia del turno <small class="tenue">🔒 solo el dueño</small></h2>
+        <span class="ganancia-total" [class.a-favor]="g.total >= 0" [class.debe]="g.total < 0">{{ g.total | dinero }}</span>
+      </div>
+      <div class="rejilla-2">
+        <div>
+          <h3>Reparaciones terminadas ({{ g.reparaciones.cantidad }})</h3>
+          <div class="linea-monto"><span>Se cobra</span><span>{{ g.reparaciones.cobrado | dinero }}</span></div>
+          <div class="linea-monto"><span>− Refacciones / créditos</span><span>{{ g.reparaciones.refaccion | dinero }}</span></div>
+          <div class="linea-monto"><span>− Mano de obra</span><span>{{ g.reparaciones.mano_obra | dinero }}</span></div>
+          <div class="linea-monto separador-superior"><b>Ganancia</b><b>{{ g.reparaciones.ganancia | dinero }}</b></div>
+          @if (g.reparaciones.sin_costos) {
+            <p class="ayuda aviso-naranja">{{ g.reparaciones.sin_costos }} sin costos capturados: su ganancia sale igual a lo que se cobra.</p>
+          }
+        </div>
+        <div>
+          <h3>Ventas de mostrador ({{ g.ventas.cantidad }})</h3>
+          <div class="linea-monto"><span>Vendido</span><span>{{ g.ventas.vendido | dinero }}</span></div>
+          <div class="linea-monto"><span>− Costo de los productos</span><span>{{ g.ventas.costo | dinero }}</span></div>
+          <div class="linea-monto separador-superior"><b>Ganancia</b><b>{{ g.ventas.ganancia | dinero }}</b></div>
+        </div>
+      </div>
+      <p class="ayuda">Los teléfonos de locatarios no tienen costos capturados, por eso no entran aquí. Las salidas de dinero no se restan.</p>
+    </div>
+  }
+
+  <!-- detalle de movimientos -->
   <div class="rejilla-2 separado-abajo">
     <div class="card tabla-scroll">
       <div class="titulo-tarjeta"><h2>Entradas: cobros</h2></div>
@@ -68,11 +170,13 @@
     </div>
   </div>
 
+  <!-- cuadre, retiro y fondo -->
   <div class="card contenido">
+    <h2>Cuadre del turno {{ x.turno }}</h2>
     <div class="rejilla-2">
       <div class="lista-corte">
         <label for="fondo">Fondo inicial en caja:</label>
-        <input id="fondo" class="input-corto" type="number" step="0.01" min="0" [(ngModel)]="fondo" (focus)="$any($event.target).select()" />
+        <input id="fondo" class="input-corto" type="number" step="0.01" min="0" [(ngModel)]="fondo" (ngModelChange)="alCambiarCaja()" (focus)="$any($event.target).select()" />
         <span>+ Entradas en efectivo:</span>
         <span>
           <b class="a-favor grande">{{ x.entradas | dinero }}</b> <small class="tenue">({{ x.cobros_efectivo }} cobros)</small>
@@ -80,25 +184,34 @@
             <small class="bloque-texto">{{ o.texto }}: {{ o.monto | dinero }} (no está en la caja)</small>
           }
         </span>
-        <span>− Salidas del día:</span>
+        <span>− Salidas:</span>
         <span><b class="debe grande">{{ x.total_salidas | dinero }}</b> <small class="tenue">({{ x.salidas.length }} salidas)</small></span>
         <b>= Debe haber en caja:</b>
         <b class="muy-grande">{{ esperado() | dinero }}</b>
       </div>
       <div class="lista-corte">
         <label for="contado">Efectivo contado:</label>
-        <input id="contado" class="input-corto" type="number" step="0.01" min="0" [(ngModel)]="contado" (focus)="$any($event.target).select()" />
+        <input id="contado" class="input-corto" type="number" step="0.01" min="0" [(ngModel)]="contado" (ngModelChange)="alCambiarCaja()" (focus)="$any($event.target).select()" />
         <span>Diferencia:</span>
         <b class="muy-grande" [class.a-favor]="diferencia() === 0" [class.debe]="diferencia() < 0" [class.sobra]="diferencia() > 0">{{ textoDiferencia() }}</b>
+        <label for="retiro">Se retira:</label>
+        <span>
+          <input id="retiro" class="input-corto" type="number" step="0.01" min="0" [(ngModel)]="retiro" (ngModelChange)="retiroEscrito = true" (focus)="$any($event.target).select()" />
+          <small class="bloque-texto tenue">Lo que se lleva el dueño o se deposita.</small>
+        </span>
+        <span>Queda de fondo:</span>
+        <b class="grande" [class.debe]="quedaDeFondo() < 0">{{ quedaDeFondo() | dinero }}</b>
         <label for="notas">Notas:</label>
         <input id="notas" [(ngModel)]="notas" />
       </div>
     </div>
     <div class="acciones-fila separado no-imprimir">
       @if (auth.tienePermiso('cortes.guardar')) {
-        <button class="btn btn-primary" (click)="guardar()">Guardar corte</button>
+        <button class="btn btn-primary" (click)="guardar()">{{ x.abierto ? 'Cerrar turno ' + x.turno : 'Guardar turno ' + x.turno + ' otra vez' }}</button>
       }
-      <button class="btn btn-secondary" (click)="imprimir()">Imprimir</button>
+      <button class="btn btn-whatsapp" (click)="whatsapp()">Mandar por WhatsApp</button>
+      <button class="btn btn-secondary" (click)="ticket()">Ticket 80 mm</button>
+      <button class="btn btn-secondary" (click)="imprimir()">Imprimir hoja</button>
     </div>
   </div>
 }
