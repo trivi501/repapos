@@ -5,8 +5,8 @@ name: repapos-evolution
 
 services:
   evolution:
-    # Revisa la versión más nueva en https://hub.docker.com/r/atendai/evolution-api/tags y cámbiala en .env
-    image: ${EVOLUTION_IMAGE:-atendai/evolution-api:v2.1.1}
+    # Revisa la versión más nueva en https://hub.docker.com/r/evoapicloud/evolution-api/tags y cámbiala en .env
+    image: ${EVOLUTION_IMAGE:-evoapicloud/evolution-api:v2.3.6}
     restart: unless-stopped
     depends_on:
       - postgres

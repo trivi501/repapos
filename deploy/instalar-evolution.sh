@@ -57,7 +57,7 @@ if [ ! -f "$DESTINO/.env" ]; then
     echo "EVOLUTION_API_KEY=$(openssl rand -hex 32)"
     echo "EVOLUTION_DB_PASSWORD=$(openssl rand -hex 24)"
     echo "EVOLUTION_PORT=$PUERTO"
-    echo '# EVOLUTION_IMAGE=atendai/evolution-api:v2.1.1'
+    echo '# EVOLUTION_IMAGE=evoapicloud/evolution-api:v2.3.6'
     echo '# si el QR no aparece, WhatsApp cambió de versión (ver deploy/EVOLUTION-API.md):'
     echo '# CONFIG_SESSION_PHONE_VERSION='
   } > "$DESTINO/.env"
