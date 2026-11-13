@@ -15,14 +15,35 @@ exigir_root
 DESTINO=/opt/repapos-evolution
 PUERTO="${EVOLUTION_PORT:-8085}"
 
+# Docker y "docker compose" del repositorio oficial de Docker (Debian no trae docker-compose-v2)
+repo_docker() {
+  . /etc/os-release
+  case "$ID" in
+    debian|ubuntu) ;;
+    *) fallo "Instala Docker a mano para $PRETTY_NAME (https://docs.docker.com/engine/install/) y vuelve a correr este script." ;;
+  esac
+  apt-get update -qq
+  apt-get install -y -qq ca-certificates curl
+  install -m 0755 -d /etc/apt/keyrings
+  curl -fsSL "https://download.docker.com/linux/$ID/gpg" -o /etc/apt/keyrings/docker.asc
+  chmod a+r /etc/apt/keyrings/docker.asc
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/$ID $VERSION_CODENAME stable" \
+    > /etc/apt/sources.list.d/docker.list
+  apt-get update -qq
+}
+
 paso 'Docker'
 if ! command -v docker >/dev/null 2>&1; then
-  aviso 'Docker no está instalado. Instalándolo con los paquetes de la distribución…'
-  apt-get update -qq
-  apt-get install -y -qq docker.io docker-compose-v2 || apt-get install -y -qq docker.io docker-compose-plugin
+  aviso 'Docker no está instalado. Instalándolo desde el repositorio oficial de Docker…'
+  repo_docker
+  apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   systemctl enable --now docker
+elif ! docker compose version >/dev/null 2>&1; then
+  aviso 'Docker ya está, pero falta "docker compose". Instalándolo desde el repositorio oficial de Docker…'
+  repo_docker
+  apt-get install -y -qq docker-compose-plugin
 fi
-docker compose version >/dev/null 2>&1 || fallo 'Falta "docker compose". Instala el paquete docker-compose-v2 (o docker-compose-plugin) y vuelve a correr este script.'
+docker compose version >/dev/null 2>&1 || fallo 'No se pudo instalar "docker compose". Sigue https://docs.docker.com/engine/install/debian/ y vuelve a correr este script.'
 
 if ss -ltn "sport = :$PUERTO" | grep -q LISTEN && ! docker ps --format '{{.Names}}' | grep -q repapos-evolution; then
   fallo "El puerto $PUERTO ya lo usa otra app. Corre de nuevo con otro: EVOLUTION_PORT=8086 bash $0"

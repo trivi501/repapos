@@ -19,7 +19,7 @@ bash /var/www/repapos/deploy/instalar-evolution.sh
 ```
 
 El script:
-- instala Docker si no está (con los paquetes de la distribución);
+- instala Docker y docker compose si no están (desde el repositorio oficial de Docker, sirve en Debian y Ubuntu);
 - levanta Evolution API y su base de datos en `/opt/repapos-evolution`, escuchando **solo en 127.0.0.1:8085**
   (no queda expuesta a internet ni toca nginx);
 - genera una clave al azar y la pone en el `.env` de RepaPOS (`EVOLUTION_URL` y `EVOLUTION_API_KEY`).
