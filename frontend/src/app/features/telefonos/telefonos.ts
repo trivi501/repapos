@@ -7,12 +7,17 @@ import { AuthService } from '../../core/services/auth.service';
 import { AvisosService, AvisoWhatsapp } from '../../core/services/avisos.service';
 import { DineroPipe, Estatus, FechaPipe, dinero, fechaISO } from '../../shared/ui';
 import { TelefonoForm } from './telefono-form';
+import { DetectarUsb, TelefonoUsb, nombreTelefonoUsb } from '../../shared/detectar-usb/detectar-usb';
 
 export interface Telefono {
   id: number;
   prioridad: string;
   fecha_recibido: string;
   modelo: string;
+  serie?: string | null;
+  imei?: string | null;
+  /** Solo llega al abrir el teléfono (nunca en la lista). */
+  pin?: string | null;
   trabajo: string;
   notas: string;
   total: string;
@@ -44,7 +49,7 @@ interface Respuesta {
 
 @Component({
   selector: 'app-telefonos',
-  imports: [FormsModule, DineroPipe, FechaPipe, Estatus, TelefonoForm],
+  imports: [FormsModule, DineroPipe, FechaPipe, Estatus, TelefonoForm, DetectarUsb],
   templateUrl: './telefonos.html',
   // tabla compacta: caben más teléfonos en pantalla sin desplazarse a los lados
   styles: `
@@ -86,8 +91,38 @@ export class Telefonos implements OnInit {
   /** Ventana de alta / edición: id null = teléfono nuevo. */
   readonly formulario = signal<{ id: number | null; eliminar: boolean } | null>(null);
 
-  filtros = { locatario: '', estado: '', prioridad: '', q: '', urgentes: false };
+  filtros = { locatario: '', estado: '', prioridad: '', q: '', urgentes: false, ident: '' };
   montoAbono: number | null = null;
+
+  /** Teléfono conectado por USB que se está buscando (para ver si ya vino y si entra en garantía). */
+  readonly buscandoUsb = signal<TelefonoUsb | null>(null);
+
+  buscarConectado(t: TelefonoUsb): void {
+    const ident = [t.serial, t.imei].filter(Boolean).join(',');
+    if (!ident) {
+      this.avisos.ok('Ese teléfono no reportó serie ni IMEI: búscalo por modelo.');
+      return;
+    }
+    this.buscandoUsb.set(t);
+    // se busca en todos: entregados, en taller y de cualquier locatario
+    this.filtros = { ...this.filtros, ident, q: '', estado: '', locatario: '' };
+    this.filtrar();
+  }
+
+  quitarBusquedaUsb(): void {
+    this.buscandoUsb.set(null);
+    this.filtros = { ...this.filtros, ident: '' };
+    this.filtrar();
+  }
+
+  /** Días desde que se entregó: para ver si entra en garantía. */
+  diasDesde(fecha: string | null): number {
+    return fecha ? Math.floor((Date.now() - new Date(fecha).getTime()) / 86400000) : 0;
+  }
+
+  nombreUsb(t: TelefonoUsb): string {
+    return nombreTelefonoUsb(t) || 'Teléfono';
+  }
 
   ngOnInit(): void {
     const q = this.route.snapshot.queryParamMap;

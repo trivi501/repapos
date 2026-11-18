@@ -43,7 +43,30 @@
     <input type="checkbox" [(ngModel)]="filtros.urgentes" (ngModelChange)="filtrar()" /> Urgentes primero
   </label>
   <button class="btn btn-secondary" (click)="filtrar()">Filtrar</button>
+  <app-detectar-usb (elegido)="buscarConectado($event)" texto="Buscar teléfono conectado (garantía)" />
 </div>
+
+@if (buscandoUsb(); as u) {
+  <div class="aviso-garantia">
+    <div class="titulo-tarjeta">
+      <strong>🔎 {{ nombreUsb(u) }} · {{ u.serial ? 'Serie ' + u.serial : '' }} {{ u.imei ? 'IMEI ' + u.imei : '' }}</strong>
+      <button class="btn btn-secondary btn-sm" (click)="quitarBusquedaUsb()">Quitar búsqueda</button>
+    </div>
+    @if (!cargando()) {
+      @if (telefonos().length === 0) {
+        <span>Este equipo no ha venido al taller: no tiene garantía.</span>
+      } @else {
+        <span>Ya vino {{ telefonos().length }} {{ telefonos().length === 1 ? 'vez' : 'veces' }}.
+          @if (telefonos()[0].entregado) {
+            La última se entregó <strong>{{ diasDesde(telefonos()[0].fecha_entrega) === 0 ? 'hoy' : 'hace ' + diasDesde(telefonos()[0].fecha_entrega) + ' días' }}</strong> ({{ telefonos()[0].fecha_entrega | fecha }}).
+          } @else {
+            Está en el taller ahora mismo (recibido el {{ telefonos()[0].fecha_recibido | fecha }}).
+          }
+        </span>
+      }
+    }
+  </div>
+}
 
 @if (resumen(); as r) {
   <div class="barra-resumen">
@@ -65,7 +88,7 @@
   <table class="tabla-compacta">
     <thead>
       <tr>
-        <th>#</th><th>Prioridad</th><th>Recibido</th><th>Locatario</th><th>Modelo</th><th>Trabajo</th><th>Notas / IMEI</th>
+        <th>#</th><th>Prioridad</th><th>Recibido</th><th>Locatario</th><th>Modelo</th><th>Trabajo</th><th>Notas / IMEI / serie</th>
         <th class="der">Total</th><th class="der">Pagado</th><th class="der">Saldo</th>
         @if (verCostos) {
           <th class="der" title="Solo lo ve el dueño">Gasto</th><th class="der" title="Solo lo ve el dueño">Ganancia</th>
@@ -82,7 +105,12 @@
           <td><strong>{{ t.locatario?.nombre }}</strong></td>
           <td>{{ t.modelo }}</td>
           <td>{{ t.trabajo }}</td>
-          <td class="tenue">{{ t.notas }}</td>
+          <td class="tenue">
+            {{ t.notas }}
+            @if (t.imei || t.serie) {
+              <small class="sin-salto d-bloque">{{ t.imei ? 'IMEI ' + t.imei : '' }}{{ t.imei && t.serie ? ' · ' : '' }}{{ t.serie ? 'S/N ' + t.serie : '' }}</small>
+            }
+          </td>
           <td class="der sin-salto">{{ t.total | dinero }}</td>
           <td class="der sin-salto">{{ t.pagado | dinero }}</td>
           <td class="der sin-salto" [class.debe]="t.saldo > 0">{{ t.saldo | dinero }}</td>

@@ -37,8 +37,18 @@ class TelefonoController extends Controller
         if ($r->filled('q')) {
             $texto = '%'.$r->input('q').'%';
             $q->where(fn ($w) => $w->where('modelo', 'like', $texto)->orWhere('trabajo', 'like', $texto)
-                ->orWhere('notas', 'like', $texto)
+                ->orWhere('notas', 'like', $texto)->orWhere('serie', 'like', $texto)->orWhere('imei', 'like', $texto)
                 ->orWhereHas('locatario', fn ($l) => $l->where('nombre', 'like', $texto)));
+        }
+        // el teléfono conectado por USB: su serie o IMEI (los de antes los tenían en las notas)
+        $ident = collect(explode(',', (string) $r->input('ident')))->map(fn ($v) => trim($v))->filter(fn ($v) => strlen($v) >= 5)->values();
+        if ($ident->isNotEmpty()) {
+            $q->where(function ($w) use ($ident) {
+                $w->whereIn('serie', $ident)->orWhereIn('imei', $ident);
+                foreach ($ident as $v) {
+                    $w->orWhere('notas', 'like', '%'.$v.'%');
+                }
+            });
         }
         if ($r->boolean('urgentes')) {
             $q->orderByRaw("CASE prioridad WHEN 'ALTA' THEN 1 WHEN 'MEDIA' THEN 2 ELSE 3 END")->orderBy('id');
@@ -95,6 +105,7 @@ class TelefonoController extends Controller
     public function show(Telefono $telefono)
     {
         $telefono->load('locatario', 'pagos');
+        $telefono->makeVisible('pin');
 
         return response()->json($this->formato($telefono) + ['cobros_total' => (float) $telefono->pagos->sum('monto')]);
     }
@@ -107,6 +118,9 @@ class TelefonoController extends Controller
             'prioridad' => ['required', Rule::in(Telefono::PRIORIDADES)],
             'fecha_recibido' => ['required', 'date'],
             'modelo' => ['required', 'string', 'max:255'],
+            'serie' => ['nullable', 'string', 'max:100'],
+            'imei' => ['nullable', 'string', 'max:30'],
+            'pin' => ['nullable', 'string', 'max:100'],
             'trabajo' => ['nullable', 'string', 'max:255'],
             'notas' => ['nullable', 'string', 'max:255'],
             'total' => ['required', 'numeric', 'min:0'],
@@ -137,6 +151,9 @@ class TelefonoController extends Controller
                 'prioridad' => $d['prioridad'],
                 'fecha_recibido' => $d['fecha_recibido'],
                 'modelo' => trim($d['modelo']),
+                'serie' => trim($d['serie'] ?? '') !== '' ? strtoupper(trim($d['serie'])) : null,
+                'imei' => trim($d['imei'] ?? '') !== '' ? preg_replace('/\s+/', '', $d['imei']) : null,
+                'pin' => trim($d['pin'] ?? '') !== '' ? trim($d['pin']) : null,
                 'trabajo' => trim($d['trabajo'] ?? ''),
                 'notas' => trim($d['notas'] ?? ''),
                 'total' => $d['total'],
@@ -273,11 +290,11 @@ class TelefonoController extends Controller
         return response()->streamDownload(function () use ($q, $costos) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // para que Excel lea bien los acentos
-            fputcsv($out, array_merge(['Id', 'Prioridad', 'Recibido', 'Locatario', 'Modelo', 'Trabajo', 'Notas', 'Total', 'Pagado',
+            fputcsv($out, array_merge(['Id', 'Prioridad', 'Recibido', 'Locatario', 'Modelo', 'Serie', 'IMEI', 'Trabajo', 'Notas', 'Total', 'Pagado',
                 'Saldo', 'Pago', 'Estatus', 'Entrega', 'Entregado el'], $costos ? ['Gasto', 'Ganancia'] : []));
             foreach ($q->cursor() as $t) {
                 fputcsv($out, array_merge([$t->id, $t->prioridad, $t->fecha_recibido->format('d/m/Y'), $t->locatario->nombre,
-                    $t->modelo, $t->trabajo, $t->notas, $t->total, $t->pagado, number_format($t->saldo, 2, '.', ''),
+                    $t->modelo, $t->serie, $t->imei, $t->trabajo, $t->notas, $t->total, $t->pagado, number_format($t->saldo, 2, '.', ''),
                     $t->estado_pago, $t->resultado, $t->entregado ? 'ENTREGADO' : 'POR ENTREGAR',
                     $t->fecha_entrega?->format('d/m/Y H:i')], $costos ? [$t->costo, number_format($t->ganancia, 2, '.', '')] : []));
             }

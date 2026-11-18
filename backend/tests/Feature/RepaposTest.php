@@ -547,6 +547,36 @@ class RepaposTest extends TestCase
         $this->assertEquals(100.0, (float) Salida::sum('monto'));
     }
 
+    public function test_telefono_con_serie_imei_y_pin_y_busqueda_por_usb(): void
+    {
+        $t = $this->telefonoDe($this->adminA, ['serie' => ' rzcy3221lgt ', 'imei' => '35660 5223232618', 'pin' => '1234']);
+        $this->assertSame('RZCY3221LGT', $t->serie);
+        $this->assertSame('356605223232618', $t->imei);
+
+        // el PIN va cifrado; se ve al abrir el teléfono, no en la lista
+        $crudo = DB::table('telefonos')->where('id', $t->id)->value('pin');
+        $this->assertStringNotContainsString('1234', $crudo);
+        $this->assertSame('1234', $this->getJson("/api/telefonos/{$t->id}")->json('pin'));
+        $this->assertArrayNotHasKey('pin', $this->getJson('/api/telefonos')->json('data.0'));
+
+        // uno viejo con el IMEI en las notas
+        $viejo = $this->telefonoDe($this->adminA, ['modelo' => 'IPHONE 11', 'notas' => 'IMEI 353912110000001']);
+        $this->telefonoDe($this->adminA, ['modelo' => 'OTRO']);
+
+        // el teléfono conectado por USB: por serie, por IMEI o por lo que haya en las notas
+        $ids = fn (string $ident) => collect($this->getJson('/api/telefonos?ident='.$ident)->json('data'))->pluck('id')->all();
+        $this->assertSame([$t->id], $ids('RZCY3221LGT'));
+        $this->assertSame([$t->id], $ids('000,356605223232618'));
+        $this->assertSame([$viejo->id], $ids('353912110000001'));
+        $this->assertSame([], $ids('NOEXISTE123'));
+        // y la búsqueda escrita también encuentra por serie
+        $this->assertSame([$t->id], collect($this->getJson('/api/telefonos?q=3221LG')->json('data'))->pluck('id')->all());
+
+        // otro taller no lo encuentra
+        $this->comoTaller($this->adminB);
+        $this->assertSame([], $this->getJson('/api/telefonos?ident=RZCY3221LGT')->json('data'));
+    }
+
     public function test_whatsapp_de_locatarios_en_su_propia_pestana(): void
     {
         $t = $this->telefonoDe($this->adminA);

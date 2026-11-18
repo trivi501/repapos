@@ -1,5 +1,5 @@
-<div class="modal-backdrop" (click)="cerrar.emit()">
-  <div class="modal modal-telefono" role="dialog" aria-modal="true" aria-labelledby="titulo-telefono" (click)="$event.stopPropagation()">
+<div class="modal-backdrop" (mousedown)="alPresionarFondo($event)" (click)="alSoltarFondo($event)">
+  <div class="modal modal-telefono" role="dialog" aria-modal="true" aria-labelledby="titulo-telefono">
     <div class="modal-header">
       <h2 id="titulo-telefono">{{ telefonoId() ? 'Editar teléfono #' + telefonoId() : 'Alta de teléfono' }}</h2>
       <button class="btn btn-secondary" type="button" (click)="cerrar.emit()" aria-label="Cerrar">✕</button>
@@ -46,9 +46,36 @@
           </div>
         </div>
         <app-detectar-usb (elegido)="usarTelefono($event)" />
+        @if (yaVino().length) {
+          <div class="aviso-garantia">
+            <strong>Este equipo ya vino {{ yaVino().length }} {{ yaVino().length === 1 ? 'vez' : 'veces' }}:</strong>
+            @for (v of yaVino(); track v.id) {
+              <div>
+                #{{ v.id }} · {{ v.locatario?.nombre }} · {{ v.trabajo || v.modelo }} ·
+                @if (v.entregado) {
+                  entregado el {{ v.fecha_entrega | fecha }} ({{ diasDesde(v.fecha_entrega) === 0 ? 'hoy' : 'hace ' + diasDesde(v.fecha_entrega) + ' días' }})
+                } @else {
+                  recibido el {{ v.fecha_recibido | fecha }}, todavía en el taller
+                }
+              </div>
+            }
+          </div>
+        }
         <div class="form-field">
           <label for="modelo">Modelo *</label>
           <input id="modelo" name="modelo" required [(ngModel)]="m.modelo" />
+        </div>
+        <div class="form-field">
+          <label for="serie">Serie</label>
+          <input id="serie" name="serie" maxlength="100" autocomplete="off" [(ngModel)]="m.serie" />
+        </div>
+        <div class="form-field">
+          <label for="imei">IMEI</label>
+          <input id="imei" name="imei" maxlength="30" inputmode="numeric" autocomplete="off" [(ngModel)]="m.imei" />
+        </div>
+        <div class="form-field">
+          <label for="pin">PIN / contraseña</label>
+          <input id="pin" name="pin" maxlength="100" autocomplete="off" [(ngModel)]="m.pin" placeholder="Se guarda cifrado" />
         </div>
         <div class="form-field">
           <label for="trabajo">Trabajo a realizar</label>
@@ -76,7 +103,7 @@
           </div>
         }
         <div class="form-field">
-          <label for="notas">Notas / IMEI</label>
+          <label for="notas">Notas</label>
           <input id="notas" name="notas" [(ngModel)]="m.notas" />
         </div>
         <div class="form-field">

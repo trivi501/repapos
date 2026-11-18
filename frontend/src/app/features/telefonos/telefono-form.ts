@@ -12,7 +12,7 @@ const ULTIMO_LOCATARIO = 'taller_ultimo_locatario';
 
 function vacio(locatario = '') {
   return {
-    locatario, whatsapp: '', fecha_recibido: fechaISO(), prioridad: 'MEDIA', modelo: '', trabajo: '', notas: '',
+    locatario, whatsapp: '', fecha_recibido: fechaISO(), prioridad: 'MEDIA', modelo: '', serie: '', imei: '', pin: '', trabajo: '', notas: '',
     total: 0, costo: null as number | null, pagado: 0, resultado: 'EN TALLER', entregado: false,
   };
 }
@@ -22,7 +22,7 @@ function vacio(locatario = '') {
   selector: 'app-telefono-form',
   imports: [FormsModule, DineroPipe, FechaPipe, DetectarUsb],
   templateUrl: './telefono-form.html',
-  host: { '(document:keydown.escape)': 'cerrar.emit()' },
+  host: { '(document:keydown.escape)': 'alEscape($event)' },
   styles: `
     .modal-telefono { max-width: 760px; }
   `,
@@ -53,14 +53,49 @@ export class TelefonoForm implements OnInit, AfterViewInit {
   m = vacio(sessionStorage.getItem(ULTIMO_LOCATARIO) ?? '');
   destinoCobros = '';
 
-  /** Teléfono detectado por USB: el modelo con su marca, y el IMEI y la serie se agregan a las notas. */
+  // ---- cerrar la ventana: solo con un clic que empiece y termine en el fondo oscuro.
+  // La lista de locatarios (datalist) se dibuja encima del fondo: al elegir un nombre, el clic llegaba al fondo y cerraba.
+  private presionoFondo = false;
+
+  alPresionarFondo(e: MouseEvent): void {
+    this.presionoFondo = e.target === e.currentTarget;
+  }
+
+  alSoltarFondo(e: MouseEvent): void {
+    if (this.presionoFondo && e.target === e.currentTarget) this.cerrar.emit();
+    this.presionoFondo = false;
+  }
+
+  /** Escape cierra la ventana, salvo si se está usando la lista de un campo (Escape solo cierra esa lista). */
+  alEscape(e: Event): void {
+    const campo = e.target as HTMLElement | null;
+    if (campo?.tagName === 'INPUT' && campo.hasAttribute('list')) return;
+    if (campo?.tagName === 'SELECT') return;
+    this.cerrar.emit();
+  }
+
+  /** Veces que este mismo equipo (por serie o IMEI) ya pasó por el taller: para ver si entra en garantía. */
+  readonly yaVino = signal<Telefono[]>([]);
+
+  /** Teléfono detectado por USB: modelo con su marca, serie e IMEI; y se busca si ya vino antes. */
   usarTelefono(t: TelefonoUsb): void {
     const nombre = nombreTelefonoUsb(t);
     if (t.modelo && nombre) this.m.modelo = nombre;   // en modo de flasheo no dice el modelo: se deja lo escrito
-    const datos = [t.imei ? `IMEI ${t.imei}` : '', t.serial ? `Serie ${t.serial}` : '']
-      .filter((d) => d && !this.m.notas.includes(d.split(' ')[1]));
-    if (datos.length) this.m.notas = [this.m.notas.trim(), datos.join(' · ')].filter(Boolean).join(' · ');
+    if (t.serial) this.m.serie = t.serial;
+    if (t.imei) this.m.imei = t.imei;
+    this.yaVino.set([]);
     this.cdr.markForCheck();
+    const ident = [t.serial, t.imei].filter(Boolean).join(',');
+    if (!ident) return;
+    this.api.get<{ data: Telefono[] }>('telefonos', { ident, por_pagina: 10 }).subscribe((r) => {
+      this.yaVino.set(r.data.filter((x) => x.id !== this.telefonoId()));
+      this.cdr.markForCheck();
+    });
+  }
+
+  /** "hace 12 días" desde que se entregó (o se recibió, si no se ha entregado). */
+  diasDesde(fecha: string | null): number {
+    return fecha ? Math.floor((Date.now() - new Date(fecha).getTime()) / 86400000) : 0;
   }
 
   ngOnInit(): void {
@@ -76,7 +111,8 @@ export class TelefonoForm implements OnInit, AfterViewInit {
         next: (t) => {
           this.m = {
             locatario: t.locatario?.nombre ?? '', whatsapp: t.locatario?.whatsapp ?? '', fecha_recibido: t.fecha_recibido.slice(0, 10),
-            prioridad: t.prioridad, modelo: t.modelo, trabajo: t.trabajo, notas: t.notas, total: Number(t.total),
+            prioridad: t.prioridad, modelo: t.modelo, serie: t.serie ?? '', imei: t.imei ?? '', pin: t.pin ?? '',
+            trabajo: t.trabajo, notas: t.notas, total: Number(t.total),
             costo: t.costo != null ? Number(t.costo) : null, pagado: Number(t.pagado), resultado: t.resultado, entregado: t.entregado,
           };
           this.fechaEntrega.set(t.fecha_entrega);
@@ -137,6 +173,7 @@ export class TelefonoForm implements OnInit, AfterViewInit {
           sessionStorage.setItem(ULTIMO_LOCATARIO, this.m.locatario);
           const { locatario, whatsapp } = this.m;
           this.m = { ...vacio(locatario), whatsapp };
+          this.yaVino.set([]);
           this.cdr.markForCheck();
         }
       },

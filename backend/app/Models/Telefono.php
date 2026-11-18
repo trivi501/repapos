@@ -24,17 +24,19 @@ class Telefono extends Model
     public const PRIORIDADES = [self::ALTA, self::MEDIA, self::BAJA];
 
     protected $fillable = [
-        'locatario_id', 'prioridad', 'fecha_recibido', 'modelo', 'trabajo', 'notas',
+        'locatario_id', 'prioridad', 'fecha_recibido', 'modelo', 'serie', 'imei', 'pin', 'trabajo', 'notas',
         'total', 'costo', 'pagado', 'resultado', 'entregado', 'fecha_entrega', 'user_id',
     ];
 
-    // el gasto (créditos, servidor o pieza) solo lo ve quien tiene "ordenes.ver_costos" (makeVisible en el controlador)
-    protected $hidden = ['costo'];
+    // el gasto (créditos, servidor o pieza) solo lo ve quien tiene "ordenes.ver_costos";
+    // el PIN solo al abrir el teléfono, nunca en la lista (makeVisible en el controlador)
+    protected $hidden = ['costo', 'pin'];
 
     protected function casts(): array
     {
         return [
             'fecha_recibido' => 'date',
+            'pin' => 'encrypted',
             'fecha_entrega' => 'datetime',
             'entregado' => 'boolean',
             'total' => 'decimal:2',

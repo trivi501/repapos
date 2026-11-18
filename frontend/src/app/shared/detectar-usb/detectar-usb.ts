@@ -1,4 +1,4 @@
-import { Component, output, signal } from '@angular/core';
+import { Component, input, output, signal } from '@angular/core';
 
 /** Programa "RepaPOS Conector" (carpeta conector/ del repositorio): lee el teléfono conectado por USB en esta PC. */
 export const CONECTOR_USB = 'http://127.0.0.1:8765';
@@ -21,7 +21,9 @@ export interface TelefonoUsb {
 /** "Samsung Galaxy A56 5G (SM-A566B)": marca, modelo comercial y, si es distinto, el de fábrica. */
 export function nombreTelefonoUsb(t: TelefonoUsb, conMarca = true): string {
   const modelo = t.modelo && t.modelo_tecnico && t.modelo_tecnico !== t.modelo ? `${t.modelo} (${t.modelo_tecnico})` : (t.modelo ?? '');
-  return (conMarca ? [t.marca, modelo] : [modelo]).filter(Boolean).join(' ');
+  // "OPPO Reno14 F 5G" ya trae la marca: no se repite
+  const yaTraeMarca = !!t.marca && modelo.toLowerCase().startsWith(t.marca.toLowerCase());
+  return (conMarca && !yaTraeMarca ? [t.marca, modelo] : [modelo]).filter(Boolean).join(' ');
 }
 
 /**
@@ -33,7 +35,7 @@ export function nombreTelefonoUsb(t: TelefonoUsb, conMarca = true): string {
   template: `
     <div class="detectar-usb">
       <button type="button" class="btn btn-secondary btn-sm" (click)="detectar()" [disabled]="detectando()">
-        🔌 {{ detectando() ? 'Buscando…' : 'Detectar teléfono conectado por USB' }}
+        🔌 {{ detectando() ? 'Buscando…' : texto() }}
       </button>
       @if (aviso()) {
         <span class="ayuda">{{ aviso() }}</span>
@@ -52,6 +54,7 @@ export function nombreTelefonoUsb(t: TelefonoUsb, conMarca = true): string {
 })
 export class DetectarUsb {
   readonly elegido = output<TelefonoUsb>();
+  readonly texto = input('Detectar teléfono conectado por USB');
 
   readonly opciones = signal<TelefonoUsb[]>([]);
   readonly detectando = signal(false);

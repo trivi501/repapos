@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Management;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace RepaPOS.Conector
@@ -84,7 +85,7 @@ namespace RepaPOS.Conector
                         else if (a.Modelo != "" && (string)t["modelo"] == "") t["modelo"] = a.Modelo;
                         if (a.Marca != "") t["marca"] = a.Marca;
                         if (a.Android != "") t["sistema"] = "Android " + a.Android;
-                        t["modo"] = t["modo"] + " + ADB";
+                        if (!((string)t["modo"]).Contains("ADB")) t["modo"] = t["modo"] + " + ADB";
                     }
                     else if (a.Estado == "unauthorized")
                         t["aviso"] = "Acepta \"Permitir depuración USB\" en el teléfono para leer el modelo exacto.";
@@ -252,7 +253,8 @@ namespace RepaPOS.Conector
             // la interfaz MTP (clase WPD) trae el nombre comercial: "Galaxy A52s 5G", "Redmi Note 12"
             var mtp = todos.FirstOrDefault(x => x.Vid == raiz.Vid && x.Pid == raiz.Pid && x.Clase == "WPD" && x.Nombre != "");
             string nombre = mtp != null ? mtp.Nombre : raiz.Nombre;
-            if (Regex.IsMatch(nombre, @"^(USB|Composite|Dispositivo|ADB|Android Composite)", RegexOptions.IgnoreCase)) return "";
+            // nombres de controlador, no del teléfono ("Android ADB Interface", "USB Composite Device"…)
+            if (Regex.IsMatch(nombre, @"^(USB|Composite|Dispositivo|ADB|Android|MTP|Interfaz)\b|ADB Interface|Composite ADB", RegexOptions.IgnoreCase)) return "";
             return nombre;
         }
 
@@ -317,7 +319,11 @@ namespace RepaPOS.Conector
         }
     }
 
-    /// <summary>Lo que dice "adb devices -l" (si adb está instalado y el teléfono tiene la depuración USB activa).</summary>
+    /// <summary>
+    /// Lo que sabe el servidor de adb que YA esté corriendo (el de Mamalonatl, UnlockTool, Android Studio…), preguntándole
+    /// directo por su puerto (127.0.0.1:5037). Nunca se ejecuta adb.exe: un adb de otra versión cierra el servidor de las
+    /// otras herramientas ("adb server version doesn't match… killing"). Si no hay servidor, no se usa adb.
+    /// </summary>
     class AdbEquipo
     {
         public string Estado = "", Modelo = "", Comercial = "", Marca = "", Android = "";
@@ -325,7 +331,7 @@ namespace RepaPOS.Conector
         public static Dictionary<string, AdbEquipo> Listar()
         {
             var r = new Dictionary<string, AdbEquipo>(StringComparer.OrdinalIgnoreCase);
-            string salida = Ejecutar("devices -l", 8000);
+            string salida = Servidor.Pedir("host:devices-l");
             if (salida == null) return r;
             foreach (var linea in salida.Split('\n'))
             {
@@ -340,7 +346,8 @@ namespace RepaPOS.Conector
                     a.Marca = Titulo(Prop(serie, "ro.product.brand"));
                     a.Android = Prop(serie, "ro.build.version.release");
                     // nombre comercial (Samsung, Xiaomi y otros lo guardan en alguna de estas)
-                    foreach (var clave in new[] { "ro.product.marketname", "ro.product.vendor.marketname", "ro.config.marketing_name" })
+                    foreach (var clave in new[] { "ro.product.marketname", "ro.product.vendor.marketname", "ro.vendor.oplus.market.name",
+                        "ro.oppo.market.name", "ro.vivo.market.name", "ro.config.marketing_name", "ro.vendor.product.display" })
                     {
                         a.Comercial = Prop(serie, clave);
                         if (a.Comercial != "") break;
@@ -355,7 +362,7 @@ namespace RepaPOS.Conector
 
         static string Prop(string serie, string clave)
         {
-            return (Ejecutar("-s " + serie + " shell getprop " + clave, 5000) ?? "").Trim();
+            return (Servidor.Shell(serie, "getprop " + clave) ?? "").Trim();
         }
 
         static string Titulo(string s)
@@ -363,36 +370,80 @@ namespace RepaPOS.Conector
             return s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s.Substring(1);
         }
 
-        static bool servidorListo;
-
-        static string Ejecutar(string args, int ms)
+        /// <summary>Protocolo del servidor de adb: "LLLL" (largo en hexadecimal) + comando; responde OKAY o FAIL.</summary>
+        static class Servidor
         {
-            try
+            const int Puerto = 5037;
+
+            /// <summary>Comando "host:" con respuesta de largo fijo (p. ej. host:devices-l). null si no hay servidor.</summary>
+            public static string Pedir(string comando)
             {
-                // el servidor de adb se arranca aparte y sin redirigir: si hereda la salida, la lectura nunca termina
-                if (!servidorListo)
+                try
                 {
-                    using (var s = Process.Start(new ProcessStartInfo("adb", "start-server") { UseShellExecute = false, CreateNoWindow = true }))
-                        s.WaitForExit(10000);
-                    servidorListo = true;
+                    using (var c = Conectar())
+                    {
+                        if (c == null) return null;
+                        var red = c.GetStream();
+                        if (!Enviar(red, comando)) return null;
+                        int largo = Convert.ToInt32(Encoding.ASCII.GetString(Leer(red, 4)), 16);
+                        return Encoding.UTF8.GetString(Leer(red, largo));
+                    }
                 }
-                var psi = new ProcessStartInfo("adb", args)
-                {
-                    UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true,
-                };
-                var salida = new System.Text.StringBuilder();
-                using (var p = new Process { StartInfo = psi })
-                {
-                    p.OutputDataReceived += (o, e) => { if (e.Data != null) lock (salida) salida.AppendLine(e.Data); };
-                    p.Start();
-                    p.BeginOutputReadLine();
-                    p.BeginErrorReadLine();
-                    if (!p.WaitForExit(ms)) { try { p.Kill(); } catch { } return null; }
-                    System.Threading.Thread.Sleep(50);   // últimas líneas
-                    lock (salida) return salida.ToString();
-                }
+                catch { return null; }
             }
-            catch { return null; }   // adb no está instalado
+
+            /// <summary>Comando de shell en un teléfono: se elige con host:transport y se lee hasta que cierre.</summary>
+            public static string Shell(string serie, string comando)
+            {
+                try
+                {
+                    using (var c = Conectar())
+                    {
+                        if (c == null) return null;
+                        var red = c.GetStream();
+                        if (!Enviar(red, "host:transport:" + serie) || !Enviar(red, "shell:" + comando)) return null;
+                        var ms = new System.IO.MemoryStream();
+                        var b = new byte[4096];
+                        int n;
+                        while ((n = red.Read(b, 0, b.Length)) > 0) ms.Write(b, 0, n);
+                        return Encoding.UTF8.GetString(ms.ToArray());
+                    }
+                }
+                catch { return null; }
+            }
+
+            static System.Net.Sockets.TcpClient Conectar()
+            {
+                var c = new System.Net.Sockets.TcpClient();
+                var intento = c.BeginConnect("127.0.0.1", Puerto, null, null);
+                if (!intento.AsyncWaitHandle.WaitOne(700) || !c.Connected) { c.Close(); return null; }   // no hay servidor de adb
+                c.EndConnect(intento);
+                c.ReceiveTimeout = 4000;
+                c.SendTimeout = 4000;
+                return c;
+            }
+
+            static bool Enviar(System.Net.Sockets.NetworkStream red, string comando)
+            {
+                byte[] datos = Encoding.UTF8.GetBytes(comando);
+                byte[] cab = Encoding.ASCII.GetBytes(datos.Length.ToString("X4"));
+                red.Write(cab, 0, 4);
+                red.Write(datos, 0, datos.Length);
+                return Encoding.ASCII.GetString(Leer(red, 4)) == "OKAY";
+            }
+
+            static byte[] Leer(System.Net.Sockets.NetworkStream red, int n)
+            {
+                var b = new byte[n];
+                int leido = 0;
+                while (leido < n)
+                {
+                    int r = red.Read(b, leido, n - leido);
+                    if (r <= 0) throw new System.IO.IOException("adb cerró la conexión");
+                    leido += r;
+                }
+                return b;
+            }
         }
     }
 }
