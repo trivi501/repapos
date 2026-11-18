@@ -17,9 +17,15 @@ Solo escucha en la misma PC (127.0.0.1:8765); nadie de la red puede leerlo.
 |---|---|---|
 | Android por MTP | Desbloqueado y en "Transferir archivos" | Marca, modelo comercial (p. ej. Galaxy A52s 5G) y serie |
 | Android con depuración USB | `adb` instalado y aceptar "Permitir depuración USB" | Además el modelo de fábrica (SM-A528B) y la versión de Android |
-| iPhone encendido | iTunes o "Dispositivos Apple" instalado; desbloqueado | Modelo (iPhone 13…) e iOS. La serie y el IMEI, si el iPhone confía en la PC |
+| iPhone encendido | iTunes o "Dispositivos Apple" instalado; desbloqueado | Modelo (iPhone 13…) e iOS |
+| iPhone ya emparejado con esta PC | Que antes haya confiado en la PC (iTunes, 3uTools…) | Además la serie y el IMEI |
 | iPhone en Recovery | Nada más | Modelo por su chip, serie (SRNM) y ECID |
 | iPhone en DFU | Nada más | Modelo por su chip y ECID (en DFU no se ve la serie) |
 | iPhone restaurándose | — | Solo lo muestra; no le habla para no estorbar la restauración |
+| Samsung en Download (Odin) | — | Solo la marca y el modo |
+| MediaTek BROM/Preloader, Qualcomm EDL, Spreadtrum | — | Solo el modo y el puerto COM |
 
 El IMEI de los Android no se puede leer por MTP: se captura a mano (`*#06#`).
+
+Para la serie del iPhone, el conector usa el emparejamiento que Windows ya guardó en `C:\ProgramData\Apple\Lockdown`
+(el mismo que usan iTunes y 3uTools); no crea emparejamientos nuevos ni manda nada fuera de la PC.

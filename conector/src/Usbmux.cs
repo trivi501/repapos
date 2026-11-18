@@ -36,8 +36,11 @@ namespace RepaPOS.Conector
             }
         }
 
-        /// <summary>Todos los valores que lockdownd quiera dar sin sesión (GetValue sin clave).</summary>
-        public static Dictionary<string, object> Valores(int dispositivo)
+        /// <summary>
+        /// Lo que lockdownd da sin sesión (modelo, iOS) y, si Windows tiene el emparejamiento de este iPhone,
+        /// lo que da dentro de la sesión cifrada (serie, IMEI). Si la sesión falla, "_sesion" dice por qué.
+        /// </summary>
+        public static Dictionary<string, object> Valores(int dispositivo, string udid)
         {
             using (var c = Conectar())
             {
@@ -52,6 +55,14 @@ namespace RepaPOS.Conector
                 var resp = RecibirLockdown(red);
                 var valores = resp.ContainsKey("Value") ? resp["Value"] as Dictionary<string, object> : null;
                 if (valores == null) throw new IOException(Plist.Texto(resp, "Error") != "" ? Plist.Texto(resp, "Error") : "sin respuesta");
+
+                try
+                {
+                    var registro = Sesion.Emparejamiento(Plist.Texto(valores, "UniqueDeviceID") != "" ? Plist.Texto(valores, "UniqueDeviceID") : udid);
+                    if (registro == null) valores["_sesion"] = "sin emparejamiento";
+                    else foreach (var kv in Sesion.Valores(red, registro)) valores[kv.Key] = kv.Value;
+                }
+                catch (Exception ex) { valores["_sesion"] = ex.Message; }
                 return valores;
             }
         }
@@ -100,16 +111,17 @@ namespace RepaPOS.Conector
             return Plist.Leer(Encoding.UTF8.GetString(Leer(red, largo - 16)));
         }
 
-        static void EnviarLockdown(NetworkStream red, string contenidoDict)
+        public static void EnviarLockdown(Stream red, string contenidoDict)
         {
             byte[] cuerpo = Encoding.UTF8.GetBytes(Documento(contenidoDict));
             byte[] largo = BitConverter.GetBytes(cuerpo.Length);
             Array.Reverse(largo);
             red.Write(largo, 0, 4);
             red.Write(cuerpo, 0, cuerpo.Length);
+            red.Flush();
         }
 
-        static Dictionary<string, object> RecibirLockdown(NetworkStream red)
+        public static Dictionary<string, object> RecibirLockdown(Stream red)
         {
             byte[] largo = Leer(red, 4);
             Array.Reverse(largo);
@@ -118,7 +130,7 @@ namespace RepaPOS.Conector
             return Plist.Leer(Encoding.UTF8.GetString(Leer(red, n)));
         }
 
-        static byte[] Leer(NetworkStream red, int n)
+        static byte[] Leer(Stream red, int n)
         {
             var b = new byte[n];
             int leido = 0;

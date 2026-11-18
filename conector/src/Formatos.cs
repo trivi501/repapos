@@ -45,7 +45,11 @@ namespace RepaPOS.Conector
                     return double.TryParse(n.InnerText.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out x) ? (object)x : n.InnerText;
                 case "true": return true;
                 case "false": return false;
-                case "data": return "(datos)";
+                case "data":
+                    var b64 = new StringBuilder();
+                    foreach (char c in n.InnerText) if (!char.IsWhiteSpace(c)) b64.Append(c);
+                    try { return Convert.FromBase64String(b64.ToString()); }
+                    catch (FormatException) { return new byte[0]; }
                 default: return n.InnerText;   // string, date
             }
         }
@@ -76,6 +80,7 @@ namespace RepaPOS.Conector
             else if (v is string) Cadena(sb, (string)v);
             else if (v is bool) sb.Append((bool)v ? "true" : "false");
             else if (v is int || v is long || v is double) sb.Append(Convert.ToString(v, CultureInfo.InvariantCulture));
+            else if (v is byte[]) sb.Append("null");   // datos binarios (certificados): nunca salen en la respuesta
             else if (v is IDictionary<string, object>)
             {
                 var d = (IDictionary<string, object>)v;
@@ -150,6 +155,7 @@ namespace RepaPOS.Conector
             { "iPhone16,1", "iPhone 15 Pro" }, { "iPhone16,2", "iPhone 15 Pro Max" },
             { "iPhone17,3", "iPhone 16" }, { "iPhone17,4", "iPhone 16 Plus" }, { "iPhone17,1", "iPhone 16 Pro" }, { "iPhone17,2", "iPhone 16 Pro Max" },
             { "iPhone17,5", "iPhone 16e" },
+            { "iPhone18,1", "iPhone 17 Pro" }, { "iPhone18,2", "iPhone 17 Pro Max" }, { "iPhone18,3", "iPhone 17" }, { "iPhone18,4", "iPhone Air" },
         };
 
         // chip (CPID) + placa (BDID) en Recovery/DFU; los que no están aquí se muestran por su chip
@@ -167,7 +173,7 @@ namespace RepaPOS.Conector
         static readonly Dictionary<string, string> Chips = new Dictionary<string, string>
         {
             { "8000", "A9" }, { "8003", "A9" }, { "8010", "A10" }, { "8015", "A11" }, { "8020", "A12" }, { "8030", "A13" },
-            { "8101", "A14" }, { "8110", "A15" }, { "8120", "A16" }, { "8130", "A17 Pro" }, { "8140", "A18" },
+            { "8101", "A14" }, { "8110", "A15" }, { "8120", "A16" }, { "8130", "A17 Pro" }, { "8140", "A18" }, { "8150", "A19" },
         };
 
         public static string NombreIphone(string tipo)

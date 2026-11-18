@@ -150,6 +150,9 @@ namespace RepaPOS.Conector
                 if (m == null && lista.Count == 1) m = lista[0];
                 if (m == null)
                 {
+                    // bloqueado: al menos el chip, que viene en el UDID (0000CPID-ECID)
+                    var u = Regex.Match(d.Serial, @"^0000([0-9A-F]{4})-?([0-9A-F]{16})$", RegexOptions.IgnoreCase);
+                    if (u.Success) t["modelo"] = Tablas.NombrePorChip(u.Groups[1].Value.ToUpperInvariant(), "");
                     t["aviso"] = fallo != null
                         ? "Instala iTunes o \"Dispositivos Apple\" de Microsoft Store para leer el modelo y la serie del iPhone."
                         : "Desbloquea el iPhone para leer su modelo.";
@@ -159,7 +162,7 @@ namespace RepaPOS.Conector
 
                 Dictionary<string, object> v = null;
                 string error = null;
-                try { v = Usbmux.Valores(Convert.ToInt32(m["DeviceID"])); }
+                try { v = Usbmux.Valores(Convert.ToInt32(m["DeviceID"]), d.Serial); }
                 catch (Exception ex) { error = ex.Message; }
                 if (v != null)
                 {
@@ -172,7 +175,11 @@ namespace RepaPOS.Conector
                     if (Plist.Texto(v, "ProductVersion") != "") t["sistema"] = "iOS " + Plist.Texto(v, "ProductVersion");
                     if (Plist.Texto(v, "DeviceName") != "") t["nombre"] = Plist.Texto(v, "DeviceName");
                     if (Plist.Texto(v, "ProductType").StartsWith("iPad")) t["tipo"] = "ipad";
-                    if (t["serial"] == null) t["aviso"] = "Para leer la serie, desbloquea el iPhone y toca \"Confiar en esta computadora\".";
+                    string sesion = Plist.Texto(v, "_sesion");
+                    if (t["serial"] == null)
+                        t["aviso"] = sesion == "sin emparejamiento"
+                            ? "Para leer la serie, conéctalo una vez con iTunes o 3uTools y toca \"Confiar en esta computadora\" en el iPhone."
+                            : "No se pudo leer la serie: " + (sesion != "" ? sesion : "el iPhone no la dio") + ". Desbloquéalo y vuelve a intentar.";
                 }
                 else t["aviso"] = "No respondió el iPhone (" + error + "). Desbloquéalo y vuelve a intentar.";
                 yield return t;
@@ -224,14 +231,19 @@ namespace RepaPOS.Conector
             }
             else if (d.Vid == "05C6" && (d.Pid == "9008" || nombre.IndexOf("QDLoader", StringComparison.OrdinalIgnoreCase) >= 0)) modo = "Qualcomm EDL (9008)";
             else if (d.Vid == "1782" && (d.Pid == "4D00" || nombre.IndexOf("SPRD", StringComparison.OrdinalIgnoreCase) >= 0)) modo = "Spreadtrum descarga";
+            else if (d.Vid == "04E8" && d.Pid == "685D") modo = "Samsung Download (Odin)";
             if (modo == null) return null;
+            // en Download de Samsung sí se sabe la marca; en los demás modos el chip no dice de qué marca es el teléfono
+            string marca = d.Vid == "04E8" ? "Samsung" : null;
 
             string com = Regex.Match(nombre, @"\((COM\d+)\)").Groups[1].Value;
             return new Dictionary<string, object>
             {
-                { "tipo", "android" }, { "marca", null }, { "modelo", null }, { "serial", null }, { "imei", null },
+                { "tipo", "android" }, { "marca", marca }, { "modelo", null }, { "serial", null }, { "imei", null },
                 { "modo", modo + (com != "" ? " (" + com + ")" : "") }, { "puerto", com == "" ? null : com },
-                { "aviso", "En modo de flasheo el teléfono no dice su marca ni su modelo: captúralos a mano." },
+                { "aviso", marca != null
+                    ? "En modo Download el teléfono no dice su modelo ni su serie: captúralos a mano o reinícialo normal."
+                    : "En modo de flasheo el teléfono no dice su marca ni su modelo: captúralos a mano." },
             };
         }
 
@@ -279,7 +291,8 @@ namespace RepaPOS.Conector
                         if (!m.Success) continue;
                         p.Vid = m.Groups[1].Value.ToUpperInvariant();
                         p.Pid = m.Groups[2].Value.ToUpperInvariant();
-                        p.EsRaiz = !m.Groups[4].Success && m.Groups[3].Value == "";
+                        // "&MODEM" (Samsung en Download) también es el equipo; las interfaces "&MI_nn" no
+                        p.EsRaiz = !m.Groups[4].Success;
                         // si Windows inventó el identificador (trae "&") el teléfono no reportó serie
                         string ultimo = m.Groups[5].Value;
                         p.Serial = p.EsRaiz && ultimo.IndexOf('&') < 0 ? ultimo : "";

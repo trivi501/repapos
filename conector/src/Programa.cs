@@ -36,16 +36,22 @@ namespace RepaPOS.Conector
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
-                try
+                // al reiniciarlo, el puerto puede tardar unos segundos en liberarse
+                for (int intento = 1; servidor == null; intento++)
                 {
-                    servidor = new TcpListener(IPAddress.Loopback, Puerto);
-                    servidor.Start();
-                }
-                catch (SocketException)
-                {
-                    MessageBox.Show("El puerto " + Puerto + " está ocupado por otro programa.", "RepaPOS Conector",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
+                    try
+                    {
+                        servidor = new TcpListener(IPAddress.Loopback, Puerto);
+                        servidor.Start();
+                    }
+                    catch (SocketException)
+                    {
+                        servidor = null;
+                        if (intento < 8) { Thread.Sleep(1000); continue; }
+                        MessageBox.Show("El puerto " + Puerto + " está ocupado por otro programa.", "RepaPOS Conector",
+                            MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
                 }
                 var hilo = new Thread(Atender) { IsBackground = true };
                 hilo.Start();

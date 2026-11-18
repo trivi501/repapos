@@ -6,7 +6,7 @@ if exist ..\..\RepaPOS-Escritorio\icono.ico set ICONO=/win32icon:..\..\RepaPOS-E
 if exist icono.ico set ICONO=/win32icon:icono.ico
 "%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /codepage:65001 /target:winexe /optimize+ %ICONO% ^
   /out:RepaPOS-Conector.exe /r:System.dll /r:System.Core.dll /r:System.Drawing.dll /r:System.Management.dll ^
-  /r:System.Windows.Forms.dll /r:System.Xml.dll src\*.cs
+  /r:System.Windows.Forms.dll /r:System.Xml.dll /r:System.Security.dll src\*.cs
 if errorlevel 1 (
   echo.
   echo ERROR al compilar.
