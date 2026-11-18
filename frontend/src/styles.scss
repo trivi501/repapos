@@ -1762,3 +1762,19 @@ app-grafica-barras {
   flex-direction: column;
   gap: 0.15rem;
 }
+
+// ---- detectar el teléfono conectado por USB (recepción de equipo)
+.detectar-usb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+
+  .lista-usb {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    width: 100%;
+  }
+}

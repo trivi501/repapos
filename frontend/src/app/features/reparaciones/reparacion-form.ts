@@ -12,6 +12,24 @@ import { OrdenService } from '../../core/services/orden.service';
 import { PatronDesbloqueo } from '../../shared/patron-desbloqueo/patron-desbloqueo';
 import { ZonaFotos } from '../../shared/zona-fotos/zona-fotos';
 
+/** Programa "RepaPOS Conector" (carpeta conector/ del repositorio): lee el teléfono conectado por USB. */
+const CONECTOR_USB = 'http://127.0.0.1:8765';
+
+/** Lo que contesta el conector por cada teléfono conectado. */
+interface TelefonoUsb {
+  tipo: 'android' | 'iphone' | 'ipad';
+  marca: string;
+  modelo: string;
+  modelo_tecnico?: string;
+  serial: string | null;
+  imei: string | null;
+  udid?: string;
+  modo: string;
+  sistema?: string;
+  aviso?: string;
+  error?: string;
+}
+
 const ZONAS_FOTOS: { categoria: CategoriaFoto; titulo: string; descripcion: string }[] = [
   { categoria: 'antes', titulo: 'Fotos antes', descripcion: 'Estado inicial al recibir el equipo' },
   { categoria: 'proceso', titulo: 'Evidencias del proceso', descripcion: 'Desensamble, placa o microscopio' },
@@ -380,6 +398,47 @@ export class ReparacionForm implements OnInit {
   cambiarModoEquipo(modo: 'previo' | 'nuevo'): void {
     if (modo === 'previo' && this.modoCliente() === 'nuevo') return;
     this.modoEquipo.set(modo);
+  }
+
+  // ---- detectar el teléfono conectado por USB (programa RepaPOS Conector en esta PC)
+  readonly telefonosUsb = signal<TelefonoUsb[]>([]);
+  readonly detectando = signal(false);
+  readonly avisoUsb = signal('');
+
+  async detectarTelefono(): Promise<void> {
+    this.detectando.set(true);
+    this.avisoUsb.set('');
+    this.telefonosUsb.set([]);
+    try {
+      // fetch directo (sin el token del sistema): el conector solo escucha en esta PC
+      const r = await fetch(`${CONECTOR_USB}/telefonos`, { cache: 'no-store', signal: AbortSignal.timeout(20000) });
+      const lista = ((await r.json()) as TelefonoUsb[]).filter((t) => !t.error);
+      if (!lista.length) this.avisoUsb.set('No se detectó ningún teléfono. Conéctalo, desbloquéalo y elige "Transferir archivos".');
+      else if (lista.length === 1) this.usarTelefono(lista[0]);
+      else {
+        this.telefonosUsb.set(lista);
+        this.avisoUsb.set('Hay varios teléfonos conectados: elige cuál es.');
+      }
+    } catch {
+      this.avisoUsb.set('No responde el conector. Abre "RepaPOS-Conector.exe" en esta PC (queda junto al reloj) y vuelve a intentar.');
+    } finally {
+      this.detectando.set(false);
+    }
+  }
+
+  usarTelefono(t: TelefonoUsb): void {
+    const grupo = this.formulario.controls.equipo_nuevo;
+    // el campo es "IMEI / Serie": el IMEI si se pudo leer, si no la serie
+    const identificador = t.imei || t.serial || '';
+    grupo.patchValue({
+      tipo: t.tipo === 'ipad' ? 'tablet' : 'celular',
+      marca: t.marca ?? '',
+      modelo: t.modelo_tecnico && t.modelo_tecnico !== t.modelo ? `${t.modelo} (${t.modelo_tecnico})` : (t.modelo ?? ''),
+      ...(identificador ? { imei: identificador } : {}),
+    });
+    this.telefonosUsb.set([]);
+    const extra = t.imei && t.serial ? ` · Serie ${t.serial}` : '';
+    this.avisoUsb.set(`✔ ${t.marca} ${t.modelo}${identificador ? '' : ' (sin serie)'}${extra}${t.aviso ? ' — ' + t.aviso : ''}`);
   }
 
   agregarFalla(texto: string): void {
