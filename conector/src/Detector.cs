@@ -59,6 +59,10 @@ namespace RepaPOS.Conector
                     continue;
                 }
 
+                // modos de flasheo (BROM/Preloader de MediaTek, EDL de Qualcomm, descarga de Spreadtrum): el teléfono no dice quién es
+                var servicio = ModoServicio(d, dispositivos);
+                if (servicio != null) { resultado.Add(servicio); continue; }
+
                 // Android: el modelo que reporta la interfaz MTP (p. ej. "Galaxy A52s 5G"); con ADB, el de fábrica (SM-A528B)
                 if (adb == null) adb = AdbEquipo.Listar();
                 var t = new Dictionary<string, object>
@@ -202,6 +206,34 @@ namespace RepaPOS.Conector
         }
 
         // ------------------------------------------------------------------ Android
+
+        /// <summary>
+        /// Puertos de flasheo: MediaTek 0E8D:0003 (BROM), 2000 (Preloader), 2001 (DA); Qualcomm 05C6:9008 (EDL);
+        /// Spreadtrum 1782:4D00 (descarga). En estos modos no se puede saber la marca real ni el modelo.
+        /// </summary>
+        static Dictionary<string, object> ModoServicio(Pnp d, List<Pnp> todos)
+        {
+            string modo = null;
+            string nombre = string.Join(" ", todos.Where(x => x.Vid == d.Vid && x.Pid == d.Pid).Select(x => x.Nombre));
+            if (d.Vid == "0E8D")
+            {
+                if (d.Pid == "0003") modo = "MediaTek BROM";
+                else if (d.Pid == "2000" || nombre.IndexOf("PreLoader", StringComparison.OrdinalIgnoreCase) >= 0) modo = "MediaTek Preloader";
+                else if (d.Pid == "2001") modo = "MediaTek DA";
+                else if (nombre.IndexOf("MediaTek USB Port", StringComparison.OrdinalIgnoreCase) >= 0) modo = "MediaTek BROM/Preloader";
+            }
+            else if (d.Vid == "05C6" && (d.Pid == "9008" || nombre.IndexOf("QDLoader", StringComparison.OrdinalIgnoreCase) >= 0)) modo = "Qualcomm EDL (9008)";
+            else if (d.Vid == "1782" && (d.Pid == "4D00" || nombre.IndexOf("SPRD", StringComparison.OrdinalIgnoreCase) >= 0)) modo = "Spreadtrum descarga";
+            if (modo == null) return null;
+
+            string com = Regex.Match(nombre, @"\((COM\d+)\)").Groups[1].Value;
+            return new Dictionary<string, object>
+            {
+                { "tipo", "android" }, { "marca", null }, { "modelo", null }, { "serial", null }, { "imei", null },
+                { "modo", modo + (com != "" ? " (" + com + ")" : "") }, { "puerto", com == "" ? null : com },
+                { "aviso", "En modo de flasheo el teléfono no dice su marca ni su modelo: captúralos a mano." },
+            };
+        }
 
         static string NombreModelo(Pnp raiz, List<Pnp> todos)
         {

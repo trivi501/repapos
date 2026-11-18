@@ -122,7 +122,7 @@
                 <div class="lista-usb">
                   @for (t of telefonosUsb(); track $index) {
                     <button type="button" class="btn btn-secondary btn-sm" (click)="usarTelefono(t)">
-                      {{ t.marca }} {{ t.modelo }} · {{ t.serial || t.imei || t.udid || 'sin serie' }} ({{ t.modo }})
+                      {{ t.marca || 'Teléfono' }} {{ t.modelo }} · {{ t.serial || t.imei || t.udid || 'sin serie' }} ({{ t.modo }})
                     </button>
                   }
                 </div>

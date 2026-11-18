@@ -18,8 +18,8 @@ const CONECTOR_USB = 'http://127.0.0.1:8765';
 /** Lo que contesta el conector por cada teléfono conectado. */
 interface TelefonoUsb {
   tipo: 'android' | 'iphone' | 'ipad';
-  marca: string;
-  modelo: string;
+  marca: string | null;
+  modelo: string | null;
   modelo_tecnico?: string;
   serial: string | null;
   imei: string | null;
@@ -430,15 +430,18 @@ export class ReparacionForm implements OnInit {
     const grupo = this.formulario.controls.equipo_nuevo;
     // el campo es "IMEI / Serie": el IMEI si se pudo leer, si no la serie
     const identificador = t.imei || t.serial || '';
+    const modelo = t.modelo && t.modelo_tecnico && t.modelo_tecnico !== t.modelo ? `${t.modelo} (${t.modelo_tecnico})` : t.modelo;
+    // solo se llena lo que el teléfono sí dijo (en modo de flasheo no dice marca ni modelo)
     grupo.patchValue({
       tipo: t.tipo === 'ipad' ? 'tablet' : 'celular',
-      marca: t.marca ?? '',
-      modelo: t.modelo_tecnico && t.modelo_tecnico !== t.modelo ? `${t.modelo} (${t.modelo_tecnico})` : (t.modelo ?? ''),
+      ...(t.marca ? { marca: t.marca } : {}),
+      ...(modelo ? { modelo } : {}),
       ...(identificador ? { imei: identificador } : {}),
     });
     this.telefonosUsb.set([]);
+    const quien = [t.marca, t.modelo].filter(Boolean).join(' ') || 'Teléfono';
     const extra = t.imei && t.serial ? ` · Serie ${t.serial}` : '';
-    this.avisoUsb.set(`✔ ${t.marca} ${t.modelo}${identificador ? '' : ' (sin serie)'}${extra}${t.aviso ? ' — ' + t.aviso : ''}`);
+    this.avisoUsb.set(`✔ ${quien} · ${t.modo}${identificador ? '' : ' (sin serie)'}${extra}${t.aviso ? ' — ' + t.aviso : ''}`);
   }
 
   agregarFalla(texto: string): void {
