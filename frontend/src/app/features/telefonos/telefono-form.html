@@ -45,6 +45,7 @@
             </select>
           </div>
         </div>
+        <app-detectar-usb (elegido)="usarTelefono($event)" />
         <div class="form-field">
           <label for="modelo">Modelo *</label>
           <input id="modelo" name="modelo" required [(ngModel)]="m.modelo" />

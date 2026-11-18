@@ -5,6 +5,7 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { AvisosService, AvisoWhatsapp } from '../../core/services/avisos.service';
 import { DineroPipe, FechaPipe, fechaISO } from '../../shared/ui';
+import { DetectarUsb, TelefonoUsb, nombreTelefonoUsb } from '../../shared/detectar-usb/detectar-usb';
 import type { Telefono } from './telefonos';
 
 const ULTIMO_LOCATARIO = 'taller_ultimo_locatario';
@@ -19,7 +20,7 @@ function vacio(locatario = '') {
 /** Alta y edición de un teléfono de locatario, en una ventana sobre la lista. */
 @Component({
   selector: 'app-telefono-form',
-  imports: [FormsModule, DineroPipe, FechaPipe],
+  imports: [FormsModule, DineroPipe, FechaPipe, DetectarUsb],
   templateUrl: './telefono-form.html',
   host: { '(document:keydown.escape)': 'cerrar.emit()' },
   styles: `
@@ -51,6 +52,16 @@ export class TelefonoForm implements OnInit, AfterViewInit {
 
   m = vacio(sessionStorage.getItem(ULTIMO_LOCATARIO) ?? '');
   destinoCobros = '';
+
+  /** Teléfono detectado por USB: el modelo con su marca, y el IMEI y la serie se agregan a las notas. */
+  usarTelefono(t: TelefonoUsb): void {
+    const nombre = nombreTelefonoUsb(t);
+    if (t.modelo && nombre) this.m.modelo = nombre;   // en modo de flasheo no dice el modelo: se deja lo escrito
+    const datos = [t.imei ? `IMEI ${t.imei}` : '', t.serial ? `Serie ${t.serial}` : '']
+      .filter((d) => d && !this.m.notas.includes(d.split(' ')[1]));
+    if (datos.length) this.m.notas = [this.m.notas.trim(), datos.join(' · ')].filter(Boolean).join(' · ');
+    this.cdr.markForCheck();
+  }
 
   ngOnInit(): void {
     this.api.get<{ locatarios: { id: number; nombre: string; whatsapp: string | null }[] }>('telefonos', { por_pagina: 1 }).subscribe((r) => {

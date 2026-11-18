@@ -111,23 +111,7 @@
               </select>
             </div>
           } @else {
-            <div class="detectar-usb">
-              <button type="button" class="btn btn-secondary btn-sm" (click)="detectarTelefono()" [disabled]="detectando()">
-                🔌 {{ detectando() ? 'Buscando…' : 'Detectar teléfono conectado por USB' }}
-              </button>
-              @if (avisoUsb()) {
-                <span class="ayuda">{{ avisoUsb() }}</span>
-              }
-              @if (telefonosUsb().length > 1) {
-                <div class="lista-usb">
-                  @for (t of telefonosUsb(); track $index) {
-                    <button type="button" class="btn btn-secondary btn-sm" (click)="usarTelefono(t)">
-                      {{ t.marca || 'Teléfono' }} {{ t.modelo }} · {{ t.serial || t.imei || t.udid || 'sin serie' }} ({{ t.modo }})
-                    </button>
-                  }
-                </div>
-              }
-            </div>
+            <app-detectar-usb (elegido)="usarTelefono($event)" />
             <div class="grid-3" formGroupName="equipo_nuevo">
               <div class="form-field">
                 <label for="en_tipo">Tipo</label>

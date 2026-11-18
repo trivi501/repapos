@@ -11,24 +11,7 @@ import { EquipoService } from '../../core/services/equipo.service';
 import { OrdenService } from '../../core/services/orden.service';
 import { PatronDesbloqueo } from '../../shared/patron-desbloqueo/patron-desbloqueo';
 import { ZonaFotos } from '../../shared/zona-fotos/zona-fotos';
-
-/** Programa "RepaPOS Conector" (carpeta conector/ del repositorio): lee el teléfono conectado por USB. */
-const CONECTOR_USB = 'http://127.0.0.1:8765';
-
-/** Lo que contesta el conector por cada teléfono conectado. */
-interface TelefonoUsb {
-  tipo: 'android' | 'iphone' | 'ipad';
-  marca: string | null;
-  modelo: string | null;
-  modelo_tecnico?: string;
-  serial: string | null;
-  imei: string | null;
-  udid?: string;
-  modo: string;
-  sistema?: string;
-  aviso?: string;
-  error?: string;
-}
+import { DetectarUsb, TelefonoUsb, nombreTelefonoUsb } from '../../shared/detectar-usb/detectar-usb';
 
 const ZONAS_FOTOS: { categoria: CategoriaFoto; titulo: string; descripcion: string }[] = [
   { categoria: 'antes', titulo: 'Fotos antes', descripcion: 'Estado inicial al recibir el equipo' },
@@ -123,7 +106,7 @@ function estimadoPorDefecto(): string {
 @Component({
   selector: 'app-reparacion-form',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, PatronDesbloqueo, ZonaFotos],
+  imports: [ReactiveFormsModule, RouterLink, PatronDesbloqueo, ZonaFotos, DetectarUsb],
   templateUrl: './reparacion-form.html',
   styleUrl: './reparacion-form.scss',
 })
@@ -400,48 +383,17 @@ export class ReparacionForm implements OnInit {
     this.modoEquipo.set(modo);
   }
 
-  // ---- detectar el teléfono conectado por USB (programa RepaPOS Conector en esta PC)
-  readonly telefonosUsb = signal<TelefonoUsb[]>([]);
-  readonly detectando = signal(false);
-  readonly avisoUsb = signal('');
-
-  async detectarTelefono(): Promise<void> {
-    this.detectando.set(true);
-    this.avisoUsb.set('');
-    this.telefonosUsb.set([]);
-    try {
-      // fetch directo (sin el token del sistema): el conector solo escucha en esta PC
-      const r = await fetch(`${CONECTOR_USB}/telefonos`, { cache: 'no-store', signal: AbortSignal.timeout(20000) });
-      const lista = ((await r.json()) as TelefonoUsb[]).filter((t) => !t.error);
-      if (!lista.length) this.avisoUsb.set('No se detectó ningún teléfono. Conéctalo, desbloquéalo y elige "Transferir archivos".');
-      else if (lista.length === 1) this.usarTelefono(lista[0]);
-      else {
-        this.telefonosUsb.set(lista);
-        this.avisoUsb.set('Hay varios teléfonos conectados: elige cuál es.');
-      }
-    } catch {
-      this.avisoUsb.set('No responde el conector. Abre "RepaPOS-Conector.exe" en esta PC (queda junto al reloj) y vuelve a intentar.');
-    } finally {
-      this.detectando.set(false);
-    }
-  }
-
+  /** Teléfono detectado por USB (botón "Detectar"): llena solo lo que el teléfono sí dijo. */
   usarTelefono(t: TelefonoUsb): void {
-    const grupo = this.formulario.controls.equipo_nuevo;
     // el campo es "IMEI / Serie": el IMEI si se pudo leer, si no la serie
     const identificador = t.imei || t.serial || '';
-    const modelo = t.modelo && t.modelo_tecnico && t.modelo_tecnico !== t.modelo ? `${t.modelo} (${t.modelo_tecnico})` : t.modelo;
-    // solo se llena lo que el teléfono sí dijo (en modo de flasheo no dice marca ni modelo)
-    grupo.patchValue({
+    const modelo = nombreTelefonoUsb(t, false);
+    this.formulario.controls.equipo_nuevo.patchValue({
       tipo: t.tipo === 'ipad' ? 'tablet' : 'celular',
       ...(t.marca ? { marca: t.marca } : {}),
       ...(modelo ? { modelo } : {}),
       ...(identificador ? { imei: identificador } : {}),
     });
-    this.telefonosUsb.set([]);
-    const quien = [t.marca, t.modelo].filter(Boolean).join(' ') || 'Teléfono';
-    const extra = t.imei && t.serial ? ` · Serie ${t.serial}` : '';
-    this.avisoUsb.set(`✔ ${quien} · ${t.modo}${identificador ? '' : ' (sin serie)'}${extra}${t.aviso ? ' — ' + t.aviso : ''}`);
   }
 
   agregarFalla(texto: string): void {
