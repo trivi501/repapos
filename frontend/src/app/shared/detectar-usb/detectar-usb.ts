@@ -14,6 +14,9 @@ export interface TelefonoUsb {
   udid?: string;
   modo: string;
   sistema?: string;
+  /** Samsung: firmware (A566EXXS6AYGE) y, en modo Descarga, el almacenamiento ("256 GB"). */
+  firmware?: string;
+  almacenamiento?: string;
   aviso?: string;
   error?: string;
 }
@@ -24,6 +27,101 @@ export function nombreTelefonoUsb(t: TelefonoUsb, conMarca = true): string {
   // "OPPO Reno14 F 5G" ya trae la marca: no se repite
   const yaTraeMarca = !!t.marca && modelo.toLowerCase().startsWith(t.marca.toLowerCase());
   return (conMarca && !yaTraeMarca ? [t.marca, modelo] : [modelo]).filter(Boolean).join(' ');
+}
+
+// ---------------------------------------------------------------- Samsung por Web Serial (sin conector)
+
+const SAMSUNG = 0x04e8;
+const SAMSUNG_DESCARGA = 0x685d;
+
+/** Lo mínimo de Web Serial que se usa (Chrome y Edge; no está en los tipos de TypeScript). */
+interface PuertoSerie {
+  getInfo(): { usbVendorId?: number; usbProductId?: number };
+  open(o: { baudRate: number }): Promise<void>;
+  close(): Promise<void>;
+  setSignals?(s: { dataTerminalReady?: boolean; requestToSend?: boolean }): Promise<void>;
+  readable: ReadableStream<Uint8Array> | null;
+  writable: WritableStream<Uint8Array> | null;
+}
+
+/**
+ * Lee los Samsung conectados directo desde el navegador, por el puerto COM de su módem:
+ * - encendido (MTP): AT+DEVCONINFO → modelo de fábrica, serie, IMEI y firmware;
+ * - modo Descarga (Odin): DVIF → modelo y firmware.
+ * La primera vez el navegador pide elegir el puerto del Samsung; después lo recuerda.
+ * Devuelve null si el navegador no tiene Web Serial o no se eligió ningún puerto.
+ */
+export async function leerSamsungPorSerial(pedirPermiso: boolean): Promise<TelefonoUsb[] | null> {
+  const serial = (navigator as unknown as { serial?: { getPorts(): Promise<PuertoSerie[]>; requestPort(o: unknown): Promise<PuertoSerie> } }).serial;
+  if (!serial) return null;
+  let puertos = (await serial.getPorts()).filter((p) => p.getInfo().usbVendorId === SAMSUNG);
+  if (!puertos.length && pedirPermiso) {
+    try {
+      puertos = [await serial.requestPort({ filters: [{ usbVendorId: SAMSUNG }] })];
+    } catch {
+      return null;   // canceló o no hay Samsung conectado
+    }
+  }
+  if (!puertos.length) return null;
+  const lista: TelefonoUsb[] = [];
+  for (const p of puertos) {
+    const t = await leerPuertoSamsung(p).catch(() => null);
+    if (t) lista.push(t);
+  }
+  return lista;
+}
+
+async function leerPuertoSamsung(p: PuertoSerie): Promise<TelefonoUsb | null> {
+  const descarga = p.getInfo().usbProductId === SAMSUNG_DESCARGA;
+  await p.open({ baudRate: 115200 });
+  try {
+    await p.setSignals?.({ dataTerminalReady: true, requestToSend: true });
+    const resp = await pedirSerie(p, descarga ? 'DVIF' : 'AT+DEVCONINFO\r\n',
+      descarga ? (s) => /@#[\s\S]*@#/.test(s) : (s) => /DEVCONINFO[\s\S]*OK|ERROR/.test(s), descarga ? 3000 : 5000);
+    const t: TelefonoUsb = { tipo: 'android', marca: 'Samsung', modelo: null, serial: null, imei: null, modo: descarga ? 'Samsung Download (Odin)' : 'Módem (navegador)' };
+    if (descarga) {
+      const datos = Object.fromEntries((/@#([\s\S]*)@#/.exec(resp)?.[1] ?? '').split(';').map((x) => x.split('=').map((y) => y.trim())).filter((x) => x.length === 2));
+      t.modelo = datos['MODEL'] || null;
+      t.modelo_tecnico = datos['MODEL'] || undefined;
+      if (datos['VER']) t.firmware = datos['VER'];
+      if (/^\d+$/.test(datos['CAPA'] ?? '')) t.almacenamiento = `${datos['CAPA']} GB`;
+      t.aviso = t.modelo ? 'En modo Download se lee el modelo, pero no la serie ni el IMEI: para esos, reinícialo normal.' : 'No respondió en modo Download.';
+    } else {
+      const datos = Object.fromEntries([...resp.matchAll(/(\w+)\(([^)]*)\)/g)].map((m) => [m[1].toUpperCase(), m[2].trim()]));
+      t.modelo = datos['MN'] || null;
+      t.modelo_tecnico = datos['MN'] || undefined;
+      t.serial = datos['SN'] || null;
+      t.imei = /^\d{14,16}$/.test(datos['IMEI'] ?? '') ? datos['IMEI'] : null;
+      if (datos['VER']) t.firmware = datos['VER'].split('/')[0];
+      if (!t.modelo && !t.serial) t.aviso = 'El Samsung no contestó: desbloquéalo y vuelve a intentar.';
+    }
+    return t;
+  } finally {
+    await p.close().catch(() => undefined);
+  }
+}
+
+/** Manda el comando y junta lo que conteste hasta que esté completo o se acabe el tiempo. */
+async function pedirSerie(p: PuertoSerie, comando: string, completa: (s: string) => boolean, ms: number): Promise<string> {
+  const escritor = p.writable!.getWriter();
+  await escritor.write(new TextEncoder().encode(comando));
+  escritor.releaseLock();
+  const lector = p.readable!.getReader();
+  const decodificador = new TextDecoder();
+  let texto = '';
+  const fin = Date.now() + ms;
+  try {
+    while (Date.now() < fin && !completa(texto)) {
+      const espera = new Promise<null>((r) => setTimeout(() => r(null), Math.max(50, fin - Date.now())));
+      const leido = await Promise.race([lector.read(), espera]);
+      if (!leido || leido.done) break;
+      texto += decodificador.decode(leido.value, { stream: true });
+    }
+  } finally {
+    await lector.cancel().catch(() => undefined);
+    lector.releaseLock();
+  }
+  return texto;
 }
 
 /**
@@ -65,17 +163,25 @@ export class DetectarUsb {
     this.aviso.set('');
     this.opciones.set([]);
     try {
-      // fetch directo (sin el token del sistema): el conector solo escucha en esta PC
-      const r = await fetch(`${CONECTOR_USB}/telefonos`, { cache: 'no-store', signal: AbortSignal.timeout(20000) });
-      const lista = ((await r.json()) as TelefonoUsb[]).filter((t) => !t.error);
+      let lista: TelefonoUsb[] | null = null;
+      try {
+        // fetch directo (sin el token del sistema): el conector solo escucha en esta PC
+        const r = await fetch(`${CONECTOR_USB}/telefonos`, { cache: 'no-store', signal: AbortSignal.timeout(20000) });
+        lista = ((await r.json()) as TelefonoUsb[]).filter((t) => !t.error);
+      } catch {
+        // sin conector: un Samsung se puede leer directo desde el navegador por su puerto COM (Web Serial)
+        lista = await leerSamsungPorSerial(true);
+        if (lista === null) {
+          this.aviso.set('No responde el conector. Abre "RepaPOS-Conector.exe" en esta PC (queda junto al reloj) y vuelve a intentar.');
+          return;
+        }
+      }
       if (!lista.length) this.aviso.set('No se detectó ningún teléfono. Conéctalo, desbloquéalo y elige "Transferir archivos".');
       else if (lista.length === 1) this.elegir(lista[0]);
       else {
         this.opciones.set(lista);
         this.aviso.set('Hay varios teléfonos conectados: elige cuál es.');
       }
-    } catch {
-      this.aviso.set('No responde el conector. Abre "RepaPOS-Conector.exe" en esta PC (queda junto al reloj) y vuelve a intentar.');
     } finally {
       this.detectando.set(false);
     }

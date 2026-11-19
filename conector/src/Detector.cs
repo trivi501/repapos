@@ -48,6 +48,8 @@ namespace RepaPOS.Conector
 
             foreach (var d in dispositivos.Where(x => x.EsRaiz && Marcas.ContainsKey(x.Vid)))
             {
+                // "&MODEM" solo cuenta como equipo si no está el dispositivo principal (Samsung en Download no lo tiene)
+                if (d.Extra != "" && dispositivos.Any(x => x.Vid == d.Vid && x.Pid == d.Pid && x.EsRaiz && x.Extra == "")) continue;
                 string llave = d.Vid + d.Pid + d.Serial;
                 if (!vistos.Add(llave)) continue;
 
@@ -75,6 +77,7 @@ namespace RepaPOS.Conector
                     { "imei", null },
                     { "modo", ModoAndroid(d, dispositivos) },
                 };
+                if (d.Vid == "04E8") LeerModemSamsung(t, d, dispositivos);   // modelo de fábrica, serie e IMEI sin adb
                 AdbEquipo a;
                 if (d.Serial != "" && adb.TryGetValue(d.Serial, out a))
                 {
@@ -215,6 +218,37 @@ namespace RepaPOS.Conector
 
         // ------------------------------------------------------------------ Android
 
+        /// <summary>El puerto COM del módem Samsung de este teléfono (interfaz "&MODEM" o clase Modem), o null.</summary>
+        static string PuertoSamsung(Pnp d, List<Pnp> todos)
+        {
+            foreach (var x in todos.Where(x => x.Vid == d.Vid && x.Pid == d.Pid
+                && (x.Clase == "Modem" || x.Id.IndexOf("&MODEM", StringComparison.OrdinalIgnoreCase) >= 0)))
+            {
+                string puerto = Samsung.Puerto(x.Id);
+                if (!string.IsNullOrEmpty(puerto)) return puerto;
+            }
+            return null;
+        }
+
+        /// <summary>Samsung encendido: AT+DEVCONINFO por su módem da modelo de fábrica, serie, IMEI y firmware.</summary>
+        static void LeerModemSamsung(Dictionary<string, object> t, Pnp d, List<Pnp> todos)
+        {
+            string puerto = PuertoSamsung(d, todos);
+            if (puerto == null) return;
+            var info = Samsung.Devconinfo(puerto);
+            string v;
+            if (info.TryGetValue("MN", out v) && v != "")
+            {
+                t["modelo_tecnico"] = v;
+                if (string.IsNullOrEmpty(t["modelo"] as string)) t["modelo"] = v;
+            }
+            if (info.TryGetValue("SN", out v) && v != "") t["serial"] = v;
+            if (info.TryGetValue("IMEI", out v) && Regex.IsMatch(v, @"^\d{14,16}$")) t["imei"] = v;
+            if (info.TryGetValue("VER", out v) && v != "") t["firmware"] = v.Split('/')[0];
+            if (info.Count > 0) t["modo"] = t["modo"] + " + módem";
+            else t["aviso"] = "No respondió el módem del Samsung (" + puerto + "): ciérralo en otros programas (Odin, UnlockTool…) y vuelve a intentar.";
+        }
+
         /// <summary>
         /// Puertos de flasheo: MediaTek 0E8D:0003 (BROM), 2000 (Preloader), 2001 (DA); Qualcomm 05C6:9008 (EDL);
         /// Spreadtrum 1782:4D00 (descarga). En estos modos no se puede saber la marca real ni el modelo.
@@ -238,14 +272,28 @@ namespace RepaPOS.Conector
             string marca = d.Vid == "04E8" ? "Samsung" : null;
 
             string com = Regex.Match(nombre, @"\((COM\d+)\)").Groups[1].Value;
-            return new Dictionary<string, object>
+            if (com == "") com = Samsung.Puerto(d.Id) ?? PuertoSamsung(d, todos) ?? "";
+            var t = new Dictionary<string, object>
             {
                 { "tipo", "android" }, { "marca", marca }, { "modelo", null }, { "serial", null }, { "imei", null },
                 { "modo", modo + (com != "" ? " (" + com + ")" : "") }, { "puerto", com == "" ? null : com },
-                { "aviso", marca != null
-                    ? "En modo Download el teléfono no dice su modelo ni su serie: captúralos a mano o reinícialo normal."
-                    : "En modo de flasheo el teléfono no dice su marca ni su modelo: captúralos a mano." },
+                { "aviso", "En modo de flasheo el teléfono no dice su marca ni su modelo: captúralos a mano." },
             };
+            if (marca == null) return t;
+
+            // Samsung en Download: DVIF (comando de información de Odin, solo lectura) da modelo y firmware
+            var info = com != "" ? Samsung.Dvif(com) : new Dictionary<string, string>();
+            string v;
+            if (info.TryGetValue("MODEL", out v) && v != "") { t["modelo"] = v; t["modelo_tecnico"] = v; }
+            // VER es el firmware (A566EXXS6AYGE); FWVER solo es la versión del modo Descarga; CAPA, el almacenamiento en GB
+            if (info.TryGetValue("VER", out v) && v != "") t["firmware"] = v;
+            if (info.TryGetValue("CAPA", out v) && Regex.IsMatch(v, @"^\d+$")) t["almacenamiento"] = v + " GB";
+            if (info.TryGetValue("SALES", out v) && v != "") t["region"] = v;
+            if (info.TryGetValue("UN", out v) && v != "") t["un"] = v;
+            t["aviso"] = info.Count > 0
+                ? "En modo Download se lee el modelo, pero no la serie ni el IMEI: para esos, reinícialo normal."
+                : "No respondió en modo Download" + (com != "" ? " (" + com + ")" : "") + ": cierra Odin u otros programas que lo estén usando.";
+            return t;
         }
 
         static string NombreModelo(Pnp raiz, List<Pnp> todos)
@@ -271,7 +319,7 @@ namespace RepaPOS.Conector
     /// <summary>Un dispositivo de Windows (Win32_PnPEntity) con su VID, PID y serie del identificador USB.</summary>
     class Pnp
     {
-        public string Id, Nombre, Clase, Vid = "", Pid = "", Serial = "";
+        public string Id, Nombre, Clase, Vid = "", Pid = "", Serial = "", Extra = "";
         public bool EsRaiz;
 
         public static List<Pnp> Listar()
@@ -295,6 +343,7 @@ namespace RepaPOS.Conector
                         p.Pid = m.Groups[2].Value.ToUpperInvariant();
                         // "&MODEM" (Samsung en Download) también es el equipo; las interfaces "&MI_nn" no
                         p.EsRaiz = !m.Groups[4].Success;
+                        p.Extra = m.Groups[3].Value;
                         // si Windows inventó el identificador (trae "&") el teléfono no reportó serie
                         string ultimo = m.Groups[5].Value;
                         p.Serial = p.EsRaiz && ultimo.IndexOf('&') < 0 ? ultimo : "";
