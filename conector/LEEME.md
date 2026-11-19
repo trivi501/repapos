@@ -9,7 +9,16 @@ En RepaPOS: **Reparaciones → Nueva → ➕ Nuevo dispositivo → 🔌 Detectar
 2. Ábrelo: queda junto al reloj. Para que abra solo al encender la PC, pon un acceso directo en `shell:startup`.
 3. Para probarlo sin RepaPOS: clic derecho en el icono → *Ver teléfonos conectados*, o abre http://127.0.0.1:8765/telefonos.
 
-Solo escucha en la misma PC (127.0.0.1:8765); nadie de la red puede leerlo.
+Solo escucha en la misma PC (127.0.0.1:8765); nadie de la red puede leerlo. Y solo le entrega los datos a RepaPOS:
+a las páginas de esta PC (localhost) y a `repapos.tech`. Otro dominio se agrega, uno por renglón, en `origenes.txt`
+junto al conector (por ejemplo `https://taller.midominio.com`).
+
+### Usar RepaPOS desde el servidor (https://repapos.tech)
+
+Chrome y Edge no dejan que un sitio de internet hable con programas de tu PC sin el permiso de **acceso a la red local**.
+Si el permiso está negado, RepaPOS abre por un instante una ventanita del conector que lee el teléfono y se cierra sola.
+Para que no salga esa ventanita: candado junto a la dirección → Configuración del sitio → **Acceso a la red local → Permitir**.
+Si el navegador bloquea ventanas emergentes en repapos.tech, permítelas también.
 
 ## Qué lee de cada teléfono
 

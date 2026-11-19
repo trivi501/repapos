@@ -1794,3 +1794,18 @@ app-grafica-barras {
 .d-bloque {
   display: block;
 }
+
+// ---- el conector USB no respondió
+.aviso-conector {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-danger, #dc2626);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-danger, #dc2626) 8%, transparent);
+  font-size: 0.85rem;
+
+  ul {
+    margin: 0.3rem 0 0;
+    padding-left: 1.2rem;
+  }
+}

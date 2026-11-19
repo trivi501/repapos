@@ -29,6 +29,39 @@ export function nombreTelefonoUsb(t: TelefonoUsb, conMarca = true): string {
   return (conMarca && !yaTraeMarca ? [t.marca, modelo] : [modelo]).filter(Boolean).join(' ');
 }
 
+// ---------------------------------------------------------------- puente por ventana (página en el servidor)
+
+/**
+ * Abre un momento la ventanita "puente" del conector (http://127.0.0.1:8765/puente). Esa página es del conector,
+ * así que el navegador no le pide el permiso de red local: lee los teléfonos y los manda aquí con postMessage.
+ * El conector solo se los manda a repapos.tech o a esta PC. Devuelve null si no se abrió o no contestó.
+ */
+export function leerPorVentanaDelConector(): Promise<TelefonoUsb[] | null> {
+  return new Promise((resolver) => {
+    let ventana: Window | null = null;
+    let vigilar: ReturnType<typeof setInterval> | undefined;
+    const terminar = (lista: TelefonoUsb[] | null) => {
+      removeEventListener('message', alMensaje);
+      clearTimeout(limite);
+      clearInterval(vigilar);
+      try { ventana?.close(); } catch { /* ya se cerró */ }
+      resolver(lista);
+    };
+    const alMensaje = (e: MessageEvent) => {
+      if (e.origin !== CONECTOR_USB || e.data?.tipo !== 'repapos-telefonos' || !Array.isArray(e.data.lista)) return;
+      terminar((e.data.lista as TelefonoUsb[]).filter((t) => !t.error));
+    };
+    addEventListener('message', alMensaje);
+    const limite = setTimeout(() => terminar(null), 25000);
+    const ancho = 420, alto = 180;
+    ventana = window.open(`${CONECTOR_USB}/puente?origen=${encodeURIComponent(location.origin)}`, 'repapos-conector',
+      `width=${ancho},height=${alto},left=${Math.round(screenX + (outerWidth - ancho) / 2)},top=${Math.round(screenY + 120)}`);
+    if (!ventana) { terminar(null); return; }   // el navegador bloqueó la ventana
+    // si se cierra sin mandar nada (conector cerrado, error), no esperar los 25 s
+    vigilar = setInterval(() => { if (ventana?.closed) setTimeout(() => terminar(null), 300); }, 400);
+  });
+}
+
 // ---------------------------------------------------------------- Samsung por Web Serial (sin conector)
 
 const SAMSUNG = 0x04e8;
@@ -138,6 +171,19 @@ async function pedirSerie(p: PuertoSerie, comando: string, completa: (s: string)
       @if (aviso()) {
         <span class="ayuda">{{ aviso() }}</span>
       }
+      @if (sinConector()) {
+        <div class="aviso-conector">
+          ⚠ <strong>No respondió el conector</strong>{{ sinConector() === 'samsung' ? ': solo se pudo leer el Samsung por su puerto. Para los demás equipos (iPhone, Motorola, Xiaomi…) hace falta el conector.' : '.' }}
+          <ul>
+            <li>Revisa que <strong>RepaPOS-Conector.exe</strong> esté abierto (icono junto al reloj).</li>
+            @if (desdeServidor) {
+              <li>Como abriste RepaPOS desde el servidor, el navegador debe permitirle hablar con tu PC: da clic en el
+                candado o los ajustes junto a la dirección → <strong>Configuración del sitio</strong> →
+                <strong>Acceso a la red local</strong> (o "Dispositivos de la red local") → <strong>Permitir</strong>, y vuelve a intentar.</li>
+            }
+          </ul>
+        </div>
+      }
       @if (opciones().length > 1) {
         <div class="lista-usb">
           @for (t of opciones(); track $index) {
@@ -157,23 +203,34 @@ export class DetectarUsb {
   readonly opciones = signal<TelefonoUsb[]>([]);
   readonly detectando = signal(false);
   readonly aviso = signal('');
+  /** El conector no contestó: 'todo' (no se leyó nada) o 'samsung' (solo se leyó el Samsung por su puerto). */
+  readonly sinConector = signal<'' | 'todo' | 'samsung'>('');
+  /** Abierto desde el servidor (no desde esta PC): el navegador pide permiso de "red local" para llegar al conector. */
+  readonly desdeServidor = !['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
 
   async detectar(): Promise<void> {
     this.detectando.set(true);
     this.aviso.set('');
     this.opciones.set([]);
+    this.sinConector.set('');
     try {
       let lista: TelefonoUsb[] | null = null;
       try {
-        // fetch directo (sin el token del sistema): el conector solo escucha en esta PC
-        const r = await fetch(`${CONECTOR_USB}/telefonos`, { cache: 'no-store', signal: AbortSignal.timeout(20000) });
+        // fetch directo (sin el token del sistema): el conector solo escucha en esta PC.
+        // targetAddressSpace le dice a Chrome/Edge que es un programa de esta PC, para que pida el permiso de red local.
+        const r = await fetch(`${CONECTOR_USB}/telefonos`, {
+          cache: 'no-store', signal: AbortSignal.timeout(20000), targetAddressSpace: 'loopback',
+        } as RequestInit);
         lista = ((await r.json()) as TelefonoUsb[]).filter((t) => !t.error);
       } catch {
-        // sin conector: un Samsung se puede leer directo desde el navegador por su puerto COM (Web Serial)
-        lista = await leerSamsungPorSerial(true);
-        if (lista === null) {
-          this.aviso.set('No responde el conector. Abre "RepaPOS-Conector.exe" en esta PC (queda junto al reloj) y vuelve a intentar.');
-          return;
+        // desde el servidor el navegador puede bloquear la conexión con esta PC (permiso de "red local"):
+        // entonces se abre un momento una ventanita del propio conector, que sí lo lee y le pasa los datos a la página
+        if (this.desdeServidor) lista = await leerPorVentanaDelConector();
+        if (!lista) {
+          // sin conector: un Samsung se puede leer directo desde el navegador por su puerto COM (Web Serial)
+          lista = await leerSamsungPorSerial(true);
+          this.sinConector.set(lista?.length ? 'samsung' : 'todo');
+          if (!lista?.length) return;
         }
       }
       if (!lista.length) this.aviso.set('No se detectó ningún teléfono. Conéctalo, desbloquéalo y elige "Transferir archivos".');
