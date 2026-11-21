@@ -21,6 +21,12 @@ import { CorteDatos, diaLargo, esperado, hora, horario, textoDiferencia, textoWh
     .tabla-desglose td, .tabla-desglose th { white-space: nowrap; }
     .tabla-desglose tfoot td { font-weight: 700; border-top: 2px solid var(--color-border); }
     .ganancia-total { font-size: 1.4rem; font-weight: 700; }
+    .estado-caja { display: flex; align-items: center; gap: 0.6rem; padding: 0.6rem 0.9rem; margin-bottom: 1rem; border-radius: 8px; border: 1px solid; }
+    .estado-caja .punto { width: 0.7rem; height: 0.7rem; border-radius: 50%; flex: none; }
+    .estado-caja.abierta { border-color: #16a34a; background: color-mix(in srgb, #16a34a 10%, transparent); }
+    .estado-caja.abierta .punto { background: #16a34a; }
+    .estado-caja.cerrada { border-color: #9ca3af; background: color-mix(in srgb, #9ca3af 10%, transparent); }
+    .estado-caja.cerrada .punto { background: #9ca3af; }
   `,
 })
 export class Corte implements OnInit {
@@ -40,11 +46,10 @@ export class Corte implements OnInit {
   readonly hora = hora;
   readonly horario = horario;
 
+  // solo ver: los valores del turno (el fondo con que se abrió y, si ya se cerró, lo contado y retirado)
   fondo = 0;
   contado = 0;
   retiro = 0;
-  /** Si el usuario escribió el retiro, ya no se recalcula solo. */
-  retiroEscrito = false;
   notas = '';
 
   ngOnInit(): void {
@@ -77,7 +82,6 @@ export class Corte implements OnInit {
         this.fondo = d.fondo;
         this.contado = d.corte ? Number(d.corte.contado) : 0;
         this.retiro = d.corte ? Number(d.corte.retiro) : 0;
-        this.retiroEscrito = !!d.corte;
         this.notas = d.corte?.notas ?? '';
         this.d.set(d);
       },
@@ -111,38 +115,8 @@ export class Corte implements OnInit {
     return textoDiferencia(this.diferencia());
   }
 
-  /** Por defecto se deja el mismo fondo y se retira lo demás. */
-  alCambiarCaja(): void {
-    if (!this.retiroEscrito) this.retiro = Math.max(0, Math.round((Number(this.contado || 0) - Number(this.fondo || 0)) * 100) / 100);
-  }
-
   quedaDeFondo(): number {
     return Math.round((Number(this.contado || 0) - Number(this.retiro || 0)) * 100) / 100;
-  }
-
-  guardar(): void {
-    const x = this.d();
-    if (!x) return;
-    if (this.retiro > this.contado) {
-      this.avisos.fallo('No puedes retirar más de lo que contaste.');
-      return;
-    }
-    const pregunta = x.abierto
-      ? `¿Cerrar el turno ${x.turno}? Lo que se cobre después entra al turno ${x.turno + 1}.`
-      : `¿Reemplazar el corte del turno ${x.turno}?`;
-    if (!confirm(pregunta)) return;
-    this.api
-      .post<{ message: string; corte: { turno: number } }>('cortes', {
-        fecha: this.dia(), turno: x.turno, fondo: this.fondo, contado: this.contado, retiro: this.retiro, notas: this.notas,
-      })
-      .subscribe({
-        next: (r) => {
-          this.avisos.ok(r.message);
-          // se queda viendo el turno que acaba de guardar
-          this.ir(this.dia(), r.corte.turno);
-        },
-        error: (e: HttpErrorResponse) => this.avisos.fallo(e),
-      });
   }
 
   whatsapp(): void {

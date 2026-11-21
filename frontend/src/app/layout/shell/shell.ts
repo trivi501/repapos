@@ -47,7 +47,8 @@ const MENU: GrupoMenu[] = [
   {
     titulo: 'Caja',
     items: [
-      { ruta: '/corte', etiqueta: 'Corte de caja', icono: '💵', permisos: ['cortes.ver'] },
+      { ruta: '/corte', etiqueta: 'Ver caja', icono: '💵', permisos: ['cortes.ver'] },
+      { ruta: '/caja', etiqueta: 'Abrir / cerrar caja', icono: '🔐', permisos: ['cortes.guardar'] },
       { ruta: '/salidas', etiqueta: 'Salidas de dinero', icono: '💸', permisos: ['salidas.ver'] },
     ],
   },

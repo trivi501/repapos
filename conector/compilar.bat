@@ -14,3 +14,9 @@ if errorlevel 1 (
   exit /b 1
 )
 echo Listo: RepaPOS-Conector.exe
+rem una copia para descargarlo desde RepaPOS (frontend/public/descargas → https://repapos.tech/descargas/RepaPOS-Conector.exe)
+if exist ..\frontend\public (
+  if not exist ..\frontend\public\descargas mkdir ..\frontend\public\descargas
+  copy /y RepaPOS-Conector.exe ..\frontend\public\descargas\RepaPOS-Conector.exe >nul
+  echo Copiado a frontend\public\descargas: se publica al compilar el frontend.
+)

@@ -88,12 +88,18 @@ namespace RepaPOS.Conector
                         else if (a.Modelo != "" && (string)t["modelo"] == "") t["modelo"] = a.Modelo;
                         if (a.Marca != "") t["marca"] = a.Marca;
                         if (a.Android != "") t["sistema"] = "Android " + a.Android;
+                        if (a.Imei != "" && t["imei"] == null) t["imei"] = a.Imei;
                         if (!((string)t["modo"]).Contains("ADB")) t["modo"] = t["modo"] + " + ADB";
                     }
                     else if (a.Estado == "unauthorized")
                         t["aviso"] = "Acepta \"Permitir depuración USB\" en el teléfono para leer el modelo exacto.";
                 }
                 if (d.Serial == "") t["aviso"] = "El teléfono no reportó número de serie por USB. Desbloquéalo y elige \"Transferir archivos\".";
+                // sin módem (Samsung) ni adb que lo dé, el IMEI no se puede leer por USB: se marca *#06#
+                if (t["imei"] == null && !t.ContainsKey("aviso"))
+                    t["aviso"] = ((string)t["modo"]).Contains("ADB")
+                        ? "Este Android no deja leer el IMEI por USB (Android 10 o más nuevo): márcalo con *#06# y escríbelo."
+                        : "El IMEI de esta marca no se puede leer por MTP: márcalo con *#06# y escríbelo (o activa la depuración USB para intentarlo).";
                 resultado.Add(t);
             }
 
@@ -245,7 +251,9 @@ namespace RepaPOS.Conector
             if (info.TryGetValue("SN", out v) && v != "") t["serial"] = v;
             if (info.TryGetValue("IMEI", out v) && Regex.IsMatch(v, @"^\d{14,16}$")) t["imei"] = v;
             if (info.TryGetValue("VER", out v) && v != "") t["firmware"] = v.Split('/')[0];
-            if (info.Count > 0) t["modo"] = t["modo"] + " + módem";
+            if (info.ContainsKey("_ESTADO"))
+                t["aviso"] = "El Samsung dijo que está ocupado: desbloquéalo y cierra SamFw, Odin u otros programas que lo estén usando, y vuelve a intentar.";
+            else if (info.Count > 0) t["modo"] = t["modo"] + " + módem";
             else t["aviso"] = "No respondió el módem del Samsung (" + puerto + "): ciérralo en otros programas (Odin, UnlockTool…) y vuelve a intentar.";
         }
 
@@ -375,7 +383,7 @@ namespace RepaPOS.Conector
     /// </summary>
     class AdbEquipo
     {
-        public string Estado = "", Modelo = "", Comercial = "", Marca = "", Android = "";
+        public string Estado = "", Modelo = "", Comercial = "", Marca = "", Android = "", Imei = "";
 
         public static Dictionary<string, AdbEquipo> Listar()
         {
@@ -403,10 +411,50 @@ namespace RepaPOS.Conector
                     }
                     string modelo = Prop(serie, "ro.product.model");
                     if (modelo != "") a.Modelo = modelo;
+                    a.Imei = LeerImei(serie);
                 }
                 r[m.Groups[1].Value] = a;
             }
             return r;
+        }
+
+        /// <summary>
+        /// El IMEI por adb, en lo posible: algunos modelos lo dejan en propiedades del sistema y los Android viejos
+        /// (hasta 9) lo dan con "service call iphonesubinfo". Android 10+ lo bloquea sin root: entonces queda vacío.
+        /// Solo se acepta un número de 15 dígitos que pase la verificación de Luhn (nunca uno inventado).
+        /// </summary>
+        static string LeerImei(string serie)
+        {
+            foreach (var clave in new[] { "persist.radio.imei", "ro.gsm.imei", "ro.ril.oem.imei", "persist.sys.imei", "ril.imei", "persist.radio.imei1", "vendor.ril.imei" })
+            {
+                string v = Prop(serie, clave);
+                if (EsImei(v)) return v;
+            }
+            foreach (var cmd in new[] { "service call iphonesubinfo 1 s16 com.android.shell", "service call iphonesubinfo 1", "service call iphonesubinfo 3 i32 0 s16 com.android.shell" })
+            {
+                string salida = Servidor.Shell(serie, cmd) ?? "";
+                // "Result: Parcel(0x00000000: 00000000 0000000f 00350033 '........3.5.9.3.')": los dígitos van entre comillas
+                var sb = new StringBuilder();
+                foreach (Match q in Regex.Matches(salida, @"'([^']*)'"))
+                    foreach (char ch in q.Groups[1].Value)
+                        if (char.IsDigit(ch)) sb.Append(ch);
+                string digitos = sb.ToString();
+                if (digitos.Length >= 15 && EsImei(digitos.Substring(0, 15))) return digitos.Substring(0, 15);
+            }
+            return "";
+        }
+
+        public static bool EsImei(string v)
+        {
+            if (v == null || !Regex.IsMatch(v, @"^\d{15}$") || v.Distinct().Count() == 1) return false;
+            int suma = 0;
+            for (int i = 0; i < 15; i++)
+            {
+                int d = v[i] - '0';
+                if (i % 2 == 1) { d *= 2; if (d > 9) d -= 9; }
+                suma += d;
+            }
+            return suma % 10 == 0;
         }
 
         static string Prop(string serie, string clave)

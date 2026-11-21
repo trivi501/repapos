@@ -147,6 +147,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('cortes/resumen', [CorteController::class, 'resumen'])->middleware('permission:cortes.ver');
         Route::get('cortes/exportar', [CorteController::class, 'exportar'])->middleware('permission:cortes.ver');
         Route::post('cortes', [CorteController::class, 'store'])->middleware('permission:cortes.guardar');
+        // abrir y cerrar caja (con el fondo contado al abrir)
+        Route::post('cortes/abrir', [CorteController::class, 'abrir'])->middleware('permission:cortes.guardar');
+        Route::post('cortes/cerrar', [CorteController::class, 'cerrar'])->middleware('permission:cortes.guardar');
 
         Route::get('configuracion', [ConfiguracionController::class, 'edit'])->middleware('permission:configuracion.ver');
         Route::post('configuracion', [ConfiguracionController::class, 'update'])->middleware('permission:configuracion.editar');

@@ -1,6 +1,9 @@
 <div class="encabezado">
-  <h1>Corte de caja <small class="tenue">{{ diaTexto() }}</small></h1>
+  <h1>Caja <small class="tenue">{{ diaTexto() }}</small></h1>
   <div class="acciones-fila no-imprimir">
+    @if (auth.tienePermiso('cortes.guardar')) {
+      <a class="btn btn-primary" routerLink="/caja">Abrir / cerrar caja</a>
+    }
     <button class="btn btn-secondary" (click)="mover(-1)" aria-label="Día anterior">◀</button>
     <input type="date" aria-label="Día del corte" [ngModel]="dia()" (ngModelChange)="ir($event)" />
     <button class="btn btn-secondary" (click)="mover(1)" aria-label="Día siguiente">▶</button>
@@ -10,6 +13,21 @@
 </div>
 
 @if (d(); as x) {
+  <!-- estado de la caja ahora (solo ver) -->
+  <div class="estado-caja no-imprimir" [class.abierta]="x.apertura" [class.cerrada]="!x.apertura">
+    @if (x.apertura; as a) {
+      <span class="punto"></span>
+      <div>
+        <strong>Caja abierta</strong> desde las {{ hora(a.abierta_at) }}{{ a.fecha.slice(0, 10) !== hoy ? ' del ' + (a.fecha | fecha) : '' }}
+        {{ a.user ? 'por ' + a.user.name : '' }} · fondo inicial <strong>{{ a.fondo | dinero }}</strong>
+        @if (a.notas) { <small class="tenue"> · {{ a.notas }}</small> }
+      </div>
+    } @else {
+      <span class="punto"></span>
+      <div><strong>Caja cerrada.</strong> Para empezar a cobrar, ábrela con el fondo contado.</div>
+    }
+  </div>
+
   <!-- turnos del día -->
   <div class="turnos no-imprimir" role="tablist" aria-label="Turnos del día">
     @for (t of x.turnos; track t.turno) {
@@ -21,7 +39,7 @@
     }
     @if (x.hay_abierto) {
       <button class="btn" role="tab" [class.btn-primary]="x.abierto" [class.btn-secondary]="!x.abierto" [attr.aria-selected]="x.abierto" (click)="verTurno(null)">
-        Turno {{ x.turnos.length + 1 }} (abierto)
+        Turno {{ x.turnos.length + 1 }} {{ x.apertura ? '(abierto)' : '(siguiente)' }}
         <small>{{ x.turnos.length ? 'desde ' + hora(x.turnos[x.turnos.length - 1].hasta) : 'todo el día' }}</small>
       </button>
     }
@@ -31,10 +49,12 @@
     @if (x.corte) {
       Turno {{ x.turno }} ({{ horario(x) }}) guardado el {{ x.corte.updated_at | fecha: true }}{{ x.corte.user ? ' por ' + x.corte.user.name : '' }}.
       @if (x.cambios_despues) {
-        ⚠ Hubo movimientos después del corte: guárdalo otra vez.
+        ⚠ Hubo movimientos después del corte.
       }
+    } @else if (x.apertura) {
+      Turno {{ x.turno }} abierto: entra lo que se cobre desde {{ x.turnos.length ? hora(x.desde) : 'las 00:00' }} hasta que se cierre la caja.
     } @else {
-      Turno {{ x.turno }} abierto: entra lo que se cobre desde {{ x.turnos.length ? hora(x.desde) : 'las 00:00' }} hasta que lo cierres.
+      Turno {{ x.turno }}: la caja está cerrada. Lo que se cobre antes de abrirla también entra a este turno.
     }
   </p>
 
@@ -179,13 +199,13 @@
     </div>
   </div>
 
-  <!-- cuadre, retiro y fondo -->
+  <!-- cuadre, retiro y fondo (solo ver: se abre y cierra en "Abrir / cerrar caja") -->
   <div class="card contenido">
-    <h2>Cuadre del turno {{ x.turno }}</h2>
+    <h2>Cuadre del turno {{ x.turno }} {{ x.abierto ? (x.apertura ? '(abierto)' : '(siguiente)') : '' }}</h2>
     <div class="rejilla-2">
       <div class="lista-corte">
-        <label for="fondo">Fondo inicial en caja:</label>
-        <input id="fondo" class="input-corto" type="number" step="0.01" min="0" [(ngModel)]="fondo" (ngModelChange)="alCambiarCaja()" (focus)="$any($event.target).select()" />
+        <span>Fondo inicial en caja:</span>
+        <b class="grande">{{ fondo | dinero }}</b>
         <span>+ Entradas en efectivo:</span>
         <span>
           <b class="a-favor grande">{{ x.entradas | dinero }}</b> <small class="tenue">({{ x.cobros_efectivo }} cobros)</small>
@@ -199,25 +219,25 @@
         <b class="muy-grande">{{ esperado() | dinero }}</b>
       </div>
       <div class="lista-corte">
-        <label for="contado">Efectivo contado:</label>
-        <input id="contado" class="input-corto" type="number" step="0.01" min="0" [(ngModel)]="contado" (ngModelChange)="alCambiarCaja()" (focus)="$any($event.target).select()" />
-        <span>Diferencia:</span>
-        <b class="muy-grande" [class.a-favor]="diferencia() === 0" [class.debe]="diferencia() < 0" [class.sobra]="diferencia() > 0">{{ textoDiferencia() }}</b>
-        <label for="retiro">Se retira:</label>
-        <span>
-          <input id="retiro" class="input-corto" type="number" step="0.01" min="0" [(ngModel)]="retiro" (ngModelChange)="retiroEscrito = true" (focus)="$any($event.target).select()" />
-          <small class="bloque-texto tenue">Lo que se lleva el dueño o se deposita.</small>
-        </span>
-        <span>Queda de fondo:</span>
-        <b class="grande" [class.debe]="quedaDeFondo() < 0">{{ quedaDeFondo() | dinero }}</b>
-        <label for="notas">Notas:</label>
-        <input id="notas" [(ngModel)]="notas" />
+        @if (x.corte) {
+          <span>Efectivo contado:</span>
+          <b class="grande">{{ contado | dinero }}</b>
+          <span>Diferencia:</span>
+          <b class="muy-grande" [class.a-favor]="diferencia() === 0" [class.debe]="diferencia() < 0" [class.sobra]="diferencia() > 0">{{ textoDiferencia() }}</b>
+          <span>Se retiró:</span>
+          <b class="grande">{{ retiro | dinero }}</b>
+          <span>Quedó de fondo:</span>
+          <b class="grande">{{ quedaDeFondo() | dinero }}</b>
+          @if (notas) {
+            <span>Notas:</span>
+            <span>{{ notas }}</span>
+          }
+        } @else {
+          <span class="ocupa-todo tenue">El turno sigue abierto: el conteo, el retiro y la diferencia se ven al cerrar la caja.</span>
+        }
       </div>
     </div>
     <div class="acciones-fila separado no-imprimir">
-      @if (auth.tienePermiso('cortes.guardar')) {
-        <button class="btn btn-primary" (click)="guardar()">{{ x.abierto ? 'Cerrar turno ' + x.turno : 'Guardar turno ' + x.turno + ' otra vez' }}</button>
-      }
       <button class="btn btn-whatsapp" (click)="whatsapp()">Mandar por WhatsApp</button>
       <button class="btn btn-secondary" (click)="ticket()">Ticket 80 mm</button>
       <button class="btn btn-secondary" (click)="imprimir()">Imprimir hoja</button>

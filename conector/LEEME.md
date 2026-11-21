@@ -5,7 +5,13 @@ En RepaPOS: **Reparaciones → Nueva → ➕ Nuevo dispositivo → 🔌 Detectar
 
 ## Instalar en la PC del mostrador
 
-1. Doble clic en `compilar.bat` (usa el compilador de C# que ya trae Windows; no instala nada). Sale `RepaPOS-Conector.exe`.
+**Lo más fácil:** en RepaPOS, Ajustes → Configuración → **⬇ Descargar RepaPOS-Conector.exe** (o el enlace del aviso cuando el conector
+no responde). Si Windows dice "protegió su PC": Más información → Ejecutar de todas formas.
+
+Para compilarlo tú:
+
+1. Doble clic en `compilar.bat` (usa el compilador de C# que ya trae Windows; no instala nada). Sale `RepaPOS-Conector.exe`
+   y una copia en `frontend/public/descargas`, que es la que se descarga desde la página (hay que recompilar el frontend).
 2. Ábrelo: queda junto al reloj. Para que abra solo al encender la PC, pon un acceso directo en `shell:startup`.
 3. Para probarlo sin RepaPOS: clic derecho en el icono → *Ver teléfonos conectados*, o abre http://127.0.0.1:8765/telefonos.
 

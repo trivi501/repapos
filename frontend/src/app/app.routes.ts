@@ -112,6 +112,7 @@ export const routes: Routes = [
 
       // caja
       { path: 'corte', ...conPermiso('cortes.ver'), loadComponent: () => import('./features/corte/corte').then((m) => m.Corte) },
+      { path: 'caja', ...conPermiso('cortes.guardar'), loadComponent: () => import('./features/corte/caja').then((m) => m.Caja) },
       { path: 'corte/historial', ...conPermiso('cortes.ver'), loadComponent: () => import('./features/corte/corte-historial').then((m) => m.CorteHistorial) },
       { path: 'salidas', ...conPermiso('salidas.ver'), loadComponent: () => import('./features/salidas/salidas').then((m) => m.Salidas) },
 

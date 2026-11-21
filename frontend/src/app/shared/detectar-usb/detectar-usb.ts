@@ -2,6 +2,8 @@ import { Component, input, output, signal } from '@angular/core';
 
 /** Programa "RepaPOS Conector" (carpeta conector/ del repositorio): lee el teléfono conectado por USB en esta PC. */
 export const CONECTOR_USB = 'http://127.0.0.1:8765';
+/** El conector para descargar desde la misma página (lo copia ahí conector/compilar.bat). */
+export const DESCARGA_CONECTOR = '/descargas/RepaPOS-Conector.exe';
 
 /** Lo que contesta el conector por cada teléfono conectado. */
 export interface TelefonoUsb {
@@ -175,7 +177,8 @@ async function pedirSerie(p: PuertoSerie, comando: string, completa: (s: string)
         <div class="aviso-conector">
           ⚠ <strong>No respondió el conector</strong>{{ sinConector() === 'samsung' ? ': solo se pudo leer el Samsung por su puerto. Para los demás equipos (iPhone, Motorola, Xiaomi…) hace falta el conector.' : '.' }}
           <ul>
-            <li>Revisa que <strong>RepaPOS-Conector.exe</strong> esté abierto (icono junto al reloj).</li>
+            <li>Revisa que <strong>RepaPOS-Conector.exe</strong> esté abierto (icono junto al reloj). ¿No lo tienes en esta PC?
+              <a [href]="descargaConector" download>⬇ Descargar el conector</a>, ábrelo y vuelve a intentar.</li>
             @if (desdeServidor) {
               <li>Como abriste RepaPOS desde el servidor, el navegador debe permitirle hablar con tu PC: da clic en el
                 candado o los ajustes junto a la dirección → <strong>Configuración del sitio</strong> →
@@ -205,6 +208,7 @@ export class DetectarUsb {
   readonly aviso = signal('');
   /** El conector no contestó: 'todo' (no se leyó nada) o 'samsung' (solo se leyó el Samsung por su puerto). */
   readonly sinConector = signal<'' | 'todo' | 'samsung'>('');
+  readonly descargaConector = DESCARGA_CONECTOR;
   /** Abierto desde el servidor (no desde esta PC): el navegador pide permiso de "red local" para llegar al conector. */
   readonly desdeServidor = !['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
 

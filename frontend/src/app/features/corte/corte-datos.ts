@@ -39,6 +39,19 @@ export interface CorteDatos {
   } | null;
   fondo: number;
   cambios_despues: boolean;
+  /** La caja abierta de la sucursal (null = cerrada). */
+  apertura: AperturaCaja | null;
+  /** Lo que quedó de fondo en el último corte: lo que se sugiere al abrir. */
+  fondo_sugerido: number;
+}
+
+export interface AperturaCaja {
+  id: number;
+  fecha: string;
+  abierta_at: string;
+  fondo: string;
+  notas: string | null;
+  user?: { id: number; name: string } | null;
 }
 
 export function hora(fecha: string): string {

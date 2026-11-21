@@ -31,8 +31,11 @@ namespace RepaPOS.Conector
         public static Dictionary<string, string> Devconinfo(string puerto)
         {
             var r = new Dictionary<string, string>();
-            string resp = Pedir(puerto, "AT+DEVCONINFO\r\n", s => s.Contains("OK") && s.Contains("DEVCONINFO") || s.Contains("ERROR"), 5000);
+            string resp = Pedir(puerto, "AT+DEVCONINFO\r\n",
+                s => s.Contains("OK") && s.Contains("DEVCONINFO:") || s.Contains("ERROR") || s.Contains("BUSY"), 8000);
             if (resp == null) return r;
+            // "BUSY": el teléfono está atendiendo a otro programa (SamFw, Odin…) o está bloqueado
+            if (resp.Contains("BUSY")) { r["_ESTADO"] = "BUSY"; return r; }
             foreach (Match m in Regex.Matches(resp, @"(\w+)\(([^)]*)\)"))
                 r[m.Groups[1].Value.ToUpperInvariant()] = m.Groups[2].Value.Trim();
             return r;

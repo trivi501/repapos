@@ -98,7 +98,7 @@
     </thead>
     <tbody>
       @for (t of telefonos(); track t.id) {
-        <tr (contextmenu)="abrirMenu($event, t)" [class.fila-activa]="menu()?.t?.id === t.id">
+        <tr (contextmenu)="abrirMenu($event, t)" (dblclick)="verDetalle(t.id)" [class.fila-activa]="menu()?.t?.id === t.id">
           <td class="tenue">{{ t.id }}</td>
           <td><app-estatus [valor]="t.prioridad" /></td>
           <td class="sin-salto">{{ t.fecha_recibido | fecha }}</td>
@@ -155,12 +155,13 @@
     <button class="btn btn-secondary" (click)="pagina(1)" [disabled]="paginaActual() >= ultimaPagina()">Siguiente</button>
   </div>
 </div>
-<p class="ayuda">Tip: clic derecho sobre cualquier teléfono para ver todas sus acciones.</p>
+<p class="ayuda">Tip: clic derecho sobre cualquier teléfono para ver todas sus acciones; doble clic para ver sus detalles.</p>
 
 @if (menu(); as m) {
   <div class="menu-fondo" (click)="menu.set(null)" (contextmenu)="$event.preventDefault(); menu.set(null)"></div>
   <div class="menu-flotante" role="menu" [style.top.px]="m.y" [style.left.px]="m.x" (keydown.escape)="menu.set(null)">
     <div class="menu-titulo">#{{ m.t.id }} · {{ m.t.locatario?.nombre }} · {{ m.t.modelo }}</div>
+    <button class="menu-item" (click)="verDetalle(m.t.id)">👁️ Ver detalles</button>
     @if (auth.tienePermiso('telefonos.editar')) {
       <button class="menu-item" (click)="abrirFormulario(m.t.id)">✏️ Editar</button>
       <button class="menu-item" (click)="accion(m.t, 'listo')">{{ m.t.resultado === 'LISTO' ? '↩️ Regresar a En taller' : '✅ Marcar como Listo' }}</button>
@@ -187,4 +188,8 @@
 
 @if (formulario(); as f) {
   <app-telefono-form [telefonoId]="f.id" [irAEliminar]="f.eliminar" (cerrar)="formulario.set(null)" (guardado)="cargar()" />
+}
+
+@if (detalle(); as id) {
+  <app-telefono-detalle [telefonoId]="id" (cerrar)="detalle.set(null)" (editar)="detalle.set(null); abrirFormulario($event)" />
 }

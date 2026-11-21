@@ -322,6 +322,55 @@ class RepaposTest extends TestCase
         $this->assertEquals(200.0, $this->getJson('/api/cortes?fecha='.$mañana)->json('fondo'));
     }
 
+    public function test_abrir_y_cerrar_caja_con_el_fondo_contado(): void
+    {
+        $this->comoTaller($this->adminA);
+        $hoy = today()->toDateString();
+
+        // cerrada: no se puede cerrar; la vista dice que está cerrada
+        $this->postJson('/api/cortes/cerrar', ['contado' => 100])->assertUnprocessable()->assertJsonPath('message', 'La caja está cerrada: ábrela primero.');
+        $this->assertNull($this->getJson('/api/cortes?fecha='.$hoy)->json('apertura'));
+
+        // abrir con 500 de fondo; no se puede abrir dos veces
+        $this->postJson('/api/cortes/abrir', ['fondo' => 500, 'notas' => 'Turno mañana'])->assertOk()
+            ->assertJsonPath('apertura.user.name', $this->adminA->name);
+        $this->postJson('/api/cortes/abrir', ['fondo' => 100])->assertUnprocessable();
+        $this->assertSame(1, \App\Models\AperturaCaja::count());
+
+        // movimientos del turno: 100 de un teléfono y 30 de salida
+        $this->telefonoDe($this->adminA);
+        $this->comoTaller($this->adminA);
+        $this->postJson('/api/salidas', ['concepto' => 'Comida', 'monto' => 30, 'fecha' => now()->format('Y-m-d\TH:i')])->assertCreated();
+
+        // la pantalla de ver muestra la caja abierta y el fondo con que se abrió
+        $v = $this->getJson('/api/cortes?fecha='.$hoy)->assertOk();
+        $v->assertJsonPath('apertura.fondo', '500.00')->assertJsonPath('abierto', true);
+        $this->assertEquals(500.0, $v->json('fondo'));
+
+        // el técnico no puede abrir ni cerrar
+        $tecnico = $this->usuario($this->tallerA, 'Tecnico');
+        $this->comoTaller($tecnico);
+        $this->postJson('/api/cortes/cerrar', ['contado' => 1])->assertForbidden();
+
+        // cerrar: el corte usa el fondo de la apertura (500 + 100 - 30 = 570)
+        $this->comoTaller($this->adminA);
+        $this->postJson('/api/cortes/cerrar', ['contado' => 560, 'retiro' => 60])->assertOk()->assertJsonPath('corte.turno', 1);
+        $corte = Corte::first();
+        $this->assertEquals(500.0, (float) $corte->fondo);
+        $this->assertEquals(570.0, (float) $corte->esperado);
+        $this->assertEquals(-10.0, (float) $corte->diferencia);
+        $this->assertEquals(500.0, (float) $corte->fondo_siguiente);
+        $a = \App\Models\AperturaCaja::first();
+        $this->assertNotNull($a->cerrada_at);
+        $this->assertSame($corte->id, $a->corte_id);
+
+        // ya cerrada: no se cierra otra vez y el fondo sugerido para abrir es lo que quedó
+        $this->postJson('/api/cortes/cerrar', ['contado' => 1])->assertUnprocessable();
+        $v = $this->getJson('/api/cortes?fecha='.$hoy)->json();
+        $this->assertNull($v['apertura']);
+        $this->assertEquals(500.0, $v['fondo_sugerido']);
+    }
+
     public function test_corte_por_turnos_con_retiro_desglose_y_ganancia(): void
     {
         $this->travelTo(today()->setTime(10, 0));

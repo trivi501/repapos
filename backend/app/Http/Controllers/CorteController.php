@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AperturaCaja;
 use App\Models\Corte;
 use App\Models\OrdenReparacion;
 use App\Models\Pago;
@@ -13,6 +14,7 @@ use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -69,8 +71,12 @@ class CorteController extends Controller
                 'user' => $c->user?->name,
             ])->values(),
             'corte' => $corte,
-            'fondo' => $fondo,
+            // con la caja abierta, el fondo del turno es el que se contó al abrirla
+            'fondo' => ! $corte && ($apertura = AperturaCaja::actual()) ? (float) $apertura->fondo : $fondo,
             'cambios_despues' => $cambiosDespues,
+            // estado de la caja de la sucursal (no del día que se está viendo)
+            'apertura' => AperturaCaja::actual(),
+            'fondo_sugerido' => $this->fondoAnterior(today(), Corte::whereDate('fecha', today())->orderByDesc('turno')->first()),
         ]);
     }
 
@@ -86,12 +92,26 @@ class CorteController extends Controller
         ], ['retiro.lte' => 'No puedes retirar más de lo que contaste.']);
 
         $dia = Carbon::parse($d['fecha'])->startOfDay();
+        $ultimo = Corte::whereDate('fecha', $dia)->orderByDesc('turno')->first();
+        // sin turno se reemplaza el último del día (o se crea el primero)
+        $resultado = $this->guardarCorte($dia, $d['turno'] ?? ($ultimo?->turno ?? 1), (float) $d['fondo'], (float) $d['contado'],
+            isset($d['retiro']) ? (float) $d['retiro'] : null, $d['notas'] ?? '');
+        if (is_string($resultado)) {
+            return response()->json(['message' => $resultado], 422);
+        }
+
+        return response()->json(['message' => "Corte del turno {$resultado->turno} guardado.", 'corte' => $resultado]);
+    }
+
+    /**
+     * Guarda (o vuelve a guardar) el corte del turno $num del día: suma lo cobrado en efectivo y las salidas del turno.
+     * Devuelve el corte, o el mensaje de por qué no se pudo.
+     */
+    private function guardarCorte(CarbonInterface $dia, int $num, float $fondo, float $contado, ?float $retiroPedido, string $notas): Corte|string
+    {
         $finDia = $dia->copy()->addDay();
         $turnos = Corte::whereDate('fecha', $dia)->orderBy('turno')->get();
         $ultimo = $turnos->last();
-
-        // sin turno se reemplaza el último del día (o se crea el primero)
-        $num = $d['turno'] ?? ($ultimo?->turno ?? 1);
         $corte = $turnos->firstWhere('turno', $num);
 
         // la base guarda la hora sin fracciones de segundo: el turno cierra al segundo siguiente
@@ -103,31 +123,99 @@ class CorteController extends Controller
             $hasta = $corte->is($ultimo) && $dia->isToday() ? $ahora : $corte->fin();
         } else {
             if ($num !== ($ultimo?->turno ?? 0) + 1) {
-                return response()->json(['message' => 'Ese turno no existe. Cierra los turnos en orden.'], 422);
+                return 'Ese turno no existe. Cierra los turnos en orden.';
             }
             $desde = $ultimo?->fin() ?? $dia->copy();
             $hasta = $dia->isToday() ? $ahora : $finDia;
             if ($desde->gte($hasta)) {
-                return response()->json(['message' => 'Este día ya está cerrado: no hay movimientos después del último corte.'], 422);
+                return 'Este día ya está cerrado: no hay movimientos después del último corte.';
             }
             $corte = new Corte(['fecha' => $dia, 'turno' => $num]);
         }
 
         $entradas = $this->efectivo($desde, $hasta);
         $salidas = round((float) $this->salidasEntre($desde, $hasta)->sum('monto'), 2);
-        $esperado = round($d['fondo'] + $entradas - $salidas, 2);
+        $esperado = round($fondo + $entradas - $salidas, 2);
         // si no dicen cuánto se retira, se deja el mismo fondo y se retira lo demás
-        $retiro = round((float) ($d['retiro'] ?? max(0, $d['contado'] - $d['fondo'])), 2);
+        $retiro = round($retiroPedido ?? max(0, $contado - $fondo), 2);
 
         $corte->fill([
             'desde' => $desde, 'hasta' => $hasta,
-            'fondo' => $d['fondo'], 'entradas' => $entradas, 'salidas' => $salidas, 'esperado' => $esperado,
-            'contado' => $d['contado'], 'diferencia' => round($d['contado'] - $esperado, 2),
-            'retiro' => $retiro, 'fondo_siguiente' => round($d['contado'] - $retiro, 2),
-            'notas' => trim($d['notas'] ?? ''), 'user_id' => auth()->id(),
+            'fondo' => $fondo, 'entradas' => $entradas, 'salidas' => $salidas, 'esperado' => $esperado,
+            'contado' => $contado, 'diferencia' => round($contado - $esperado, 2),
+            'retiro' => $retiro, 'fondo_siguiente' => round($contado - $retiro, 2),
+            'notas' => trim($notas), 'user_id' => auth()->id(),
         ])->save();
 
-        return response()->json(['message' => "Corte del turno {$corte->turno} guardado.", 'corte' => $corte]);
+        return $corte;
+    }
+
+    // ---------------------------------------------------------------- abrir y cerrar caja
+
+    /** Abrir la caja: se cuenta el fondo con que empieza. Una sucursal solo tiene una caja abierta a la vez. */
+    public function abrir(Request $r)
+    {
+        $d = $r->validate([
+            'fondo' => ['required', 'numeric', 'min:0'],
+            'notas' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $abierta = DB::transaction(function () use ($d) {
+            if ($ya = AperturaCaja::abierta()->lockForUpdate()->first()) {
+                return $ya;
+            }
+
+            return AperturaCaja::create([
+                'fecha' => today(), 'abierta_at' => now(), 'fondo' => $d['fondo'],
+                'notas' => trim($d['notas'] ?? '') ?: null, 'user_id' => auth()->id(),
+            ]);
+        });
+        if (! $abierta->wasRecentlyCreated) {
+            $abierta->load('user:id,name');
+
+            return response()->json(['message' => 'La caja ya está abierta desde las '.$abierta->abierta_at->format('H:i')
+                .($abierta->user ? ' ('.$abierta->user->name.')' : '').'.'], 422);
+        }
+
+        return response()->json(['message' => 'Caja abierta con '.dinero($d['fondo']).' de fondo.', 'apertura' => $abierta->load('user:id,name')]);
+    }
+
+    /** Cerrar la caja: se cuenta el efectivo y se guarda el corte del turno, con el fondo con que se abrió. */
+    public function cerrar(Request $r)
+    {
+        $d = $r->validate([
+            'contado' => ['required', 'numeric', 'min:0'],
+            'retiro' => ['nullable', 'numeric', 'min:0', 'lte:contado'],
+            'notas' => ['nullable', 'string', 'max:255'],
+        ], ['retiro.lte' => 'No puedes retirar más de lo que contaste.']);
+
+        $apertura = AperturaCaja::actual();
+        if (! $apertura) {
+            return response()->json(['message' => 'La caja está cerrada: ábrela primero.'], 422);
+        }
+
+        // el turno que sigue abierto del día en que se abrió la caja (si se quedó abierta de un día para otro,
+        // el corte cubre hasta el fin de ese día)
+        $dia = $apertura->fecha->copy()->startOfDay();
+        $ultimo = Corte::whereDate('fecha', $dia)->orderByDesc('turno')->first();
+        $resultado = DB::transaction(function () use ($dia, $ultimo, $apertura, $d) {
+            $corte = $this->guardarCorte($dia, ($ultimo?->turno ?? 0) + 1, (float) $apertura->fondo, (float) $d['contado'],
+                isset($d['retiro']) ? (float) $d['retiro'] : null, $d['notas'] ?? '');
+            if ($corte instanceof Corte) {
+                $apertura->update(['cerrada_at' => now(), 'cerrada_por' => auth()->id(), 'corte_id' => $corte->id]);
+            }
+
+            return $corte;
+        });
+        if (is_string($resultado)) {
+            return response()->json(['message' => $resultado], 422);
+        }
+
+        return response()->json([
+            'message' => "Caja cerrada: corte del turno {$resultado->turno} guardado.",
+            'corte' => $resultado,
+            'fecha' => $dia->toDateString(),
+        ]);
     }
 
     public function historial()

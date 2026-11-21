@@ -7,6 +7,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { AvisosService, AvisoWhatsapp } from '../../core/services/avisos.service';
 import { DineroPipe, Estatus, FechaPipe, dinero, fechaISO } from '../../shared/ui';
 import { TelefonoForm } from './telefono-form';
+import { TelefonoDetalle } from './telefono-detalle';
 import { DetectarUsb, TelefonoUsb, nombreTelefonoUsb } from '../../shared/detectar-usb/detectar-usb';
 
 export interface Telefono {
@@ -49,7 +50,7 @@ interface Respuesta {
 
 @Component({
   selector: 'app-telefonos',
-  imports: [FormsModule, DineroPipe, FechaPipe, Estatus, TelefonoForm, DetectarUsb],
+  imports: [FormsModule, DineroPipe, FechaPipe, Estatus, TelefonoForm, TelefonoDetalle, DetectarUsb],
   templateUrl: './telefonos.html',
   // tabla compacta: caben más teléfonos en pantalla sin desplazarse a los lados
   styles: `
@@ -90,6 +91,13 @@ export class Telefonos implements OnInit {
 
   /** Ventana de alta / edición: id null = teléfono nuevo. */
   readonly formulario = signal<{ id: number | null; eliminar: boolean } | null>(null);
+  /** Ventana de detalles (solo ver) del teléfono con este id. */
+  readonly detalle = signal<number | null>(null);
+
+  verDetalle(id: number): void {
+    this.menu.set(null);
+    this.detalle.set(id);
+  }
 
   filtros = { locatario: '', estado: '', prioridad: '', q: '', urgentes: false, ident: '' };
   montoAbono: number | null = null;
