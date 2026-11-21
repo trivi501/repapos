@@ -88,7 +88,7 @@
   <table class="tabla-compacta">
     <thead>
       <tr>
-        <th>#</th><th>Prioridad</th><th>Recibido</th><th>Locatario</th><th>Modelo</th><th>Trabajo</th><th>Notas / IMEI / serie</th>
+        <th>#</th><th>Prioridad</th><th>Recibido</th><th title="Locatario · modelo · trabajo">Locatario / equipo</th><th>Notas / IMEI / serie</th>
         <th class="der">Total</th><th class="der">Pagado</th><th class="der">Saldo</th>
         @if (verCostos) {
           <th class="der" title="Solo lo ve el dueño">Gasto</th><th class="der" title="Solo lo ve el dueño">Ganancia</th>
@@ -102,9 +102,13 @@
           <td class="tenue">{{ t.id }}</td>
           <td><app-estatus [valor]="t.prioridad" /></td>
           <td class="sin-salto">{{ t.fecha_recibido | fecha }}</td>
-          <td><strong>{{ t.locatario?.nombre }}</strong></td>
-          <td>{{ t.modelo }}</td>
-          <td>{{ t.trabajo }}</td>
+          <td class="celda-equipo">
+            <strong>{{ t.locatario?.nombre }}</strong>
+            <span class="d-bloque">{{ t.modelo }}</span>
+            @if (t.trabajo) {
+              <small class="d-bloque tenue">{{ t.trabajo }}</small>
+            }
+          </td>
           <td class="tenue">
             {{ t.notas }}
             @if (t.imei || t.serie) {
@@ -145,7 +149,7 @@
           </td>
         </tr>
       } @empty {
-        <tr><td [attr.colspan]="verCostos ? 14 : 12"><div class="empty-state">{{ cargando() ? 'Cargando…' : 'No hay teléfonos con estos filtros.' }}</div></td></tr>
+        <tr><td [attr.colspan]="verCostos ? 12 : 10"><div class="empty-state">{{ cargando() ? 'Cargando…' : 'No hay teléfonos con estos filtros.' }}</div></td></tr>
       }
     </tbody>
   </table>
