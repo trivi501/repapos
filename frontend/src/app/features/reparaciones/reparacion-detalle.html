@@ -267,19 +267,27 @@
               </button>
             }
           </div>
-          @if (rechazando()) {
+          @if (pidiendoMotivo(); as estado) {
+            @if (estado === 'no_quedo') {
+              <div class="motivos-rapidos separado">
+                @for (m of motivosNoQuedo; track m) {
+                  <button type="button" class="btn btn-sm" [class.btn-primary]="motivo === m" [class.btn-secondary]="motivo !== m" (click)="motivo = m">{{ m }}</button>
+                }
+              </div>
+            }
             <div class="form-field separado">
-              <label for="motivo_rechazo">¿Por qué se rechaza? *</label>
+              <label for="motivo_rechazo">{{ estado === 'no_quedo' ? '¿Por qué no quedó?' : '¿Por qué se rechaza?' }} *</label>
               <textarea id="motivo_rechazo" rows="2" maxlength="255" [(ngModel)]="motivo"
-                        placeholder="Ej. Reportado por robo, no hay servidor para este modelo, el cliente no tiene la factura…"></textarea>
+                        [placeholder]="estado === 'no_quedo' ? 'Escribe o elige uno de arriba' : 'Ej. Reportado por robo, no hay servidor para este modelo, el cliente no tiene la factura…'"></textarea>
+              <span class="ayuda">Va en el WhatsApp de aviso y en la página donde el cliente consulta su orden.</span>
             </div>
             <div class="acciones-fila">
-              <button class="btn btn-danger btn-sm" (click)="confirmarRechazo()" [disabled]="!motivo.trim()">Rechazar</button>
-              <button class="btn btn-secondary btn-sm" (click)="rechazando.set(false)">Cancelar</button>
+              <button class="btn btn-danger btn-sm" (click)="confirmarMotivo()" [disabled]="!motivo.trim()">{{ estado === 'no_quedo' ? 'Marcar No quedó' : 'Rechazar' }}</button>
+              <button class="btn btn-secondary btn-sm" (click)="pidiendoMotivo.set(null)">Cancelar</button>
             </div>
           }
-          @if (x.estado === 'rechazado' && x.motivo_rechazo) {
-            <p class="separado"><span class="etiqueta-campo">Motivo del rechazo</span><br /><strong class="debe">{{ x.motivo_rechazo }}</strong></p>
+          @if ((x.estado === 'rechazado' || x.estado === 'no_quedo') && x.motivo_rechazo) {
+            <p class="separado"><span class="etiqueta-campo">{{ x.estado === 'no_quedo' ? 'Por qué no quedó' : 'Motivo del rechazo' }}</span><br /><strong class="debe">{{ x.motivo_rechazo }}</strong></p>
           }
         </div>
       }

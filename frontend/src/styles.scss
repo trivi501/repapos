@@ -1809,3 +1809,19 @@ app-grafica-barras {
     padding-left: 1.2rem;
   }
 }
+
+// ---- motivos frecuentes de "No quedó"
+.motivos-rapidos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.6rem;
+}
+
+.motivo-corto {
+  display: block;
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

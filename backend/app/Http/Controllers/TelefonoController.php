@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /** Teléfonos de locatarios (mayoreo). */
@@ -128,6 +129,7 @@ class TelefonoController extends Controller
             'costo' => ['nullable', 'numeric', 'min:0'],
             'pagado' => ['required', 'numeric', 'min:0'],
             'resultado' => ['required', Rule::in(Telefono::RESULTADOS)],
+            'motivo_no_quedo' => ['nullable', 'string', 'max:255'],
             'entregado' => ['nullable', 'boolean'],
         ], ['whatsapp.regex' => 'El WhatsApp debe tener al menos 10 dígitos.']);
     }
@@ -138,6 +140,15 @@ class TelefonoController extends Controller
         $d = $this->validar($r);
         $antes = $t->exists ? $t->resultado : null;
         $nuevo = ! $t->exists;
+        // al pasar a "No quedó" se pide el motivo (va en el aviso al locatario); los que ya estaban así lo conservan
+        $motivo = trim((string) ($d['motivo_no_quedo'] ?? ''));
+        if ($d['resultado'] === Telefono::NO_QUEDO && $motivo === '') {
+            if ($antes !== Telefono::NO_QUEDO) {
+                throw ValidationException::withMessages(['motivo_no_quedo' => 'Escribe por qué no quedó.']);
+            }
+            $motivo = (string) $t->motivo_no_quedo;
+        }
+        $d['motivo_no_quedo'] = $d['resultado'] === Telefono::NO_QUEDO ? ($motivo ?: null) : null;
 
         DB::transaction(function () use ($r, $d, $t, $nuevo) {
             $loc = Locatario::porNombre($d['locatario']);
@@ -158,6 +169,7 @@ class TelefonoController extends Controller
                 'notas' => trim($d['notas'] ?? ''),
                 'total' => $d['total'],
                 'resultado' => $d['resultado'],
+                'motivo_no_quedo' => $d['motivo_no_quedo'],
                 'fecha_entrega' => $entregado ? ($t->entregado ? $t->fecha_entrega : now()) : null,
                 'entregado' => $entregado,
             ]);
@@ -231,7 +243,14 @@ class TelefonoController extends Controller
                 $estatus = $accion === 'listo' ? Telefono::LISTO : Telefono::NO_QUEDO;
                 $antes = $t->resultado;
                 // presionar el mismo estatus otra vez lo regresa a "En taller"
-                $t->update(['resultado' => $antes === $estatus ? Telefono::EN_TALLER : $estatus]);
+                $nuevo = $antes === $estatus ? Telefono::EN_TALLER : $estatus;
+                // "No quedó" pide el motivo: va en el aviso por WhatsApp
+                $motivo = null;
+                if ($nuevo === Telefono::NO_QUEDO) {
+                    $motivo = trim((string) $r->validate(['motivo' => ['required', 'string', 'max:255']],
+                        ['motivo.required' => 'Escribe por qué no quedó.'])['motivo']);
+                }
+                $t->update(['resultado' => $nuevo, 'motivo_no_quedo' => $motivo]);
                 $mensaje = "#{$t->id} {$t->modelo}: ahora está {$t->resultado}.";
                 $aviso = $this->avisoSiQuedoListo($t, $antes);
                 break;
@@ -268,15 +287,17 @@ class TelefonoController extends Controller
     }
 
     /** Si acaba de pasar a LISTO, deja listo el botón para avisar por WhatsApp. */
+    /** Si acaba de quedar listo o no quedó, deja listo el botón para avisar por WhatsApp (con el motivo, si no quedó). */
     protected function avisoSiQuedoListo(Telefono $t, ?string $antes): ?array
     {
-        if ($t->resultado !== Telefono::LISTO || $antes === Telefono::LISTO) {
+        if (! in_array($t->resultado, [Telefono::LISTO, Telefono::NO_QUEDO], true) || $antes === $t->resultado) {
             return null;
         }
         $t->loadMissing('locatario');
+        $que = $t->resultado === Telefono::LISTO ? 'ya está listo' : 'no quedó ('.$t->motivo_no_quedo.')';
 
         return [
-            'texto' => "¿Avisar a {$t->locatario->nombre} que su {$t->modelo} ya está listo?",
+            'texto' => "¿Avisar a {$t->locatario->nombre} que su {$t->modelo} {$que}?",
             'url' => WhatsApp::aviso($t),
             'sin_numero' => ! $t->locatario->whatsapp,
         ];

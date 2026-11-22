@@ -114,6 +114,17 @@
             <option value="NO QUEDÓ">No quedó (no se cobra)</option>
           </select>
         </div>
+        @if (m.resultado === 'NO QUEDÓ') {
+          <div class="form-field ocupa-todo">
+            <label for="motivo_no_quedo">¿Por qué no quedó? *</label>
+            <input id="motivo_no_quedo" name="motivo_no_quedo" maxlength="255" list="lista-motivos-no-quedo" required
+                   placeholder="Ej. Placa dañada, no hay refacción…" [(ngModel)]="m.motivo_no_quedo" />
+            <datalist id="lista-motivos-no-quedo">
+              @for (mo of motivos; track mo) { <option [value]="mo"></option> }
+            </datalist>
+            <span class="ayuda">Va en el WhatsApp de aviso al locatario.</span>
+          </div>
+        }
       </div>
 
       <label class="check-linea">

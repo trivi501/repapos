@@ -1,0 +1,1 @@
+var a=[`Placa dañada`,`No hay refacción`,`Equipo mojado / sulfatado`,`Falla en la placa (no es la pieza)`,`Bloqueado por cuenta (FRP / iCloud)`,`El cliente no autorizó el costo`,`No se encontró la falla`];export{a as t};

@@ -43,9 +43,9 @@
         }
       </div>
 
-      @if (o.estado === 'rechazado') {
+      @if (o.estado === 'rechazado' || o.estado === 'no_quedo') {
         <p class="alert alert-error separado">
-          No se pudo liberar tu equipo.
+          {{ o.estado === 'rechazado' ? 'No se pudo liberar tu equipo.' : 'No se pudo reparar tu equipo. No tiene costo.' }}
           @if (o.motivo_rechazo) {
             <br /><b>Motivo:</b> {{ o.motivo_rechazo }}
           }

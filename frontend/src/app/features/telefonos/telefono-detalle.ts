@@ -48,6 +48,9 @@ type Detalle = Telefono & { pagos?: { id: number; fecha: string; concepto: strin
               }
             </div>
             <div><span class="etiqueta-campo">Trabajo</span><div>{{ x.trabajo || '—' }}</div></div>
+            @if (x.resultado === 'NO QUEDÓ') {
+              <div class="ocupa-todo"><span class="etiqueta-campo">Por qué no quedó</span><div class="debe"><strong>{{ x.motivo_no_quedo || 'Sin motivo registrado' }}</strong></div></div>
+            }
             <div><span class="etiqueta-campo">Recibido</span><div>{{ x.fecha_recibido | fecha }}</div></div>
             <div><span class="etiqueta-campo">Entregado</span><div>{{ x.fecha_entrega ? (x.fecha_entrega | fecha: true) : 'Todavía no' }}</div></div>
             @if (x.notas) {

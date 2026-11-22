@@ -234,13 +234,35 @@ class RepaposTest extends TestCase
     {
         $t = $this->telefonoDe($this->adminA);
 
-        $this->postJson("/api/telefonos/{$t->id}/accion", ['accion' => 'noquedo'])->assertOk();
+        // "No quedó" pide el motivo y ofrece avisar por WhatsApp con él
+        $this->postJson("/api/telefonos/{$t->id}/accion", ['accion' => 'noquedo'])->assertUnprocessable()->assertJsonValidationErrors('motivo');
+        $t->locatario->update(['whatsapp' => '5512345678']);
+        $r = $this->postJson("/api/telefonos/{$t->id}/accion", ['accion' => 'noquedo', 'motivo' => 'Placa dañada'])->assertOk();
+        $this->assertStringContainsString('no quedó (Placa dañada)', $r->json('aviso.texto'));
+        $this->assertStringContainsString('Motivo: Placa dañada', rawurldecode($r->json('aviso.url')));
+        $this->assertSame('Placa dañada', $t->fresh()->motivo_no_quedo);
         $this->assertEquals(0.0, $t->fresh()->saldo);
         $this->assertSame('NO SE COBRA', $t->fresh()->estado_pago);
         $this->postJson("/api/telefonos/{$t->id}/accion", ['accion' => 'liquidar'])->assertUnprocessable();
 
+        // un texto personalizado sin {motivo} también lo lleva
+        \App\Models\Ajuste::poner('mensaje_no_quedo', "Hola {locatario}, tu {modelo} no quedó.\n{taller}");
+        $this->assertStringContainsString('Motivo: Placa dañada', rawurldecode(\App\Support\WhatsApp::aviso($t->fresh()->load('locatario'))));
+
+        // otra vez el botón: regresa a "En taller" sin pedir motivo, y el motivo se borra
         $this->postJson("/api/telefonos/{$t->id}/accion", ['accion' => 'noquedo'])->assertOk();
         $this->assertSame(Telefono::EN_TALLER, $t->fresh()->resultado);
+        $this->assertNull($t->fresh()->motivo_no_quedo);
+
+        // desde el formulario también se pide al pasar a "No quedó"
+        $base = ['locatario' => 'Don Pepe', 'prioridad' => 'MEDIA', 'fecha_recibido' => '2026-11-01', 'modelo' => 'MOTO G60',
+            'total' => 500, 'pagado' => 100];
+        $this->putJson("/api/telefonos/{$t->id}", $base + ['resultado' => 'NO QUEDÓ'])->assertUnprocessable()->assertJsonValidationErrors('motivo_no_quedo');
+        $this->putJson("/api/telefonos/{$t->id}", $base + ['resultado' => 'NO QUEDÓ', 'motivo_no_quedo' => 'Sin refacción'])->assertOk();
+        $this->assertSame('Sin refacción', $t->fresh()->motivo_no_quedo);
+        // al volver a guardar sin escribirlo, se conserva
+        $this->putJson("/api/telefonos/{$t->id}", $base + ['resultado' => 'NO QUEDÓ', 'notas' => 'x'])->assertOk();
+        $this->assertSame('Sin refacción', $t->fresh()->motivo_no_quedo);
     }
 
     public function test_marcar_listo_ofrece_aviso_por_whatsapp_con_saldo(): void
@@ -824,8 +846,13 @@ class RepaposTest extends TestCase
         $this->assertNotNull(OrdenReparacion::find($id)->fecha_entrega_real);
 
         $o2 = $this->ordenNueva(['bloqueo_tipo' => 'ninguno', 'bloqueo_valor' => null]);
-        $this->postJson("/api/ordenes/{$o2['id']}/accion", ['accion' => 'estatus', 'estado' => 'no_quedo'])->assertOk();
+        // "No quedó" pide el motivo; va en el aviso y en la página pública
+        $this->postJson("/api/ordenes/{$o2['id']}/accion", ['accion' => 'estatus', 'estado' => 'no_quedo'])
+            ->assertUnprocessable()->assertJsonValidationErrors('motivo');
+        $r = $this->postJson("/api/ordenes/{$o2['id']}/accion", ['accion' => 'estatus', 'estado' => 'no_quedo', 'motivo' => 'Placa en corto'])->assertOk();
+        $this->assertStringContainsString('Motivo: Placa en corto', rawurldecode($r->json('aviso.url')));
         $this->assertEquals(0.0, OrdenReparacion::find($o2['id'])->saldo, 'Si no quedó, no se cobra');
+        $this->getJson("/api/publico/orden/{$o2['token']}")->assertJsonPath('motivo_rechazo', 'Placa en corto');
     }
 
     public function test_liberacion_solo_tiene_4_estatus_y_el_rechazo_pide_motivo(): void
@@ -877,7 +904,7 @@ class RepaposTest extends TestCase
 
         // al editar cambia la ganancia; si no quedó, no entra nada y es pérdida
         $this->putJson("/api/ordenes/{$o['id']}", [
-            'falla_reportada' => 'Pantalla rota', 'estado' => 'no_quedo', 'costo_refaccion' => 450, 'costo_mano_obra' => 0,
+            'falla_reportada' => 'Pantalla rota', 'estado' => 'no_quedo', 'motivo_rechazo' => 'Placa dañada', 'costo_refaccion' => 450, 'costo_mano_obra' => 0,
         ])->assertOk()->assertJsonPath('ganancia', -450);
 
         // el técnico no los ve en la ficha, ni en la lista, ni puede cambiarlos
@@ -1007,7 +1034,12 @@ class RepaposTest extends TestCase
         // quitarle los bloqueos la vuelve reparación normal: ya no acepta "rechazado"
         $this->putJson("/api/ordenes/{$o['id']}", ['falla_reportada' => 'MDM Telcel', 'bloqueos' => [], 'estado' => 'rechazado', 'motivo_rechazo' => 'x'])
             ->assertUnprocessable()->assertJsonValidationErrors('estado');
-        $this->putJson("/api/ordenes/{$o['id']}", ['falla_reportada' => 'MDM Telcel', 'bloqueos' => [], 'estado' => 'no_quedo'])->assertOk()
+        // al pasar a "No quedó" se pide su motivo; al salir de ahí se borra
+        $this->putJson("/api/ordenes/{$o['id']}", ['falla_reportada' => 'MDM Telcel', 'bloqueos' => [], 'estado' => 'no_quedo'])
+            ->assertUnprocessable()->assertJsonValidationErrors('motivo_rechazo');
+        $this->putJson("/api/ordenes/{$o['id']}", ['falla_reportada' => 'MDM Telcel', 'bloqueos' => [], 'estado' => 'no_quedo', 'motivo_rechazo' => 'Sin servidor'])
+            ->assertOk()->assertJsonPath('motivo_rechazo', 'Sin servidor');
+        $this->putJson("/api/ordenes/{$o['id']}", ['falla_reportada' => 'MDM Telcel', 'bloqueos' => [], 'estado' => 'reparado'])->assertOk()
             ->assertJsonPath('motivo_rechazo', null);
     }
 

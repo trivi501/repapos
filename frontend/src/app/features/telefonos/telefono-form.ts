@@ -7,13 +7,14 @@ import { AvisosService, AvisoWhatsapp } from '../../core/services/avisos.service
 import { DineroPipe, FechaPipe, fechaISO } from '../../shared/ui';
 import { DetectarUsb, TelefonoUsb, nombreTelefonoUsb } from '../../shared/detectar-usb/detectar-usb';
 import type { Telefono } from './telefonos';
+import { MOTIVOS_NO_QUEDO } from '../../shared/motivos-no-quedo';
 
 const ULTIMO_LOCATARIO = 'taller_ultimo_locatario';
 
 function vacio(locatario = '') {
   return {
     locatario, whatsapp: '', fecha_recibido: fechaISO(), prioridad: 'MEDIA', modelo: '', serie: '', imei: '', pin: '', trabajo: '', notas: '',
-    total: 0, costo: null as number | null, pagado: 0, resultado: 'EN TALLER', entregado: false,
+    total: 0, costo: null as number | null, pagado: 0, resultado: 'EN TALLER', motivo_no_quedo: '', entregado: false,
   };
 }
 
@@ -52,6 +53,7 @@ export class TelefonoForm implements OnInit, AfterViewInit {
 
   m = vacio(sessionStorage.getItem(ULTIMO_LOCATARIO) ?? '');
   destinoCobros = '';
+  readonly motivos = MOTIVOS_NO_QUEDO;
 
   // ---- cerrar la ventana: solo con un clic que empiece y termine en el fondo oscuro.
   // La lista de locatarios (datalist) se dibuja encima del fondo: al elegir un nombre, el clic llegaba al fondo y cerraba.
@@ -113,7 +115,8 @@ export class TelefonoForm implements OnInit, AfterViewInit {
             locatario: t.locatario?.nombre ?? '', whatsapp: t.locatario?.whatsapp ?? '', fecha_recibido: t.fecha_recibido.slice(0, 10),
             prioridad: t.prioridad, modelo: t.modelo, serie: t.serie ?? '', imei: t.imei ?? '', pin: t.pin ?? '',
             trabajo: t.trabajo, notas: t.notas, total: Number(t.total),
-            costo: t.costo != null ? Number(t.costo) : null, pagado: Number(t.pagado), resultado: t.resultado, entregado: t.entregado,
+            costo: t.costo != null ? Number(t.costo) : null, pagado: Number(t.pagado), resultado: t.resultado,
+            motivo_no_quedo: t.motivo_no_quedo ?? '', entregado: t.entregado,
           };
           this.fechaEntrega.set(t.fecha_entrega);
           this.cobros.set(t.cobros_total ?? 0);

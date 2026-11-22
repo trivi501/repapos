@@ -251,6 +251,14 @@ class OrdenReparacionController extends Controller
         ], $this->mensajesEstado($bloqueos));
 
         $antes = $orden->estado;
+        // al pasar a "No quedó" se pide el motivo (va en el aviso al cliente); las que ya estaban así lo conservan
+        $motivo = trim((string) ($datos['motivo_rechazo'] ?? ''));
+        if ($datos['estado'] === OrdenReparacion::NO_QUEDO && $motivo === '') {
+            if ($antes !== OrdenReparacion::NO_QUEDO) {
+                throw ValidationException::withMessages(['motivo_rechazo' => 'Escribe por qué no quedó.']);
+            }
+            $datos['motivo_rechazo'] = $orden->motivo_rechazo;
+        }
         DB::transaction(function () use ($orden, $datos) {
             // lo pagado solo cambia con abonos: así cada peso queda registrado en la caja
             $campos = $this->camposOrden($datos);
@@ -258,7 +266,8 @@ class OrdenReparacionController extends Controller
             if ($orden->refacciones()->exists()) {
                 unset($campos['costo_refaccion']);
             }
-            $campos['motivo_rechazo'] = $datos['estado'] === OrdenReparacion::RECHAZADO ? trim($datos['motivo_rechazo']) : null;
+            $campos['motivo_rechazo'] = in_array($datos['estado'], [OrdenReparacion::RECHAZADO, OrdenReparacion::NO_QUEDO], true)
+                ? (trim((string) $datos['motivo_rechazo']) ?: null) : null;
             $campos['fecha_entrega_real'] = $datos['estado'] === OrdenReparacion::ENTREGADO ? ($orden->fecha_entrega_real ?? now()) : null;
             $orden->update($campos);
             $this->asociarFotos($orden, $datos['lote'] ?? null);
@@ -278,13 +287,14 @@ class OrdenReparacionController extends Controller
                 abort_unless($usuario->can('ordenes.cambiar_estado') || $usuario->can('ordenes.editar'), 403);
                 $d = $request->validate([
                     'estado' => ['required', Rule::in(OrdenReparacion::estadosPara($orden->bloqueos))],
-                    'motivo' => ['nullable', 'required_if:estado,'.OrdenReparacion::RECHAZADO, 'string', 'max:255'],
+                    // rechazado (liberación) o no quedó: el motivo va en el aviso al cliente
+                    'motivo' => ['nullable', 'required_if:estado,'.OrdenReparacion::RECHAZADO.','.OrdenReparacion::NO_QUEDO, 'string', 'max:255'],
                 ], $this->mensajesEstado($orden->bloqueos, 'motivo'));
                 $nuevo = $d['estado'];
                 $antes = $orden->estado;
                 $orden->update([
                     'estado' => $nuevo,
-                    'motivo_rechazo' => $nuevo === OrdenReparacion::RECHAZADO ? trim($d['motivo']) : null,
+                    'motivo_rechazo' => in_array($nuevo, [OrdenReparacion::RECHAZADO, OrdenReparacion::NO_QUEDO], true) ? trim($d['motivo']) : null,
                     'fecha_entrega_real' => $nuevo === OrdenReparacion::ENTREGADO ? now() : null,
                 ]);
                 $aviso = $this->aviso($orden, $antes);
@@ -321,7 +331,7 @@ class OrdenReparacionController extends Controller
             'estado.in' => OrdenReparacion::esLiberacion($bloqueos)
                 ? 'Una liberación solo puede estar Recibido, En proceso, Listo o Rechazado.'
                 : 'En proceso y Rechazado son solo para liberaciones (órdenes con bloqueo).',
-            "{$campoMotivo}.required_if" => 'Escribe por qué se rechazó la liberación.',
+            "{$campoMotivo}.required_if" => 'Escribe el motivo: por qué no quedó o por qué se rechazó.',
         ];
     }
 

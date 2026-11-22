@@ -10,6 +10,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { AvisosService, AvisoWhatsapp } from '../../core/services/avisos.service';
 import { DineroPipe, Estatus, FechaPipe, PatronVista, dinero } from '../../shared/ui';
 import { metodoTexto } from '../ventas/ventas';
+import { MOTIVOS_NO_QUEDO } from '../../shared/motivos-no-quedo';
 
 type Ficha = OrdenReparacion & {
   enlaces: { publico: string; pdf_publico: string; whatsapp_ticket: string; whatsapp_estatus: string };
@@ -35,8 +36,9 @@ export class ReparacionDetalle implements OnInit {
   readonly o = signal<Ficha | null>(null);
   readonly revision = REVISION_ORDEN;
   readonly metodoTexto = metodoTexto;
-  /** Se está escribiendo el motivo para rechazar la liberación. */
-  readonly rechazando = signal(false);
+  /** Se está escribiendo el motivo: para rechazar la liberación o porque no quedó (va en el aviso al cliente). */
+  readonly pidiendoMotivo = signal<'rechazado' | 'no_quedo' | null>(null);
+  readonly motivosNoQuedo = MOTIVOS_NO_QUEDO;
 
   monto: number | null = null;
   motivo = '';
@@ -147,7 +149,7 @@ export class ReparacionDetalle implements OnInit {
 
   private mostrar(o: Ficha): void {
     this.monto = o.saldo > 0 ? o.saldo : null;
-    this.rechazando.set(false);
+    this.pidiendoMotivo.set(null);
     this.motivo = '';
     this.o.set(o);
   }
@@ -195,18 +197,20 @@ export class ReparacionDetalle implements OnInit {
 
   cambiarEstado(x: Ficha, estado: string): void {
     if (estado === 'entregado' && x.saldo > 0 && !confirm(`Aún debe ${dinero(x.saldo)}. ¿Entregar de todos modos?`)) return;
-    // rechazar siempre lleva el motivo: primero se escribe
-    if (estado === 'rechazado') {
-      this.rechazando.set(true);
+    // rechazar y "no quedó" siempre llevan el motivo: primero se escribe
+    if (estado === 'rechazado' || estado === 'no_quedo') {
+      this.motivo = '';
+      this.pidiendoMotivo.set(estado);
       return;
     }
     this.accion({ accion: 'estatus', estado });
   }
 
-  confirmarRechazo(): void {
+  confirmarMotivo(): void {
     const motivo = this.motivo.trim();
-    if (!motivo) return;
-    this.accion({ accion: 'estatus', estado: 'rechazado', motivo });
+    const estado = this.pidiendoMotivo();
+    if (!motivo || !estado) return;
+    this.accion({ accion: 'estatus', estado, motivo });
   }
 
   eliminar(x: Ficha): void {

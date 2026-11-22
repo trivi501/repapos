@@ -11,11 +11,11 @@ class Ajuste extends Model
     use DelTaller;
 
     public const MENSAJE_LISTO = "Hola {locatario}\nTu equipo *{modelo}* ya está LISTO\nTrabajo: {trabajo}{saldo}\n¡Ya puedes pasar por él!\n{taller}";
-    public const MENSAJE_NO_QUEDO = "Hola {locatario}\nTe aviso que tu equipo *{modelo}* no quedó ({trabajo}). No tiene costo.\nPuedes pasar a recogerlo.\n{taller}";
+    public const MENSAJE_NO_QUEDO = "Hola {locatario}\nTe aviso que tu equipo *{modelo}* no quedó ({trabajo}).\nMotivo: {motivo}\nNo tiene costo. Puedes pasar a recogerlo.\n{taller}";
 
     // clientes finales (órdenes de servicio)
     public const MENSAJE_ORDEN_LISTO = "Hola {cliente}\nTu equipo *{equipo}* (orden {folio}) ya está LISTO.{saldo}\nRecuerda traer tu nota para recogerlo.\nConsulta tu orden aquí: {enlace}\n{taller}";
-    public const MENSAJE_ORDEN_NO_QUEDO = "Hola {cliente}\nTe aviso que tu equipo *{equipo}* (orden {folio}) no se pudo reparar. No tiene costo.\nPuedes pasar a recogerlo con tu nota.\n{taller}";
+    public const MENSAJE_ORDEN_NO_QUEDO = "Hola {cliente}\nTe aviso que tu equipo *{equipo}* (orden {folio}) no se pudo reparar.\nMotivo: {motivo}\nNo tiene costo. Puedes pasar a recogerlo con tu nota.\n{taller}";
     public const MENSAJE_ORDEN_RECHAZADO = "Hola {cliente}\nTe aviso que la liberación de tu equipo *{equipo}* (orden {folio}) fue RECHAZADA.\nMotivo: {motivo}\nNo tiene costo. Puedes pasar a recogerlo con tu nota.\n{taller}";
     public const MENSAJE_ORDEN_ESTATUS = "Hola {cliente}\nTu equipo *{equipo}* (orden {folio}) está: {estatus}.\nConsulta tu orden aquí: {enlace}\n{taller}";
     // ticket de la orden que se manda por WhatsApp (resumen de la nota de recepción)

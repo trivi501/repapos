@@ -55,19 +55,44 @@ class WhatsApp
 
     public static function mensaje(Telefono $t, string $plantilla): string
     {
+        $plantilla = static::conMotivo($plantilla, $t->resultado === Telefono::NO_QUEDO ? (string) $t->motivo_no_quedo : '');
+
         return strtr($plantilla, [
             '{locatario}' => $t->locatario->nombre,
             '{modelo}' => $t->modelo,
             '{trabajo}' => $t->trabajo,
             '{total}' => dinero($t->total),
             '{saldo}' => $t->saldo > 0 ? "\nSaldo pendiente: ".dinero($t->saldo) : '',
+            '{motivo}' => (string) $t->motivo_no_quedo,
             '{taller}' => $t->taller?->nombre ?? '',
         ]);
+    }
+
+    /**
+     * El motivo siempre llega: si el texto guardado en Configuración no trae {motivo}, se agrega antes del nombre del taller;
+     * si no hay motivo, se quita el renglón "Motivo: {motivo}" para que no quede vacío.
+     */
+    public static function conMotivo(string $plantilla, string $motivo): string
+    {
+        if (trim($motivo) === '') {
+            return preg_replace('/^[^\n]*\{motivo\}[^\n]*\n?/m', '', $plantilla);
+        }
+        if (! str_contains($plantilla, '{motivo}')) {
+            return str_contains($plantilla, "\n{taller}")
+                ? str_replace("\n{taller}", "\nMotivo: {motivo}\n{taller}", $plantilla)
+                : $plantilla."\nMotivo: {motivo}";
+        }
+
+        return $plantilla;
     }
 
     /** Mensaje para un cliente final sobre su orden de servicio. */
     public static function mensajeOrden(OrdenReparacion $o, string $plantilla): string
     {
+        if (in_array($o->estado, [OrdenReparacion::NO_QUEDO, OrdenReparacion::RECHAZADO], true)) {
+            $plantilla = static::conMotivo($plantilla, (string) $o->motivo_rechazo);
+        }
+
         return strtr($plantilla, [
             '{cliente}' => $o->cliente->nombre_completo,
             '{equipo}' => $o->equipo?->nombre ?? '',

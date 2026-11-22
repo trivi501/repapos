@@ -80,8 +80,9 @@ class ConsultaController extends Controller
         }
 
         $respuesta['equipo'] = $orden->equipo?->nombre;
-        if ($orden->estado === OrdenReparacion::RECHAZADO) {
-            $respuesta['motivo_rechazo'] = $orden->motivo_rechazo; // el cliente debe saber por qué
+        // si no quedó o se rechazó, el cliente debe saber por qué
+        if (in_array($orden->estado, [OrdenReparacion::RECHAZADO, OrdenReparacion::NO_QUEDO], true) && $orden->motivo_rechazo) {
+            $respuesta['motivo_rechazo'] = $orden->motivo_rechazo;
         }
 
         if (! $orden->visible_cliente) {

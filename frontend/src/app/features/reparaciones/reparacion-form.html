@@ -465,11 +465,12 @@
               }
             </select>
           </div>
-          @if (valores().estado === 'rechazado') {
+          @if (valores().estado === 'rechazado' || valores().estado === 'no_quedo') {
             <div class="form-field">
-              <label for="motivo_rechazo">¿Por qué se rechazó? <span class="req">*</span></label>
+              <label for="motivo_rechazo">{{ valores().estado === 'no_quedo' ? '¿Por qué no quedó?' : '¿Por qué se rechazó?' }} <span class="req">*</span></label>
               <textarea id="motivo_rechazo" rows="2" maxlength="255" formControlName="motivo_rechazo"
-                        placeholder="Ej. Reportado por robo, no hay servidor para este modelo…"></textarea>
+                        [placeholder]="valores().estado === 'no_quedo' ? 'Ej. Placa dañada, no hay refacción…' : 'Ej. Reportado por robo, no hay servidor para este modelo…'"></textarea>
+              <span class="sub">Va en el WhatsApp de aviso al cliente.</span>
             </div>
           }
         }

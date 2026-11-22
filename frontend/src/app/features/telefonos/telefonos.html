@@ -126,6 +126,9 @@
             <div class="estatus-apilados">
               <app-estatus [valor]="t.estado_pago" />
               <app-estatus [valor]="t.resultado" />
+              @if (t.resultado === 'NO QUEDÓ' && t.motivo_no_quedo) {
+                <small class="debe motivo-corto" [title]="t.motivo_no_quedo">{{ t.motivo_no_quedo }}</small>
+              }
               <app-estatus [valor]="t.entregado ? 'ENTREGADO' : 'POR ENTREGAR'" />
               @if (t.fecha_entrega) {
                 <small class="tenue sin-salto">{{ t.fecha_entrega | fecha }}</small>
@@ -169,7 +172,7 @@
     @if (auth.tienePermiso('telefonos.editar')) {
       <button class="menu-item" (click)="abrirFormulario(m.t.id)">✏️ Editar</button>
       <button class="menu-item" (click)="accion(m.t, 'listo')">{{ m.t.resultado === 'LISTO' ? '↩️ Regresar a En taller' : '✅ Marcar como Listo' }}</button>
-      <button class="menu-item" (click)="accion(m.t, 'noquedo')">{{ m.t.resultado === 'NO QUEDÓ' ? '↩️ Regresar a En taller' : '❌ Marcar como No quedó' }}</button>
+      <button class="menu-item" (click)="marcarNoQuedo(m.t)">{{ m.t.resultado === 'NO QUEDÓ' ? '↩️ Regresar a En taller' : '❌ Marcar como No quedó…' }}</button>
       <button class="menu-item" (click)="entregar(m.t)">{{ m.t.entregado ? '↩️ Quitar entrega' : '📦 Marcar como entregado' }}</button>
     }
     @if (auth.tienePermiso('telefonos.cobrar')) {
@@ -192,6 +195,33 @@
 
 @if (formulario(); as f) {
   <app-telefono-form [telefonoId]="f.id" [irAEliminar]="f.eliminar" (cerrar)="formulario.set(null)" (guardado)="cargar()" />
+}
+
+@if (noQuedo(); as t) {
+  <div class="modal-backdrop" (click)="$event.target === $event.currentTarget && noQuedo.set(null)">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="titulo-no-quedo" (keydown.escape)="noQuedo.set(null)">
+      <div class="modal-header">
+        <h2 id="titulo-no-quedo">¿Por qué no quedó?</h2>
+        <button class="btn btn-secondary" type="button" (click)="noQuedo.set(null)" aria-label="Cerrar">✕</button>
+      </div>
+      <p class="tenue">#{{ t.id }} · {{ t.locatario?.nombre }} · {{ t.modelo }}{{ t.trabajo ? ' · ' + t.trabajo : '' }}</p>
+      <div class="motivos-rapidos">
+        @for (m of motivos; track m) {
+          <button type="button" class="btn btn-sm" [class.btn-primary]="motivoNoQuedo === m" [class.btn-secondary]="motivoNoQuedo !== m"
+                  (click)="motivoNoQuedo = m">{{ m }}</button>
+        }
+      </div>
+      <div class="form-field">
+        <label for="motivo-no-quedo">Motivo *</label>
+        <textarea id="motivo-no-quedo" rows="2" maxlength="255" placeholder="Escribe o elige uno de arriba" [(ngModel)]="motivoNoQuedo"></textarea>
+        <span class="ayuda">Va en el WhatsApp de aviso al locatario.</span>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" type="button" (click)="noQuedo.set(null)">Cancelar</button>
+        <button class="btn btn-danger" type="button" (click)="confirmarNoQuedo()" [disabled]="!motivoNoQuedo.trim()">Marcar No quedó</button>
+      </div>
+    </div>
+  </div>
 }
 
 @if (detalle(); as id) {

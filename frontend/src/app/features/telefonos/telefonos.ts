@@ -8,6 +8,7 @@ import { AvisosService, AvisoWhatsapp } from '../../core/services/avisos.service
 import { DineroPipe, Estatus, FechaPipe, dinero, fechaISO } from '../../shared/ui';
 import { TelefonoForm } from './telefono-form';
 import { TelefonoDetalle } from './telefono-detalle';
+import { MOTIVOS_NO_QUEDO } from '../../shared/motivos-no-quedo';
 import { DetectarUsb, TelefonoUsb, nombreTelefonoUsb } from '../../shared/detectar-usb/detectar-usb';
 
 export interface Telefono {
@@ -29,6 +30,8 @@ export interface Telefono {
   saldo: number;
   estado_pago: string;
   resultado: string;
+  /** Por qué no quedó (va en el aviso por WhatsApp). */
+  motivo_no_quedo?: string | null;
   entregado: boolean;
   fecha_entrega: string | null;
   aviso_url: string | null;
@@ -189,6 +192,27 @@ export class Telefonos implements OnInit {
     const x = Math.min(evento.clientX, window.innerWidth - 280);
     const y = Math.min(evento.clientY, window.innerHeight - 340);
     this.menu.set({ t, x: Math.max(8, x), y: Math.max(8, y) });
+  }
+
+  // ---- "No quedó" pide el motivo: va en el WhatsApp de aviso al locatario
+  readonly motivos = MOTIVOS_NO_QUEDO;
+  readonly noQuedo = signal<Telefono | null>(null);
+  motivoNoQuedo = '';
+
+  marcarNoQuedo(t: Telefono): void {
+    // si ya está "No quedó", el botón lo regresa a "En taller" (no pide motivo)
+    if (t.resultado === 'NO QUEDÓ') return this.accion(t, 'noquedo');
+    this.menu.set(null);
+    this.motivoNoQuedo = '';
+    this.noQuedo.set(t);
+  }
+
+  confirmarNoQuedo(): void {
+    const t = this.noQuedo();
+    const motivo = this.motivoNoQuedo.trim();
+    if (!t || !motivo) return;
+    this.noQuedo.set(null);
+    this.accion(t, 'noquedo', { motivo });
   }
 
   accion(t: Telefono, accion: string, extra: Record<string, unknown> = {}): void {

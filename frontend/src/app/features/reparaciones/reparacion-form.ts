@@ -475,6 +475,9 @@ export class ReparacionForm implements OnInit {
     if (this.esEdicion() && v.estado === 'rechazado' && !v.motivo_rechazo?.trim()) {
       errores.push('Escribe por qué se rechazó la liberación.');
     }
+    if (this.esEdicion() && v.estado === 'no_quedo' && !v.motivo_rechazo?.trim()) {
+      errores.push('Escribe por qué no quedó.');
+    }
 
     this.errores.set(errores);
     if (errores.length) return null;
@@ -515,7 +518,7 @@ export class ReparacionForm implements OnInit {
       return {
         ...base,
         estado: v.estado,
-        motivo_rechazo: v.estado === 'rechazado' ? v.motivo_rechazo?.trim() || null : null,
+        motivo_rechazo: v.estado === 'rechazado' || v.estado === 'no_quedo' ? v.motivo_rechazo?.trim() || null : null,
         diagnostico: v.diagnostico || null,
         solucion: v.solucion || null,
         costo_final: v.costo_final,

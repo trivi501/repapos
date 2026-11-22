@@ -25,7 +25,7 @@ class Telefono extends Model
 
     protected $fillable = [
         'locatario_id', 'prioridad', 'fecha_recibido', 'modelo', 'serie', 'imei', 'pin', 'trabajo', 'notas',
-        'total', 'costo', 'pagado', 'resultado', 'entregado', 'fecha_entrega', 'user_id',
+        'total', 'costo', 'pagado', 'resultado', 'motivo_no_quedo', 'entregado', 'fecha_entrega', 'user_id',
     ];
 
     // el gasto (créditos, servidor o pieza) solo lo ve quien tiene "ordenes.ver_costos";

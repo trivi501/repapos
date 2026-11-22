@@ -42,8 +42,8 @@
       </div>
       <p class="ayuda">
         Puedes usar: <code>{{ llaves('locatario') }}</code> <code>{{ llaves('modelo') }}</code> <code>{{ llaves('trabajo') }}</code>
-        <code>{{ llaves('total') }}</code> <code>{{ llaves('saldo') }}</code> <code>{{ llaves('taller') }}</code>
-        ({{ llaves('saldo') }} solo aparece si debe algo). <code>*texto*</code> = negritas en WhatsApp.
+        <code>{{ llaves('total') }}</code> <code>{{ llaves('saldo') }}</code> <code>{{ llaves('motivo') }}</code> (por qué no quedó) <code>{{ llaves('taller') }}</code>
+        ({{ llaves('saldo') }} solo aparece si debe algo; si el texto de "no quedó" no trae {{ llaves('motivo') }}, el motivo se agrega al final). <code>*texto*</code> = negritas en WhatsApp.
         Los emojis no se envían: WhatsApp para Windows los cambia por símbolos raros.
       </p>
       @if (puedeEditar) {
@@ -69,7 +69,8 @@
       <h2>Clientes finales: mensajes y comprobante</h2>
       <p class="ayuda">
         En los mensajes puedes usar: <code>{{ llaves('cliente') }}</code> <code>{{ llaves('equipo') }}</code> <code>{{ llaves('folio') }}</code>
-        <code>{{ llaves('estatus') }}</code> <code>{{ llaves('saldo') }}</code> <code>{{ llaves('enlace') }}</code> (para que consulte su orden) <code>{{ llaves('taller') }}</code>.
+        <code>{{ llaves('estatus') }}</code> <code>{{ llaves('saldo') }}</code> <code>{{ llaves('motivo') }}</code> (por qué no quedó o se rechazó)
+        <code>{{ llaves('enlace') }}</code> (para que consulte su orden) <code>{{ llaves('taller') }}</code>.
         En el ticket además: <code>{{ llaves('fecha') }}</code> <code>{{ llaves('falla') }}</code> <code>{{ llaves('revision') }}</code>
         <code>{{ llaves('total') }}</code> <code>{{ llaves('anticipo') }}</code> <code>{{ llaves('resta') }}</code> <code>{{ llaves('sucursal') }}</code>.
         Si dejas un texto vacío, regresa al de fábrica.
