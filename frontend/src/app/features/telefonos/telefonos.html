@@ -145,7 +145,7 @@
                         [title]="t.entregado ? 'Entregado (clic = quitar entrega)' : 'Marcar como entregado'" aria-label="Entregado">📦</button>
               }
               @if (t.aviso_url) {
-                <a class="icono-btn" [href]="t.aviso_url" target="_blank" rel="noopener" title="Avisar por WhatsApp" aria-label="Avisar por WhatsApp">💬</a>
+                <a class="icono-btn" [href]="t.aviso_url" target="_blank" rel="noopener" [title]="t.entregado ? 'Recordar pago por WhatsApp' : 'Avisar por WhatsApp'" [attr.aria-label]="t.entregado ? 'Recordar pago por WhatsApp' : 'Avisar por WhatsApp'">💬</a>
               }
               <button class="icono-btn" (click)="abrirMenu($event, t)" title="Más acciones" aria-label="Más acciones">⋮</button>
             </div>
@@ -185,7 +185,7 @@
       }
     }
     @if (m.t.aviso_url) {
-      <a class="menu-item" [href]="m.t.aviso_url" target="_blank" rel="noopener" (click)="menu.set(null)">💬 Avisar por WhatsApp</a>
+      <a class="menu-item" [href]="m.t.aviso_url" target="_blank" rel="noopener" (click)="menu.set(null)">💬 {{ m.t.entregado ? 'Recordar pago por WhatsApp' : 'Avisar por WhatsApp' }}</a>
     }
     @if (auth.tienePermiso('telefonos.eliminar')) {
       <button class="menu-item peligro" (click)="abrirFormulario(m.t.id, true)">🗑️ Eliminar…</button>

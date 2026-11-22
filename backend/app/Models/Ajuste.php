@@ -12,6 +12,8 @@ class Ajuste extends Model
 
     public const MENSAJE_LISTO = "Hola {locatario}\nTu equipo *{modelo}* ya está LISTO\nTrabajo: {trabajo}{saldo}\n¡Ya puedes pasar por él!\n{taller}";
     public const MENSAJE_NO_QUEDO = "Hola {locatario}\nTe aviso que tu equipo *{modelo}* no quedó ({trabajo}).\nMotivo: {motivo}\nNo tiene costo. Puedes pasar a recogerlo.\n{taller}";
+    /** Ya se le entregó pero debe: solo se le recuerda pasar a liquidar. */
+    public const MENSAJE_COBRO = "Hola {locatario}\nTe recuerdo que tu equipo *{modelo}* ({trabajo}) ya se te entregó y queda un saldo pendiente de *{adeudo}*.\nPor favor pasa a liquidarlo. Gracias.\n{taller}";
 
     // clientes finales (órdenes de servicio)
     public const MENSAJE_ORDEN_LISTO = "Hola {cliente}\nTu equipo *{equipo}* (orden {folio}) ya está LISTO.{saldo}\nRecuerda traer tu nota para recogerlo.\nConsulta tu orden aquí: {enlace}\n{taller}";

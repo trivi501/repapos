@@ -55,7 +55,7 @@ class WhatsApp
 
     public static function mensaje(Telefono $t, string $plantilla): string
     {
-        $plantilla = static::conMotivo($plantilla, $t->resultado === Telefono::NO_QUEDO ? (string) $t->motivo_no_quedo : '');
+        $plantilla = static::conMotivo($plantilla, ! $t->entregado && $t->resultado === Telefono::NO_QUEDO ? (string) $t->motivo_no_quedo : '');
 
         return strtr($plantilla, [
             '{locatario}' => $t->locatario->nombre,
@@ -63,6 +63,7 @@ class WhatsApp
             '{trabajo}' => $t->trabajo,
             '{total}' => dinero($t->total),
             '{saldo}' => $t->saldo > 0 ? "\nSaldo pendiente: ".dinero($t->saldo) : '',
+            '{adeudo}' => dinero($t->saldo),
             '{motivo}' => (string) $t->motivo_no_quedo,
             '{taller}' => $t->taller?->nombre ?? '',
         ]);
@@ -172,11 +173,16 @@ class WhatsApp
         return static::link($v->cliente_telefono, $texto);
     }
 
-    /** Aviso de LISTO o NO QUEDÓ según el estatus del teléfono; null si sigue en taller o ya se entregó (ya no tiene que pasar por él). */
+    /**
+     * Aviso de LISTO o NO QUEDÓ según el estatus del teléfono; null si sigue en taller.
+     * Ya entregado no se le dice que pase por él: si debe, solo se le recuerda pasar a liquidar.
+     */
     public static function aviso(Telefono $t): ?string
     {
         if ($t->entregado) {
-            return null;
+            return $t->saldo > 0
+                ? static::link($t->locatario->whatsapp, static::mensaje($t, Ajuste::valor('mensaje_cobro', Ajuste::MENSAJE_COBRO)))
+                : null;
         }
         $plantilla = match ($t->resultado) {
             Telefono::LISTO => Ajuste::valor('mensaje_listo', Ajuste::MENSAJE_LISTO),

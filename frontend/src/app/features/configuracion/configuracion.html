@@ -40,9 +40,14 @@
         <label for="mensaje_no_quedo">Mensaje cuando NO QUEDÓ</label>
         <textarea id="mensaje_no_quedo" name="mensaje_no_quedo" rows="5" [(ngModel)]="mensajeNoQuedo"></textarea>
       </div>
+      <div class="form-field">
+        <label for="mensaje_cobro">Mensaje cuando ya se ENTREGÓ y debe</label>
+        <textarea id="mensaje_cobro" name="mensaje_cobro" rows="4" [(ngModel)]="mensajeCobro"></textarea>
+        <span class="ayuda">Solo recuerda pasar a liquidar; <code>{{ llaves('adeudo') }}</code> = lo que debe.</span>
+      </div>
       <p class="ayuda">
         Puedes usar: <code>{{ llaves('locatario') }}</code> <code>{{ llaves('modelo') }}</code> <code>{{ llaves('trabajo') }}</code>
-        <code>{{ llaves('total') }}</code> <code>{{ llaves('saldo') }}</code> <code>{{ llaves('motivo') }}</code> (por qué no quedó) <code>{{ llaves('taller') }}</code>
+        <code>{{ llaves('total') }}</code> <code>{{ llaves('saldo') }}</code> <code>{{ llaves('adeudo') }}</code> <code>{{ llaves('motivo') }}</code> (por qué no quedó) <code>{{ llaves('taller') }}</code>
         ({{ llaves('saldo') }} solo aparece si debe algo; si el texto de "no quedó" no trae {{ llaves('motivo') }}, el motivo se agrega al final). <code>*texto*</code> = negritas en WhatsApp.
         Los emojis no se envían: WhatsApp para Windows los cambia por símbolos raros.
       </p>

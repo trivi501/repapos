@@ -11,6 +11,7 @@ interface Datos {
   lada: string;
   mensaje_listo: string;
   mensaje_no_quedo: string;
+  mensaje_cobro: string;
   textos: { clave: string; titulo: string; valor: string; renglones: number }[];
   taller: { nombre: string; logo_url: string | null };
 }
@@ -34,6 +35,7 @@ export class Configuracion implements OnInit {
   lada = '52';
   mensajeListo = '';
   mensajeNoQuedo = '';
+  mensajeCobro = '';
   quitarLogo = false;
   private logo: File | null = null;
 
@@ -48,6 +50,7 @@ export class Configuracion implements OnInit {
         this.lada = d.lada;
         this.mensajeListo = d.mensaje_listo;
         this.mensajeNoQuedo = d.mensaje_no_quedo;
+        this.mensajeCobro = d.mensaje_cobro;
         this.quitarLogo = false;
         this.logo = null;
         this.logoUrl.set(d.taller.logo_url);
@@ -73,6 +76,7 @@ export class Configuracion implements OnInit {
     f.append('lada', this.lada);
     f.append('mensaje_listo', this.mensajeListo);
     f.append('mensaje_no_quedo', this.mensajeNoQuedo);
+    f.append('mensaje_cobro', this.mensajeCobro);
     if (this.quitarLogo) f.append('quitar_logo', '1');
     if (this.logo) f.append('logo', this.logo);
     for (const t of this.textos()) f.append(`textos[${t.clave}]`, t.valor);

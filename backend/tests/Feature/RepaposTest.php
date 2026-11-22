@@ -281,12 +281,23 @@ class RepaposTest extends TestCase
         $t = $this->telefonoDe($this->adminA, ['whatsapp' => '5512345678']);
         $this->postJson("/api/telefonos/{$t->id}/accion", ['accion' => 'entregado'])->assertOk();
 
+        // entregado y debe: el WhatsApp solo le recuerda pasar a liquidar
+        $texto = rawurldecode($this->getJson("/api/telefonos/{$t->id}")->json('aviso_url'));
+        $this->assertStringContainsString('saldo pendiente de *$400.00*', $texto);
+        $this->assertStringContainsString('pasa a liquidarlo', $texto);
+        $this->assertStringNotContainsString('pasar por él', $texto);
+
         // entregado y luego marcado listo / no quedó: no ofrece el aviso de "pasa por él"
         $this->postJson("/api/telefonos/{$t->id}/accion", ['accion' => 'listo'])->assertOk()->assertJsonPath('aviso', null);
-        $this->assertNull($this->getJson("/api/telefonos/{$t->id}")->json('aviso_url'));
         $this->postJson("/api/telefonos/{$t->id}/accion", ['accion' => 'listo'])->assertOk();
         $this->postJson("/api/telefonos/{$t->id}/accion", ['accion' => 'noquedo', 'motivo' => 'Placa dañada'])
             ->assertOk()->assertJsonPath('aviso', null);
+        // no quedó no cobra: ya no debe nada, no hay recordatorio
+        $this->assertNull($this->getJson("/api/telefonos/{$t->id}")->json('aviso_url'));
+
+        // ya pagado: sin aviso
+        $this->postJson("/api/telefonos/{$t->id}/accion", ['accion' => 'listo'])->assertOk();
+        $this->postJson("/api/telefonos/{$t->id}/accion", ['accion' => 'liquidar'])->assertOk();
         $this->assertNull($this->getJson("/api/telefonos/{$t->id}")->json('aviso_url'));
     }
 

@@ -43,6 +43,7 @@ class ConfiguracionController extends Controller
             'lada' => Ajuste::valor('lada', '52'),
             'mensaje_listo' => Ajuste::valor('mensaje_listo', Ajuste::MENSAJE_LISTO),
             'mensaje_no_quedo' => Ajuste::valor('mensaje_no_quedo', Ajuste::MENSAJE_NO_QUEDO),
+            'mensaje_cobro' => Ajuste::valor('mensaje_cobro', Ajuste::MENSAJE_COBRO),
             'textos' => $textos,
             'taller' => ['nombre' => $taller->nombre, 'logo_url' => $taller->logoUrl()],
         ]);
@@ -57,6 +58,7 @@ class ConfiguracionController extends Controller
             'lada' => ['required', 'regex:/^\d{1,4}$/'],
             'mensaje_listo' => ['required', 'string', 'max:2000'],
             'mensaje_no_quedo' => ['required', 'string', 'max:2000'],
+            'mensaje_cobro' => ['sometimes', 'required', 'string', 'max:2000'],
             'textos' => ['array'],
             'textos.*' => ['nullable', 'string', 'max:5000'],
         ]);
@@ -87,6 +89,9 @@ class ConfiguracionController extends Controller
         Ajuste::poner('lada', $d['lada']);
         Ajuste::poner('mensaje_listo', str_replace("\r\n", "\n", $d['mensaje_listo']));
         Ajuste::poner('mensaje_no_quedo', str_replace("\r\n", "\n", $d['mensaje_no_quedo']));
+        if (isset($d['mensaje_cobro'])) {
+            Ajuste::poner('mensaje_cobro', str_replace("\r\n", "\n", $d['mensaje_cobro']));
+        }
 
         return response()->json(['message' => 'Configuración guardada.']);
     }
