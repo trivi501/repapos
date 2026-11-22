@@ -18,7 +18,7 @@ namespace RepaPOS.Conector
 
         [STAThread]
         /// <summary>%LOCALAPPDATA%\RepaPOS\conector.log: por qué se cerró, si algún día se cierra solo.</summary>
-        static void Anotar(string texto)
+        internal static void Anotar(string texto)
         {
             try
             {

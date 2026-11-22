@@ -77,6 +77,14 @@ namespace RepaPOS.Conector
                     { "imei", null },
                     { "modo", ModoAndroid(d, dispositivos) },
                 };
+                // Xiaomi, Motorola y otros con el controlador MTP genérico: bloqueados (o sin "Transferencia de archivos")
+                // salen como "Dispositivo MTP USB" sin nombre; el USB sí trae el modelo de fábrica (p. ej. Xiaomi "2212ARNC4L")
+                bool sinNombre = (string)t["modelo"] == "";
+                if (sinNombre)
+                {
+                    string deFabrica = ModeloDelUsb(d.Id);
+                    if (deFabrica != "") { t["modelo"] = deFabrica; t["modelo_tecnico"] = deFabrica; }
+                }
                 if (d.Vid == "04E8") LeerModemSamsung(t, d, dispositivos);   // modelo de fábrica, serie e IMEI sin adb
                 AdbEquipo a;
                 if (d.Serial != "" && adb.TryGetValue(d.Serial, out a))
@@ -95,6 +103,11 @@ namespace RepaPOS.Conector
                         t["aviso"] = "Acepta \"Permitir depuración USB\" en el teléfono para leer el modelo exacto.";
                 }
                 if (d.Serial == "") t["aviso"] = "El teléfono no reportó número de serie por USB. Desbloquéalo y elige \"Transferir archivos\".";
+                // sigue sin el nombre comercial (ni adb que lo dé): se pide desbloquearlo
+                else if (sinNombre && !t.ContainsKey("aviso") && !((string)t["modo"]).Contains("ADB"))
+                    t["aviso"] = ((string)t["modelo"] != "" ? "Se leyó el modelo de fábrica (" + t["modelo"] + "). " : "")
+                        + "Para el nombre comercial, desbloquea el teléfono, elige \"Transferencia de archivos\" y vuelve a detectar."
+                        + (t["imei"] == null ? " El IMEI márcalo con *#06#." : "");
                 // sin módem (Samsung) ni adb que lo dé, el IMEI no se puede leer por USB: se marca *#06#
                 if (t["imei"] == null && !t.ContainsKey("aviso"))
                     t["aviso"] = ((string)t["modo"]).Contains("ADB")
@@ -312,6 +325,36 @@ namespace RepaPOS.Conector
             // nombres de controlador, no del teléfono ("Android ADB Interface", "USB Composite Device"…)
             if (Regex.IsMatch(nombre, @"^(USB|Composite|Dispositivo|ADB|Android|MTP|Interfaz)\b|ADB Interface|Composite ADB", RegexOptions.IgnoreCase)) return "";
             return nombre;
+        }
+
+        /// <summary>
+        /// El nombre de producto que el teléfono manda en su descriptor USB (DEVPKEY_Device_BusReportedDeviceDesc).
+        /// Xiaomi manda el modelo de fábrica ("2212ARNC4L"), Motorola casi siempre el comercial ("moto g(60)").
+        /// </summary>
+        static string ModeloDelUsb(string idPnp)
+        {
+            try
+            {
+                using (var o = new ManagementObject("Win32_PnPEntity.DeviceID=\"" + idPnp.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\""))
+                {
+                    var entrada = o.GetMethodParameters("GetDeviceProperties");
+                    entrada["devicePropertyKeys"] = new[] { "DEVPKEY_Device_BusReportedDeviceDesc" };
+                    using (var salida = o.InvokeMethod("GetDeviceProperties", entrada, null))
+                    {
+                        var props = salida["deviceProperties"] as ManagementBaseObject[];
+                        if (props == null || props.Length == 0 || props[0]["Data"] == null) return "";
+                        string v = props[0]["Data"].ToString().Trim();
+                        // descriptores genéricos que no dicen el modelo ("SAMSUNG_Android", "MTP", "Mi", "Xiaomi"…)
+                        if (v.Length < 3 || Regex.IsMatch(v, @"android|\bmtp\b|composite|\badb\b|^usb|^(xiaomi|motorola|mi|redmi|poco|generic)$", RegexOptions.IgnoreCase)) return "";
+                        return v;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Programa.Anotar("No se pudo leer el modelo del USB: " + ex.Message);
+                return "";
+            }
         }
 
         static string ModoAndroid(Pnp raiz, List<Pnp> todos)
