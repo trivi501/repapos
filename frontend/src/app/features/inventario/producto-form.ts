@@ -6,6 +6,7 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { AvisosService } from '../../core/services/avisos.service';
 import { Producto } from './inventario';
+import { DialogoService } from '../../core/services/dialogo.service';
 
 @Component({
   selector: 'app-producto-form',
@@ -13,6 +14,7 @@ import { Producto } from './inventario';
   templateUrl: './producto-form.html',
 })
 export class ProductoForm implements OnInit {
+  private readonly dialogo = inject(DialogoService);
   private readonly api = inject(ApiService);
   private readonly avisos = inject(AvisosService);
   private readonly route = inject(ActivatedRoute);
@@ -57,8 +59,8 @@ export class ProductoForm implements OnInit {
     });
   }
 
-  eliminar(): void {
-    if (!confirm(`¿Eliminar ${this.m.nombre} del catálogo? Se borran también sus existencias y movimientos en todas las sucursales.`)) return;
+  async eliminar(): Promise<void> {
+    if (!await this.dialogo.confirmar(`¿Eliminar ${this.m.nombre} del catálogo? Se borran también sus existencias y movimientos en todas las sucursales.`)) return;
     this.api.delete(`inventario/${this.id()}`).subscribe({
       next: () => this.router.navigate(['/inventario']).then(() => this.avisos.ok(`Producto ${this.m.nombre} eliminado del catálogo.`)),
       error: (e: HttpErrorResponse) => this.avisos.fallo(e),

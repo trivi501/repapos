@@ -1825,3 +1825,16 @@ app-grafica-barras {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Ventana de confirmación (reemplaza confirm/alert del navegador) */
+.dialogo-fondo {
+  z-index: 100;
+  align-items: center;
+}
+.modal-dialogo {
+  max-width: 440px;
+}
+.dialogo-texto {
+  white-space: pre-line;
+  margin: 0;
+}

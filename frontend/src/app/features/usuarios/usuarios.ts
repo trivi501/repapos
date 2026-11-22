@@ -7,6 +7,7 @@ import { GRAFICAS_BASICAS, GRAFICAS_PANEL, Rol, Sucursal, UsuarioAdmin } from '.
 import { OrdenService } from '../../core/services/orden.service';
 import { HttpErrorResponse } from '@angular/common/http';
 import { textoError } from '../../core/services/api.service';
+import { DialogoService } from '../../core/services/dialogo.service';
 
 @Component({
   selector: 'app-usuarios',
@@ -16,6 +17,7 @@ import { textoError } from '../../core/services/api.service';
   styleUrl: './usuarios.scss',
 })
 export class Usuarios implements OnInit {
+  private readonly dialogo = inject(DialogoService);
   private readonly fb = inject(FormBuilder);
   private readonly usuarioService = inject(UsuarioService);
   private readonly rolService = inject(RolService);
@@ -164,11 +166,11 @@ export class Usuarios implements OnInit {
     });
   }
 
-  eliminar(usuario: UsuarioAdmin): void {
-    if (!confirm(`¿Eliminar al usuario "${usuario.name}"?`)) return;
+  async eliminar(usuario: UsuarioAdmin): Promise<void> {
+    if (!await this.dialogo.confirmar(`¿Eliminar al usuario "${usuario.name}"?`)) return;
     this.usuarioService.eliminar(usuario.id).subscribe({
       next: () => this.cargar(),
-      error: (e: HttpErrorResponse) => alert(textoError(e, 'No se pudo eliminar el usuario.')),
+      error: (e: HttpErrorResponse) => void this.dialogo.alerta(textoError(e, 'No se pudo eliminar el usuario.')),
     });
   }
 }

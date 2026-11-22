@@ -4,6 +4,7 @@ import { EquipoService } from '../../core/services/equipo.service';
 import { ClienteService } from '../../core/services/cliente.service';
 import { AuthService } from '../../core/services/auth.service';
 import { Cliente, Equipo } from '../../core/models/taller.model';
+import { DialogoService } from '../../core/services/dialogo.service';
 
 @Component({
   selector: 'app-equipos',
@@ -13,6 +14,7 @@ import { Cliente, Equipo } from '../../core/models/taller.model';
   styleUrl: './equipos.scss',
 })
 export class Equipos implements OnInit {
+  private readonly dialogo = inject(DialogoService);
   private readonly fb = inject(FormBuilder);
   private readonly equipoService = inject(EquipoService);
   private readonly clienteService = inject(ClienteService);
@@ -121,8 +123,8 @@ export class Equipos implements OnInit {
     });
   }
 
-  eliminar(equipo: Equipo): void {
-    if (!confirm(`¿Eliminar el equipo "${equipo.marca} ${equipo.modelo}"?`)) return;
+  async eliminar(equipo: Equipo): Promise<void> {
+    if (!await this.dialogo.confirmar(`¿Eliminar el equipo "${equipo.marca} ${equipo.modelo}"?`)) return;
     this.equipoService.eliminar(equipo.id).subscribe(() => this.cargar());
   }
 

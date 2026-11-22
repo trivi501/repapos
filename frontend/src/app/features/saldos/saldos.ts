@@ -5,6 +5,7 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { AvisosService } from '../../core/services/avisos.service';
 import { DineroPipe, Estatus, FechaPipe, dinero } from '../../shared/ui';
+import { DialogoService } from '../../core/services/dialogo.service';
 
 interface Movimiento {
   id: number;
@@ -37,6 +38,7 @@ interface Datos {
   templateUrl: './saldos.html',
 })
 export class Saldos implements OnInit {
+  private readonly dialogo = inject(DialogoService);
   private readonly api = inject(ApiService);
   private readonly avisos = inject(AvisosService);
   readonly auth = inject(AuthService);
@@ -96,23 +98,23 @@ export class Saldos implements OnInit {
     });
   }
 
-  aplicar(e: Elegido): void {
+  async aplicar(e: Elegido): Promise<void> {
     const detalle = e.plan.map((p) => `#${p.id} ${p.modelo}: ${dinero(p.monto)} ${p.parcial ? '(abono parcial)' : '(queda pagado)'}`).join('\n');
-    if (!confirm(`Se usará el saldo a favor así:\n\n${detalle}\n\n¿Continuar?`)) return;
+    if (!await this.dialogo.confirmar(`Se usará el saldo a favor así:\n\n${detalle}\n\n¿Continuar?`)) return;
     this.ejecutar(this.api.post<{ message: string }>(`saldos/${e.id}/aplicar`));
   }
 
-  devolver(e: Elegido): void {
-    if (!confirm('¿Registrar la devolución en efectivo? Sale de la caja de hoy.')) return;
+  async devolver(e: Elegido): Promise<void> {
+    if (!await this.dialogo.confirmar('¿Registrar la devolución en efectivo? Sale de la caja de hoy.')) return;
     this.ejecutar(this.api.post<{ message: string }>(`saldos/${e.id}/devolver`, { monto: this.montoDevolver }));
   }
 
-  eliminar(m: Movimiento, locatario: number): void {
+  async eliminar(m: Movimiento, locatario: number): Promise<void> {
     const pregunta: Record<string, string> = {
       DEPÓSITO: '¿Eliminar este depósito? También se quita el cobro de la caja de ese día.',
       DEVUELTO: '¿Eliminar esta devolución? Se quita la salida de caja y el dinero regresa a su saldo a favor.',
     };
-    if (!confirm(pregunta[m.tipo] ?? '¿Eliminar? El teléfono vuelve a deber ese monto y el dinero regresa a su saldo a favor.')) return;
+    if (!await this.dialogo.confirmar(pregunta[m.tipo] ?? '¿Eliminar? El teléfono vuelve a deber ese monto y el dinero regresa a su saldo a favor.')) return;
     this.locatarioId = locatario;
     this.ejecutar(this.api.delete<{ message: string }>(`saldos/movimiento/${m.id}`));
   }

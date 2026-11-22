@@ -10,6 +10,7 @@ import { TelefonoForm } from './telefono-form';
 import { TelefonoDetalle } from './telefono-detalle';
 import { MOTIVOS_NO_QUEDO } from '../../shared/motivos-no-quedo';
 import { DetectarUsb, TelefonoUsb, nombreTelefonoUsb } from '../../shared/detectar-usb/detectar-usb';
+import { DialogoService } from '../../core/services/dialogo.service';
 
 export interface Telefono {
   id: number;
@@ -68,6 +69,7 @@ interface Respuesta {
   `,
 })
 export class Telefonos implements OnInit {
+  private readonly dialogo = inject(DialogoService);
   private readonly api = inject(ApiService);
   private readonly avisos = inject(AvisosService);
   private readonly route = inject(ActivatedRoute);
@@ -226,13 +228,14 @@ export class Telefonos implements OnInit {
     });
   }
 
-  entregar(t: Telefono): void {
+  async entregar(t: Telefono): Promise<void> {
     const pregunta = t.entregado
       ? 'Ya está entregado. ¿Quitarle la entrega?'
       : t.resultado === 'EN TALLER'
         ? 'Sigue En taller (no está Listo ni No quedó). ¿Entregarlo de todos modos?'
         : null;
-    if (pregunta && !confirm(pregunta)) return;
+    this.menu.set(null);
+    if (pregunta && !await this.dialogo.confirmar(pregunta)) return;
     this.accion(t, 'entregado');
   }
 
@@ -241,8 +244,9 @@ export class Telefonos implements OnInit {
     this.accion(t, 'abono', { monto: this.montoAbono });
   }
 
-  liquidar(t: Telefono): void {
-    if (!confirm(`¿Marcar como pagado completo? Se registra un cobro de ${dinero(t.saldo)}.`)) return;
+  async liquidar(t: Telefono): Promise<void> {
+    this.menu.set(null);
+    if (!await this.dialogo.confirmar(`¿Marcar como pagado completo? Se registra un cobro de ${dinero(t.saldo)}.`)) return;
     this.accion(t, 'liquidar');
   }
 

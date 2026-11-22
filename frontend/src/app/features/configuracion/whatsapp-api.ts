@@ -5,6 +5,7 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { AvisosService } from '../../core/services/avisos.service';
 import { RouterLink } from '@angular/router';
+import { DialogoService } from '../../core/services/dialogo.service';
 
 type Proveedor = 'evolution' | 'meta';
 
@@ -158,6 +159,7 @@ const TEXTO_ESTADO: Record<string, string> = {
   `,
 })
 export class WhatsAppApi implements OnInit, OnDestroy {
+  private readonly dialogo = inject(DialogoService);
   private readonly api = inject(ApiService);
   private readonly avisos = inject(AvisosService);
   private readonly auth = inject(AuthService);
@@ -265,8 +267,8 @@ export class WhatsAppApi implements OnInit, OnDestroy {
     });
   }
 
-  desconectar(): void {
-    if (!confirm('¿Desvincular el WhatsApp del taller? Los botones volverán a abrir WhatsApp.')) return;
+  async desconectar(): Promise<void> {
+    if (!await this.dialogo.confirmar('¿Desvincular el WhatsApp del taller? Los botones volverán a abrir WhatsApp.')) return;
     this.trabajando.set(true);
     this.api.post<{ message: string }>('whatsapp-api/evolution/desconectar', {}).subscribe({
       next: (r) => {

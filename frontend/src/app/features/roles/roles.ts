@@ -2,6 +2,7 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RolService } from '../../core/services/rol.service';
 import { Permiso, Rol } from '../../core/models/taller.model';
+import { DialogoService } from '../../core/services/dialogo.service';
 
 @Component({
   selector: 'app-roles',
@@ -11,6 +12,7 @@ import { Permiso, Rol } from '../../core/models/taller.model';
   styleUrl: './roles.scss',
 })
 export class Roles implements OnInit {
+  private readonly dialogo = inject(DialogoService);
   private readonly fb = inject(FormBuilder);
   private readonly rolService = inject(RolService);
 
@@ -107,11 +109,11 @@ export class Roles implements OnInit {
     });
   }
 
-  eliminar(rol: Rol): void {
-    if (!confirm(`¿Eliminar el rol "${rol.name}"?`)) return;
+  async eliminar(rol: Rol): Promise<void> {
+    if (!await this.dialogo.confirmar(`¿Eliminar el rol "${rol.name}"?`)) return;
     this.rolService.eliminar(rol.id).subscribe({
       next: () => this.cargar(),
-      error: () => alert('Este rol no se puede eliminar.'),
+      error: () => void this.dialogo.alerta('Este rol no se puede eliminar.'),
     });
   }
 }

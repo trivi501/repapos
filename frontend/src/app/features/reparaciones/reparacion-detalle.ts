@@ -11,6 +11,7 @@ import { AvisosService, AvisoWhatsapp } from '../../core/services/avisos.service
 import { DineroPipe, Estatus, FechaPipe, PatronVista, dinero } from '../../shared/ui';
 import { metodoTexto } from '../ventas/ventas';
 import { MOTIVOS_NO_QUEDO } from '../../shared/motivos-no-quedo';
+import { DialogoService } from '../../core/services/dialogo.service';
 
 type Ficha = OrdenReparacion & {
   enlaces: { publico: string; pdf_publico: string; whatsapp_ticket: string; whatsapp_estatus: string };
@@ -27,6 +28,7 @@ type Ficha = OrdenReparacion & {
   templateUrl: './reparacion-detalle.html',
 })
 export class ReparacionDetalle implements OnInit {
+  private readonly dialogo = inject(DialogoService);
   readonly api = inject(ApiService);
   private readonly avisos = inject(AvisosService);
   private readonly route = inject(ActivatedRoute);
@@ -135,9 +137,9 @@ export class ReparacionDetalle implements OnInit {
     });
   }
 
-  quitarRefaccion(r: RefaccionOrden): void {
+  async quitarRefaccion(r: RefaccionOrden): Promise<void> {
     const aviso = r.del_inventario ? ' La pieza regresa al inventario.' : '';
-    if (!confirm(`¿Quitar "${r.descripcion}" de la orden?${aviso}`)) return;
+    if (!await this.dialogo.confirmar(`¿Quitar "${r.descripcion}" de la orden?${aviso}`)) return;
     this.api.delete<{ message: string; orden: Ficha }>(`ordenes/${this.id}/refacciones/${r.id}`).subscribe({
       next: (res) => {
         this.avisos.ok(res.message);
@@ -191,12 +193,12 @@ export class ReparacionDetalle implements OnInit {
     if (this.monto && this.monto > 0) this.accion({ accion: 'abono', monto: this.monto, metodo: this.metodo });
   }
 
-  liquidar(x: Ficha): void {
-    if (confirm(`¿Liquidar ${dinero(x.saldo)}?`)) this.accion({ accion: 'liquidar', metodo: this.metodo });
+  async liquidar(x: Ficha): Promise<void> {
+    if (await this.dialogo.confirmar(`¿Liquidar ${dinero(x.saldo)}?`)) this.accion({ accion: 'liquidar', metodo: this.metodo });
   }
 
-  cambiarEstado(x: Ficha, estado: string): void {
-    if (estado === 'entregado' && x.saldo > 0 && !confirm(`Aún debe ${dinero(x.saldo)}. ¿Entregar de todos modos?`)) return;
+  async cambiarEstado(x: Ficha, estado: string): Promise<void> {
+    if (estado === 'entregado' && x.saldo > 0 && !await this.dialogo.confirmar(`Aún debe ${dinero(x.saldo)}. ¿Entregar de todos modos?`)) return;
     // rechazar y "no quedó" siempre llevan el motivo: primero se escribe
     if (estado === 'rechazado' || estado === 'no_quedo') {
       this.motivo = '';
@@ -213,8 +215,8 @@ export class ReparacionDetalle implements OnInit {
     this.accion({ accion: 'estatus', estado, motivo });
   }
 
-  eliminar(x: Ficha): void {
-    if (!confirm(`¿Eliminar la orden N° ${x.folio}? No se puede deshacer.`)) return;
+  async eliminar(x: Ficha): Promise<void> {
+    if (!await this.dialogo.confirmar(`¿Eliminar la orden N° ${x.folio}? No se puede deshacer.`)) return;
     this.api.delete(`ordenes/${x.id}`, { cobros: this.destinoCobros }).subscribe({
       next: () => this.router.navigate(['/reparaciones']).then(() => this.avisos.ok(`Orden folio ${x.folio} eliminada.`)),
       error: (e: HttpErrorResponse) => this.avisos.fallo(e),

@@ -8,6 +8,7 @@ import { DineroPipe, FechaPipe, fechaISO } from '../../shared/ui';
 import { DetectarUsb, TelefonoUsb, nombreTelefonoUsb } from '../../shared/detectar-usb/detectar-usb';
 import type { Telefono } from './telefonos';
 import { MOTIVOS_NO_QUEDO } from '../../shared/motivos-no-quedo';
+import { DialogoService } from '../../core/services/dialogo.service';
 
 const ULTIMO_LOCATARIO = 'taller_ultimo_locatario';
 
@@ -29,6 +30,7 @@ function vacio(locatario = '') {
   `,
 })
 export class TelefonoForm implements OnInit, AfterViewInit {
+  private readonly dialogo = inject(DialogoService);
   private readonly api = inject(ApiService);
   private readonly avisos = inject(AvisosService);
   // la app no usa zone.js: al cambiar `m` desde una respuesta del servidor hay que pedir que se redibuje
@@ -189,16 +191,16 @@ export class TelefonoForm implements OnInit, AfterViewInit {
     });
   }
 
-  limpiar(): void {
-    if (!confirm('¿Limpiar el formulario?')) return;
+  async limpiar(): Promise<void> {
+    if (!await this.dialogo.confirmar('¿Limpiar el formulario?')) return;
     sessionStorage.removeItem(ULTIMO_LOCATARIO);
     this.m = vacio();
     this.errores.set([]);
   }
 
-  eliminar(): void {
+  async eliminar(): Promise<void> {
     const id = this.telefonoId();
-    if (!confirm(`¿Eliminar el teléfono #${id} (${this.m.modelo})? No se puede deshacer.`)) return;
+    if (!await this.dialogo.confirmar(`¿Eliminar el teléfono #${id} (${this.m.modelo})? No se puede deshacer.`)) return;
     this.api.delete(`telefonos/${id}`, { cobros: this.destinoCobros }).subscribe({
       next: () => {
         this.avisos.ok(`Teléfono #${id} eliminado.`);

@@ -5,6 +5,7 @@ import { RouterLink } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { AvisosService } from '../../core/services/avisos.service';
+import { DialogoService } from '../../core/services/dialogo.service';
 
 interface Sucursal {
   id: number;
@@ -19,6 +20,7 @@ interface Sucursal {
   templateUrl: './sucursales.html',
 })
 export class Sucursales implements OnInit {
+  private readonly dialogo = inject(DialogoService);
   private readonly api = inject(ApiService);
   private readonly avisos = inject(AvisosService);
   readonly auth = inject(AuthService);
@@ -61,8 +63,8 @@ export class Sucursales implements OnInit {
     });
   }
 
-  eliminar(s: Sucursal): void {
-    if (!confirm(`¿Eliminar la sucursal ${s.nombre}?`)) return;
+  async eliminar(s: Sucursal): Promise<void> {
+    if (!await this.dialogo.confirmar(`¿Eliminar la sucursal ${s.nombre}?`)) return;
     this.api.delete(`sucursales/${s.id}`).subscribe({
       next: () => this.alTerminar('Sucursal eliminada.'),
       error: (e: HttpErrorResponse) => this.avisos.fallo(e),

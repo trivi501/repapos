@@ -3,6 +3,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ClienteService } from '../../core/services/cliente.service';
 import { AuthService } from '../../core/services/auth.service';
 import { Cliente } from '../../core/models/taller.model';
+import { DialogoService } from '../../core/services/dialogo.service';
 
 @Component({
   selector: 'app-clientes',
@@ -12,6 +13,7 @@ import { Cliente } from '../../core/models/taller.model';
   styleUrl: './clientes.scss',
 })
 export class Clientes implements OnInit {
+  private readonly dialogo = inject(DialogoService);
   private readonly fb = inject(FormBuilder);
   private readonly clienteService = inject(ClienteService);
   readonly authService = inject(AuthService);
@@ -111,8 +113,8 @@ export class Clientes implements OnInit {
     });
   }
 
-  eliminar(cliente: Cliente): void {
-    if (!confirm(`¿Eliminar al cliente "${cliente.nombre}"?`)) return;
+  async eliminar(cliente: Cliente): Promise<void> {
+    if (!await this.dialogo.confirmar(`¿Eliminar al cliente "${cliente.nombre}"?`)) return;
     this.clienteService.eliminar(cliente.id).subscribe(() => this.cargar());
   }
 }

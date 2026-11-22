@@ -5,6 +5,7 @@ import QRCode from 'qrcode';
 import { Subscription, interval, startWith, switchMap } from 'rxjs';
 import { CategoriaFoto, FotoOrden } from '../../core/models/taller.model';
 import { FotoService } from '../../core/services/foto.service';
+import { DialogoService } from '../../core/services/dialogo.service';
 
 const INTERVALO_SINCRONIZACION_MS = 3000;
 
@@ -20,6 +21,7 @@ const INTERVALO_SINCRONIZACION_MS = 3000;
   styleUrl: './zona-fotos.scss',
 })
 export class ZonaFotos implements OnDestroy {
+  private readonly dialogo = inject(DialogoService);
   private readonly fotoService = inject(FotoService);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -80,8 +82,8 @@ export class ZonaFotos implements OnDestroy {
     }
   }
 
-  eliminar(foto: FotoOrden): void {
-    if (foto.orden_reparacion_id && !confirm('Esta foto ya está guardada en la orden. ¿Eliminarla definitivamente?')) return;
+  async eliminar(foto: FotoOrden): Promise<void> {
+    if (foto.orden_reparacion_id && !await this.dialogo.confirmar('Esta foto ya está guardada en la orden. ¿Eliminarla definitivamente?')) return;
     this.fotoService.eliminar(foto.id).subscribe({
       next: () => this.eliminada.emit(foto.id),
       error: () => this.error.set('No se pudo eliminar la foto.'),

@@ -73,17 +73,6 @@
           <button class="cerrar" (click)="avisos.limpiar()" aria-label="Cerrar aviso">✕</button>
         </div>
       }
-      @if (avisos.whatsapp(); as w) {
-        <div class="alert alert-success aviso-cerrable no-imprimir">
-          <span>
-            {{ w.texto }}
-            @if (w.sin_numero) {
-              <small>(no tiene número guardado: elegirás el contacto en WhatsApp)</small>
-            }
-          </span>
-          <a class="btn btn-whatsapp" [href]="w.url" target="_blank" rel="noopener" (click)="avisos.limpiar()">Avisar por WhatsApp</a>
-        </div>
-      }
       <router-outlet />
     </main>
   </div>

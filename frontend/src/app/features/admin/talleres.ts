@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
 import { AvisosService } from '../../core/services/avisos.service';
 import { FechaPipe } from '../../shared/ui';
+import { DialogoService } from '../../core/services/dialogo.service';
 
 interface TallerFila {
   id: number;
@@ -31,6 +32,7 @@ interface Datos {
   templateUrl: './talleres.html',
 })
 export class Talleres implements OnInit {
+  private readonly dialogo = inject(DialogoService);
   private readonly api = inject(ApiService);
   private readonly avisos = inject(AvisosService);
 
@@ -59,11 +61,11 @@ export class Talleres implements OnInit {
     });
   }
 
-  suspender(t: TallerFila): void {
-    if (confirm(`¿Suspender ${t.nombre}? No podrá entrar, pero sus datos se conservan.`)) this.actuar(t, 'suspender');
+  async suspender(t: TallerFila): Promise<void> {
+    if (await this.dialogo.confirmar(`¿Suspender ${t.nombre}? No podrá entrar, pero sus datos se conservan.`)) this.actuar(t, 'suspender');
   }
 
-  cortesia(t: TallerFila): void {
-    if (confirm(`¿Dar acceso gratis sin vencimiento a ${t.nombre}?`)) this.actuar(t, 'cortesia');
+  async cortesia(t: TallerFila): Promise<void> {
+    if (await this.dialogo.confirmar(`¿Dar acceso gratis sin vencimiento a ${t.nombre}?`)) this.actuar(t, 'cortesia');
   }
 }

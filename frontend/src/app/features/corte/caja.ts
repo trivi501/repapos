@@ -7,6 +7,7 @@ import { AvisosService } from '../../core/services/avisos.service';
 import { DineroPipe, FechaPipe, fechaISO } from '../../shared/ui';
 import { metodoTexto } from '../ventas/ventas';
 import { CorteDatos, esperado, hora, textoDiferencia } from './corte-datos';
+import { DialogoService } from '../../core/services/dialogo.service';
 
 /**
  * Abrir y cerrar la caja (permiso cortes.guardar).
@@ -106,6 +107,7 @@ import { CorteDatos, esperado, hora, textoDiferencia } from './corte-datos';
   `,
 })
 export class Caja implements OnInit {
+  private readonly dialogo = inject(DialogoService);
   private readonly api = inject(ApiService);
   private readonly avisos = inject(AvisosService);
 
@@ -182,11 +184,11 @@ export class Caja implements OnInit {
     });
   }
 
-  cerrar(): void {
+  async cerrar(): Promise<void> {
     if (this.contado == null) return;
     const dif = this.diferencia();
     const aviso = dif === 0 ? '' : `\n\nOjo: ${textoDiferencia(dif)}.`;
-    if (!confirm(`¿Cerrar la caja con ${this.contado} contados?${aviso}`)) return;
+    if (!await this.dialogo.confirmar(`¿Cerrar la caja con ${this.contado} contados?${aviso}`)) return;
     this.enviando.set(true);
     this.api
       .post<{ message: string; fecha: string; corte: { turno: number; contado: string; diferencia: string; retiro: string; fondo_siguiente: string } }>(

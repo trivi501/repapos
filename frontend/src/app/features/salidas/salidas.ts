@@ -6,6 +6,7 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { AvisosService } from '../../core/services/avisos.service';
 import { DineroPipe, FechaPipe, dinero, fechaHoraLocal, fechaISO } from '../../shared/ui';
+import { DialogoService } from '../../core/services/dialogo.service';
 
 interface Salida {
   id: number;
@@ -26,6 +27,7 @@ function vacia() {
   templateUrl: './salidas.html',
 })
 export class Salidas implements OnInit {
+  private readonly dialogo = inject(DialogoService);
   private readonly api = inject(ApiService);
   private readonly avisos = inject(AvisosService);
   private readonly route = inject(ActivatedRoute);
@@ -98,8 +100,8 @@ export class Salidas implements OnInit {
     });
   }
 
-  eliminar(s: Salida): void {
-    if (!confirm(`¿Eliminar la salida ${s.concepto} de ${dinero(s.monto)}?`)) return;
+  async eliminar(s: Salida): Promise<void> {
+    if (!await this.dialogo.confirmar(`¿Eliminar la salida ${s.concepto} de ${dinero(s.monto)}?`)) return;
     this.api.delete(`salidas/${s.id}`).subscribe({
       next: () => {
         this.avisos.ok('Salida eliminada.');

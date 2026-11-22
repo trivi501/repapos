@@ -8,6 +8,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { AvisosService } from '../../core/services/avisos.service';
 import { DineroPipe, FechaPipe, dinero } from '../../shared/ui';
 import { Venta, metodoTexto } from './ventas';
+import { DialogoService } from '../../core/services/dialogo.service';
 
 @Component({
   selector: 'app-venta-detalle',
@@ -15,6 +16,7 @@ import { Venta, metodoTexto } from './ventas';
   templateUrl: './venta-detalle.html',
 })
 export class VentaDetalle implements OnInit {
+  private readonly dialogo = inject(DialogoService);
   readonly api = inject(ApiService);
   private readonly avisos = inject(AvisosService);
   private readonly route = inject(ActivatedRoute);
@@ -60,12 +62,12 @@ export class VentaDetalle implements OnInit {
     });
   }
 
-  devolver(): void {
+  async devolver(): Promise<void> {
     if (!Object.values(this.piezas).some((n) => n > 0)) {
       this.avisos.fallo('Indica cuántas piezas regresa.');
       return;
     }
-    if (!confirm('¿Registrar la devolución? Las piezas regresan al inventario.')) return;
+    if (!await this.dialogo.confirmar('¿Registrar la devolución? Las piezas regresan al inventario.')) return;
     this.ejecutar(this.api.post(`ventas/${this.id}/devolver`, { piezas: this.piezas, destino: this.destino, nota: this.nota }));
   }
 
@@ -73,10 +75,10 @@ export class VentaDetalle implements OnInit {
     this.ejecutar(this.api.post(`ventas/${this.id}/abonar`, { monto: this.montoAbono, metodo: this.metodoAbono }));
   }
 
-  cancelar(): void {
+  async cancelar(): Promise<void> {
     const v = this.venta()!;
     const dinero_ = Number(v.pagado) > 0 ? ` y se restan ${dinero(v.pagado)} de la caja de hoy` : '';
-    if (!confirm(`¿Cancelar la venta ${v.folio}? Las piezas regresan al inventario${dinero_}.`)) return;
+    if (!await this.dialogo.confirmar(`¿Cancelar la venta ${v.folio}? Las piezas regresan al inventario${dinero_}.`)) return;
     this.ejecutar(this.api.post(`ventas/${this.id}/cancelar`));
   }
 }
