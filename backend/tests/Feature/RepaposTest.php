@@ -273,6 +273,21 @@ class RepaposTest extends TestCase
         $url = $r->json('aviso.url');
         $this->assertStringStartsWith('https://wa.me/525512345678?text=', $url);
         $this->assertStringContainsString('Saldo pendiente: $400.00', rawurldecode($url));
+        $this->assertNotNull($this->getJson("/api/telefonos/{$t->id}")->json('aviso_url'));
+    }
+
+    public function test_ya_entregado_no_se_avisa_que_pase_por_el(): void
+    {
+        $t = $this->telefonoDe($this->adminA, ['whatsapp' => '5512345678']);
+        $this->postJson("/api/telefonos/{$t->id}/accion", ['accion' => 'entregado'])->assertOk();
+
+        // entregado y luego marcado listo / no quedó: no ofrece el aviso de "pasa por él"
+        $this->postJson("/api/telefonos/{$t->id}/accion", ['accion' => 'listo'])->assertOk()->assertJsonPath('aviso', null);
+        $this->assertNull($this->getJson("/api/telefonos/{$t->id}")->json('aviso_url'));
+        $this->postJson("/api/telefonos/{$t->id}/accion", ['accion' => 'listo'])->assertOk();
+        $this->postJson("/api/telefonos/{$t->id}/accion", ['accion' => 'noquedo', 'motivo' => 'Placa dañada'])
+            ->assertOk()->assertJsonPath('aviso', null);
+        $this->assertNull($this->getJson("/api/telefonos/{$t->id}")->json('aviso_url'));
     }
 
     public function test_gasto_de_telefono_y_ganancia_solo_para_el_dueno(): void

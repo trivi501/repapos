@@ -290,7 +290,8 @@ class TelefonoController extends Controller
     /** Si acaba de quedar listo o no quedó, deja listo el botón para avisar por WhatsApp (con el motivo, si no quedó). */
     protected function avisoSiQuedoListo(Telefono $t, ?string $antes): ?array
     {
-        if (! in_array($t->resultado, [Telefono::LISTO, Telefono::NO_QUEDO], true) || $antes === $t->resultado) {
+        // ya entregado: no se le dice que pase por él
+        if ($t->entregado || ! in_array($t->resultado, [Telefono::LISTO, Telefono::NO_QUEDO], true) || $antes === $t->resultado) {
             return null;
         }
         $t->loadMissing('locatario');

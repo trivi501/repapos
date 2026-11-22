@@ -172,9 +172,12 @@ class WhatsApp
         return static::link($v->cliente_telefono, $texto);
     }
 
-    /** Aviso de LISTO o NO QUEDÓ según el estatus del teléfono; null si sigue en taller. */
+    /** Aviso de LISTO o NO QUEDÓ según el estatus del teléfono; null si sigue en taller o ya se entregó (ya no tiene que pasar por él). */
     public static function aviso(Telefono $t): ?string
     {
+        if ($t->entregado) {
+            return null;
+        }
         $plantilla = match ($t->resultado) {
             Telefono::LISTO => Ajuste::valor('mensaje_listo', Ajuste::MENSAJE_LISTO),
             Telefono::NO_QUEDO => Ajuste::valor('mensaje_no_quedo', Ajuste::MENSAJE_NO_QUEDO),
