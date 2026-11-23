@@ -1,3 +1,4 @@
+import { TablaTarjetas } from '../../shared/tabla-tarjetas';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { OrdenService } from '../../core/services/orden.service';
@@ -8,7 +9,7 @@ import { DineroPipe, FechaPipe } from '../../shared/ui';
 @Component({
   selector: 'app-ordenes',
   standalone: true,
-  imports: [RouterLink, DineroPipe, FechaPipe],
+  imports: [TablaTarjetas, RouterLink, DineroPipe, FechaPipe],
   templateUrl: './ordenes.html',
   styleUrl: './ordenes.scss',
 })

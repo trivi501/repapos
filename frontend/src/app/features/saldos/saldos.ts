@@ -1,3 +1,4 @@
+import { TablaTarjetas } from '../../shared/tabla-tarjetas';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -18,7 +19,7 @@ interface Datos {
 
 @Component({
   selector: 'app-saldos',
-  imports: [FormsModule, DineroPipe, FechaPipe, Estatus],
+  imports: [TablaTarjetas, FormsModule, DineroPipe, FechaPipe, Estatus],
   templateUrl: './saldos.html',
 })
 export class Saldos implements OnInit {

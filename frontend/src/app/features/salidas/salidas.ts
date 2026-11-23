@@ -1,3 +1,4 @@
+import { TablaTarjetas } from '../../shared/tabla-tarjetas';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -23,7 +24,7 @@ function vacia() {
 
 @Component({
   selector: 'app-salidas',
-  imports: [FormsModule, DineroPipe, FechaPipe],
+  imports: [TablaTarjetas, FormsModule, DineroPipe, FechaPipe],
   templateUrl: './salidas.html',
 })
 export class Salidas implements OnInit {

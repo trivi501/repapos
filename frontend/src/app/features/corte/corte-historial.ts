@@ -1,3 +1,4 @@
+import { TablaTarjetas } from '../../shared/tabla-tarjetas';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -41,7 +42,7 @@ interface FilaResumen {
 
 @Component({
   selector: 'app-corte-historial',
-  imports: [FormsModule, RouterLink, DineroPipe, FechaPipe],
+  imports: [TablaTarjetas, FormsModule, RouterLink, DineroPipe, FechaPipe],
   template: `
     <div class="encabezado">
       <h1>Historial de cortes</h1>
@@ -70,7 +71,7 @@ interface FilaResumen {
     </div>
 
     <div class="card tabla-scroll separado-abajo">
-      <table>
+      <table tablaTarjetas>
         <thead>
           <tr><th>{{ filtros.agrupar === 'mes' ? 'Mes' : 'Semana' }}</th><th class="der">Efectivo</th><th class="der">Tarjeta</th>
             <th class="der">Transferencia</th><th class="der">Total cobrado</th><th class="der">Salidas</th><th class="der">Cortes</th>
@@ -117,7 +118,7 @@ interface FilaResumen {
     <!-- cada corte -->
     <h2>Cortes guardados</h2>
     <div class="card tabla-scroll">
-      <table>
+      <table tablaTarjetas>
         <thead>
           <tr><th>Día</th><th>Turno</th><th class="der">Fondo</th><th class="der">Entradas</th><th class="der">Salidas</th>
             <th class="der">Debía haber</th><th class="der">Contado</th><th class="der">Diferencia</th>

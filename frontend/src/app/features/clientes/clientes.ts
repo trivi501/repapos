@@ -1,3 +1,4 @@
+import { TablaTarjetas } from '../../shared/tabla-tarjetas';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ClienteService } from '../../core/services/cliente.service';
@@ -8,7 +9,7 @@ import { DialogoService } from '../../core/services/dialogo.service';
 @Component({
   selector: 'app-clientes',
   standalone: true,
-  imports: [ReactiveFormsModule],
+  imports: [TablaTarjetas, ReactiveFormsModule],
   templateUrl: './clientes.html',
   styleUrl: './clientes.scss',
 })

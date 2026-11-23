@@ -1,3 +1,4 @@
+import { TablaTarjetas } from '../../shared/tabla-tarjetas';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -56,7 +57,7 @@ export function metodoTexto(m: string): string {
 
 @Component({
   selector: 'app-ventas',
-  imports: [FormsModule, RouterLink, DineroPipe, FechaPipe],
+  imports: [TablaTarjetas, FormsModule, RouterLink, DineroPipe, FechaPipe],
   templateUrl: './ventas.html',
 })
 export class Ventas implements OnInit {

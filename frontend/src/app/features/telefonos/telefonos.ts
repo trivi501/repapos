@@ -1,3 +1,4 @@
+import { TablaTarjetas } from '../../shared/tabla-tarjetas';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -66,7 +67,7 @@ interface Cuenta {
 
 @Component({
   selector: 'app-telefonos',
-  imports: [FormsModule, DineroPipe, FechaPipe, Estatus, TelefonoForm, TelefonoDetalle, DetectarUsb],
+  imports: [TablaTarjetas, FormsModule, DineroPipe, FechaPipe, Estatus, TelefonoForm, TelefonoDetalle, DetectarUsb],
   templateUrl: './telefonos.html',
   // tabla compacta: caben más teléfonos en pantalla sin desplazarse a los lados
   styles: `
@@ -78,6 +79,12 @@ interface Cuenta {
     /* las acciones en dos renglones: ocupan lo mismo de alto que los tres estatus apilados */
     .tabla-compacta .iconos { flex-wrap: wrap; width: 5rem; gap: 0.1rem; }
     .estatus-apilados { display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem; }
+    /* celular (la tabla se ve como tarjetas): acciones en un renglón y del tamaño del dedo */
+    @media (max-width: 640px) {
+      .tabla-compacta .iconos { width: auto; flex-wrap: nowrap; gap: 0.3rem; }
+      .tabla-compacta .icono-btn { width: 2.25rem; height: 2.25rem; font-size: 1rem; }
+      .estatus-apilados { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; }
+    }
   `,
 })
 export class Telefonos implements OnInit {

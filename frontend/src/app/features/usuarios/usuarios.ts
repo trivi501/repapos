@@ -1,3 +1,4 @@
+import { TablaTarjetas } from '../../shared/tabla-tarjetas';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { UsuarioService } from '../../core/services/usuario.service';
@@ -12,7 +13,7 @@ import { DialogoService } from '../../core/services/dialogo.service';
 @Component({
   selector: 'app-usuarios',
   standalone: true,
-  imports: [ReactiveFormsModule],
+  imports: [TablaTarjetas, ReactiveFormsModule],
   templateUrl: './usuarios.html',
   styleUrl: './usuarios.scss',
 })

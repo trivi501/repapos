@@ -1,3 +1,4 @@
+import { TablaTarjetas } from '../../shared/tabla-tarjetas';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { EquipoService } from '../../core/services/equipo.service';
@@ -9,7 +10,7 @@ import { DialogoService } from '../../core/services/dialogo.service';
 @Component({
   selector: 'app-equipos',
   standalone: true,
-  imports: [ReactiveFormsModule],
+  imports: [TablaTarjetas, ReactiveFormsModule],
   templateUrl: './equipos.html',
   styleUrl: './equipos.scss',
 })

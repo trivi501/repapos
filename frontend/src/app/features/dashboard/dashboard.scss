@@ -68,6 +68,30 @@
   }
 }
 
+/* celular: los números de dos en dos */
+@media (max-width: 640px) {
+  .panel-encabezado h1 {
+    font-size: 1.35rem;
+  }
+
+  .panel-numeros {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .panel-numero {
+    padding: 0.65rem 0.75rem;
+
+    strong {
+      font-size: 1.2rem;
+    }
+
+    small {
+      font-size: 0.7rem;
+    }
+  }
+}
+
 /* dos gráficas por renglón (una en pantallas angostas) */
 .panel-rejilla {
   display: grid;

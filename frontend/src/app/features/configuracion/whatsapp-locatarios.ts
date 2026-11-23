@@ -1,3 +1,4 @@
+import { TablaTarjetas } from '../../shared/tabla-tarjetas';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -14,7 +15,7 @@ interface LocatarioWhatsapp {
 /** Ajustes → WhatsApp de locatarios: el número al que se mandan sus avisos y su cuenta. */
 @Component({
   selector: 'app-whatsapp-locatarios',
-  imports: [FormsModule],
+  imports: [TablaTarjetas, FormsModule],
   template: `
     <div class="encabezado"><h1>WhatsApp de locatarios</h1></div>
 
@@ -25,7 +26,7 @@ interface LocatarioWhatsapp {
                [ngModel]="filtro()" (ngModelChange)="filtro.set($event)" />
       </div>
       <form (ngSubmit)="guardar()">
-        <table>
+        <table tablaTarjetas>
           <thead><tr><th>Locatario</th><th>WhatsApp</th></tr></thead>
           <tbody>
             @for (l of visibles(); track l.id) {

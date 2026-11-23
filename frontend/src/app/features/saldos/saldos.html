@@ -33,7 +33,7 @@
       <h2>Locatarios</h2>
       <button class="enlace" (click)="alternarTodos()">{{ todos() ? 'Ver solo los que tienen saldo' : 'Ver todos' }}</button>
     </div>
-    <table>
+    <table tablaTarjetas>
       <thead><tr><th>Locatario</th><th class="der">A favor</th></tr></thead>
       <tbody>
         @for (l of datos()?.lista; track l.id) {
@@ -73,7 +73,7 @@
         </div>
         @if (e.plan.length) {
           <p class="ayuda separado">Se paga primero lo entregado que debe y luego lo demás, del más antiguo al más nuevo:</p>
-          <table>
+          <table tablaTarjetas>
             <tbody>
               @for (p of e.plan; track p.tipo + p.id) {
                 <tr>
@@ -90,7 +90,7 @@
 
       <div class="card tabla-scroll">
         <div class="titulo-tarjeta"><h2>Movimientos</h2></div>
-        <table>
+        <table tablaTarjetas>
           <thead><tr><th>Fecha</th><th>Tipo</th><th>Concepto</th><th class="der">Monto</th><th></th></tr></thead>
           <tbody>
             @for (m of e.movimientos; track m.id) {

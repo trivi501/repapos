@@ -1,3 +1,4 @@
+import { TablaTarjetas } from '../../shared/tabla-tarjetas';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -29,7 +30,7 @@ interface Datos {
 
 @Component({
   selector: 'app-inventario',
-  imports: [FormsModule, RouterLink, DineroPipe],
+  imports: [TablaTarjetas, FormsModule, RouterLink, DineroPipe],
   templateUrl: './inventario.html',
 })
 export class Inventario implements OnInit {

@@ -1,3 +1,4 @@
+import { TablaTarjetas } from '../../shared/tabla-tarjetas';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
@@ -21,7 +22,7 @@ interface Fila {
 
 @Component({
   selector: 'app-resumen',
-  imports: [RouterLink, DineroPipe],
+  imports: [TablaTarjetas, RouterLink, DineroPipe],
   templateUrl: './resumen.html',
 })
 export class Resumen implements OnInit {

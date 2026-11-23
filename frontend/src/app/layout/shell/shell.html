@@ -45,8 +45,11 @@
           <a routerLink="/perfil" title="Mi perfil y contraseña"><strong>{{ usuario()?.name }}</strong></a>
           <span>{{ usuario()?.roles?.join(', ') }}</span>
         </div>
+        <!-- en celular solo el ícono: el texto se esconde para que la barra quepa en un renglón -->
         @if (auth.tienePermiso('respaldo.descargar')) {
-          <button class="btn btn-secondary" (click)="respaldo()" title="Descargar respaldo de los datos de tu taller">Respaldo</button>
+          <button class="btn btn-secondary" (click)="respaldo()" title="Descargar respaldo de los datos de tu taller" aria-label="Respaldo">
+            💾<span class="texto-boton"> Respaldo</span>
+          </button>
         }
         <button
           class="btn btn-secondary"
@@ -54,9 +57,11 @@
           [attr.aria-label]="temaService.tema() === 'oscuro' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'"
           [title]="temaService.tema() === 'oscuro' ? 'Tema claro' : 'Tema oscuro'"
         >
-          {{ temaService.tema() === 'oscuro' ? '☀️ Claro' : '🌙 Oscuro' }}
+          {{ temaService.tema() === 'oscuro' ? '☀️' : '🌙' }}<span class="texto-boton">{{ temaService.tema() === 'oscuro' ? ' Claro' : ' Oscuro' }}</span>
         </button>
-        <button class="btn btn-secondary" (click)="cerrarSesion()">Salir</button>
+        <button class="btn btn-secondary" (click)="cerrarSesion()" title="Cerrar sesión" aria-label="Salir">
+          🚪<span class="texto-boton"> Salir</span>
+        </button>
       </div>
     </header>
 

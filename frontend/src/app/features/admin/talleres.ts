@@ -1,3 +1,4 @@
+import { TablaTarjetas } from '../../shared/tabla-tarjetas';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -28,7 +29,7 @@ interface Datos {
 
 @Component({
   selector: 'app-talleres',
-  imports: [FormsModule, FechaPipe],
+  imports: [TablaTarjetas, FormsModule, FechaPipe],
   templateUrl: './talleres.html',
 })
 export class Talleres implements OnInit {

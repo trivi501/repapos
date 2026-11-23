@@ -1781,6 +1781,140 @@ app-grafica-barras {
   }
 }
 
+/* ---- celular ---- */
+@media (max-width: 640px) {
+  /* filtros en dos columnas, la búsqueda a lo ancho */
+  .filtros {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: end;
+    gap: 0.5rem 0.6rem;
+    padding: 0.65rem 0.75rem;
+
+    .form-field {
+      min-width: 0;
+    }
+
+    input,
+    select {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .form-field:has(input[type='search']),
+    .form-field:has(input[type='text']) {
+      grid-column: 1 / -1;
+    }
+  }
+
+  .encabezado {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+
+    h1 {
+      font-size: 1.35rem;
+    }
+  }
+
+  .barra-resumen {
+    gap: 0.25rem 0.9rem;
+    font-size: 0.8rem;
+  }
+
+  .filtros .check-linea {
+    justify-self: start;
+    text-align: left;
+  }
+
+  /* tablas marcadas con tablaTarjetas: cada renglón es una tarjeta "etiqueta: valor" */
+  .tabla-scroll table.tabla-tarjetas,
+  .tabla-tarjetas {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .tabla-tarjetas {
+    thead {
+      display: none;
+    }
+
+    /* un dato vacío no ocupa renglón en la tarjeta */
+    td[data-vacia] {
+      display: none !important;
+    }
+
+    /* botones de acción del tamaño del dedo */
+    .icono-btn {
+      min-width: 2.25rem;
+      min-height: 2.25rem;
+    }
+
+    tbody,
+    tfoot {
+      display: block;
+    }
+
+    tr {
+      display: block;
+      margin: 0.5rem;
+      padding: 0.35rem 0.7rem;
+      border: 1px solid var(--color-border);
+      border-radius: 10px;
+      background: var(--color-surface);
+    }
+
+    tbody tr:hover {
+      background: var(--color-surface);
+    }
+
+    td {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      /* la etiqueta a la izquierda; el valor (aunque sean varios datos) junto, a la derecha */
+      justify-content: flex-end;
+      gap: 0.2rem 0.45rem;
+      padding: 0.3rem 0;
+      border: 0;
+      border-bottom: 1px dashed var(--color-border);
+      text-align: right;
+      white-space: normal;
+
+      &:last-child {
+        border-bottom: 0;
+      }
+
+      &::before {
+        content: attr(data-label);
+        flex: none;
+        max-width: 45%;
+        margin-right: auto;
+        text-align: left;
+        font-size: 0.72rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+        color: var(--color-text-muted);
+      }
+
+      /* sin etiqueta (acciones, mensaje de "sin datos"): a lo ancho */
+      &[data-label='']::before {
+        display: none;
+      }
+
+      &[data-label=''] {
+        justify-content: flex-end;
+      }
+
+      &[colspan] {
+        display: block;
+        text-align: center;
+      }
+    }
+  }
+}
+
 @media print {
   .no-imprimir {
     display: none !important;

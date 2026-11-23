@@ -177,6 +177,54 @@
   }
 }
 
+/* celular: la barra de arriba en un solo renglón, con íconos */
+@media (max-width: 640px) {
+  .topbar {
+    flex-wrap: nowrap;
+    gap: 0.35rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .topbar-user {
+    flex-wrap: nowrap;
+    gap: 0.35rem;
+    min-width: 0;
+
+    .btn {
+      padding: 0.4rem 0.55rem;
+    }
+  }
+
+  .texto-boton,
+  .topbar-user-info span {
+    display: none;
+  }
+
+  .topbar-user-info {
+    min-width: 0;
+
+    strong {
+      display: block;
+      max-width: 6.5rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  .selector-sucursal select,
+  .sucursal-fija {
+    max-width: 6.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .page {
+    padding: 0.75rem;
+  }
+}
+
 @media print {
   .sidebar {
     display: none;

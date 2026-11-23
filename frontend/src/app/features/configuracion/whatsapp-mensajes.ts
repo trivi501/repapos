@@ -1,3 +1,4 @@
+import { TablaTarjetas } from '../../shared/tabla-tarjetas';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -29,7 +30,7 @@ interface Respuesta {
 /** Historial de los mensajes de WhatsApp que mandó el sistema (envío directo). */
 @Component({
   selector: 'app-whatsapp-mensajes',
-  imports: [FormsModule, RouterLink, FechaPipe],
+  imports: [TablaTarjetas, FormsModule, RouterLink, FechaPipe],
   styles: `
     .texto-mensaje { white-space: pre-line; max-width: 46ch; }
     .texto-mensaje.corto { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -81,7 +82,7 @@ interface Respuesta {
     </div>
 
     <div class="card tabla-scroll">
-      <table>
+      <table tablaTarjetas>
         <thead><tr><th>Cuándo</th><th>A</th><th>Mensaje</th><th>Estado</th><th>Envió</th><th></th></tr></thead>
         <tbody>
           @for (m of mensajes(); track m.id) {

@@ -1,3 +1,4 @@
+import { TablaTarjetas } from '../../shared/tabla-tarjetas';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -29,7 +30,7 @@ const redondear = (n: number) => Math.round(n * 100) / 100;
 /** Punto de venta: el catálogo se trae una vez y se busca sin volver al servidor. */
 @Component({
   selector: 'app-venta-nueva',
-  imports: [FormsModule, RouterLink, DineroPipe],
+  imports: [TablaTarjetas, FormsModule, RouterLink, DineroPipe],
   templateUrl: './venta-nueva.html',
 })
 export class VentaNueva implements OnInit {

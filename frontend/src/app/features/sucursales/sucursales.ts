@@ -1,3 +1,4 @@
+import { TablaTarjetas } from '../../shared/tabla-tarjetas';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -16,7 +17,7 @@ interface Sucursal {
 
 @Component({
   selector: 'app-sucursales',
-  imports: [FormsModule, RouterLink],
+  imports: [TablaTarjetas, FormsModule, RouterLink],
   templateUrl: './sucursales.html',
 })
 export class Sucursales implements OnInit {
