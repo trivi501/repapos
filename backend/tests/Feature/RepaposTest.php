@@ -648,7 +648,7 @@ class RepaposTest extends TestCase
     {
         // el más antiguo, pero sigue en el taller: debe 400
         $enTaller = $this->telefonoDe($this->adminA, ['fecha_recibido' => '2026-11-01', 'pagado' => 100]);
-        // una venta a crédito de hoy por 160 (los productos ya se los llevó: cuenta como entregado)
+        // una venta a crédito de hoy por 160: el saldo a favor NO la paga (solo teléfonos)
         $p = $this->productoDe($this->adminA);
         $venta = Venta::findOrFail($this->postJson('/api/ventas', [
             'lineas' => [['producto_id' => $p->id, 'cantidad' => 2, 'precio' => 80]], 'metodo' => 'CRÉDITO', 'tipo' => 'LOCATARIO', 'locatario' => 'Don Pepe',
@@ -659,26 +659,21 @@ class RepaposTest extends TestCase
         ]);
         $loc = Locatario::first();
 
-        // 700 a favor: primero lo entregado (venta 160 y teléfono entregado 300) y lo que sobra (240) al que sigue en taller
-        $this->postJson('/api/saldos/deposito', ['locatario' => 'Don Pepe', 'monto' => 700])->assertCreated();
+        // 500 a favor: primero el teléfono entregado (300) y lo que sobra (200) al que sigue en taller; la venta no
+        $this->postJson('/api/saldos/deposito', ['locatario' => 'Don Pepe', 'monto' => 500])->assertCreated();
         $plan = $this->getJson("/api/saldos?locatario={$loc->id}")->assertOk()->json('elegido.plan');
-        $this->assertSame(['venta', 'telefono', 'telefono'], array_column($plan, 'tipo'));
-        $this->assertSame([$venta->id, $entregado->id, $enTaller->id], array_column($plan, 'id'));
-        $this->assertSame([false, false, true], array_column($plan, 'parcial'));
-        $this->assertEquals([160, 300, 240], array_column($plan, 'monto'));
+        $this->assertSame(['telefono', 'telefono'], array_column($plan, 'tipo'));
+        $this->assertSame([$entregado->id, $enTaller->id], array_column($plan, 'id'));
+        $this->assertSame([false, true], array_column($plan, 'parcial'));
+        $this->assertEquals([300, 200], array_column($plan, 'monto'));
 
         $this->postJson("/api/saldos/{$loc->id}/aplicar")->assertOk();
-        $this->assertSame(Venta::PAGADA, $venta->fresh()->estatus);
         $this->assertEquals(0.0, $entregado->fresh()->saldo);
-        $this->assertEquals(160.0, $enTaller->fresh()->saldo);
+        $this->assertEquals(200.0, $enTaller->fresh()->saldo);
+        $this->assertSame(Venta::PENDIENTE, $venta->fresh()->estatus, 'La venta a crédito sigue debiendo');
+        $this->assertSame(0, Credito::whereNotNull('venta_id')->count());
         $this->assertEquals(0.0, $loc->saldoAFavor());
-        $this->assertEquals(160.0, $loc->deuda());
-
-        // deshacer lo aplicado a la venta: vuelve a deber
-        $aplicadoVenta = Credito::where('venta_id', $venta->id)->firstOrFail();
-        $this->deleteJson("/api/saldos/movimiento/{$aplicadoVenta->id}")->assertOk();
-        $this->assertSame(Venta::PENDIENTE, $venta->fresh()->estatus);
-        $this->assertEquals(160.0, $loc->saldoAFavor());
+        $this->assertEquals(360.0, $loc->deuda());   // 200 del teléfono + 160 de la venta
     }
 
     public function test_telefono_con_serie_imei_y_pin_y_busqueda_por_usb(): void

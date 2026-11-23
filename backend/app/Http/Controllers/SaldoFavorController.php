@@ -53,8 +53,8 @@ class SaldoFavorController extends Controller
     }
 
     /**
-     * Reparte el saldo a favor entre todo lo que debe: primero lo que ya se llevó y debe (teléfonos entregados y
-     * ventas a crédito), luego los teléfonos que siguen en el taller; cada grupo del más antiguo al más nuevo.
+     * Reparte el saldo a favor entre los teléfonos que debe (las ventas a crédito no se pagan con saldo a favor):
+     * primero los entregados, luego los que siguen en el taller; cada grupo del más antiguo al más nuevo.
      * Liquida los que alcance y al último le abona lo que sobre.
      */
     protected function plan(Locatario $l): array
@@ -62,11 +62,7 @@ class SaldoFavorController extends Controller
         $deudas = $l->telefonos()->conSaldo()->get()->map(fn (Telefono $t) => [
             'tipo' => 'telefono', 'deuda' => $t, 'fecha' => $t->fecha_recibido, 'debe' => $t->saldo, 'entregado' => (bool) $t->entregado,
             'descripcion' => "Teléfono #{$t->id} {$t->modelo}".($t->trabajo ? " ({$t->trabajo})" : '').($t->entregado ? ' · entregado' : ''),
-        ])->concat($l->ventas()->conSaldo()->with('detalles')->get()->map(fn (Venta $v) => [
-            // los productos ya se los llevó: cuenta como entregado
-            'tipo' => 'venta', 'deuda' => $v, 'fecha' => $v->created_at, 'debe' => $v->saldo, 'entregado' => true,
-            'descripcion' => "Venta N° {$v->folio}: ".$v->detalles->pluck('nombre')->take(3)->implode(', '),
-        ]))
+        ])
             ->filter(fn ($d) => $d['debe'] > 0)
             ->sortBy([
                 fn ($a, $b) => $b['entregado'] <=> $a['entregado'],   // entregados que deben, primero
@@ -124,20 +120,12 @@ class SaldoFavorController extends Controller
         DB::transaction(function () use ($plan, $locatario) {
             foreach ($plan as $p) {
                 // sin cobro en caja: el dinero ya entró cuando se depositó el saldo a favor
-                $deuda = $p['deuda'];
-                $deuda->pagado = round((float) $deuda->pagado + $p['monto'], 2);
-                if ($p['tipo'] === 'venta' && $deuda->saldo <= 0) {
-                    $deuda->estatus = Venta::PAGADA;
-                }
-                $deuda->save();
+                $t = $p['deuda'];
+                $t->update(['pagado' => round((float) $t->pagado + $p['monto'], 2)]);
                 Credito::create([
                     'fecha' => now(), 'locatario_id' => $locatario->id, 'tipo' => Credito::APLICADO,
-                    'concepto' => 'Aplicado a '.($p['tipo'] === 'venta' ? "venta N° {$deuda->folio}" : "#{$deuda->id} {$deuda->modelo}")
-                        .($p['parcial'] ? ' (abono)' : ''),
-                    'monto' => -$p['monto'],
-                    'telefono_id' => $p['tipo'] === 'telefono' ? $deuda->id : null,
-                    'venta_id' => $p['tipo'] === 'venta' ? $deuda->id : null,
-                    'user_id' => auth()->id(),
+                    'concepto' => "Aplicado a #{$t->id} {$t->modelo}".($p['parcial'] ? ' (abono)' : ''),
+                    'monto' => -$p['monto'], 'telefono_id' => $t->id, 'user_id' => auth()->id(),
                 ]);
             }
         });
