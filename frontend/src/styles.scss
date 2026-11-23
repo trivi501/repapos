@@ -1313,6 +1313,7 @@ input.input-corto,
 
 /* Gráficas del panel (shared/graficas.ts) */
 app-grafica-lineas,
+app-grafica-columnas,
 app-grafica-barras {
   display: block;
   min-width: 0;
@@ -1364,6 +1365,48 @@ app-grafica-barras {
     stroke: var(--color-text-muted);
     stroke-width: 1;
   }
+}
+
+.grafica-columnas {
+  position: relative;
+  height: 170px;
+  border-radius: 6px;
+  touch-action: pan-y;
+
+  svg {
+    display: block;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  .rejilla {
+    stroke: var(--color-border);
+    stroke-width: 1;
+
+    &.base {
+      stroke: var(--color-text-muted);
+    }
+  }
+
+  .eje {
+    fill: var(--color-text-muted);
+    font-size: 11px;
+  }
+
+  /* el día bajo el puntero, apenas marcado */
+  .banda {
+    fill: var(--color-surface-hover);
+  }
+}
+
+/* en las columnas la clave es un cuadrito, no una rayita de línea */
+.clave.cuadro {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
 }
 
 .grafica-globo {

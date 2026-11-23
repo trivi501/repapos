@@ -25,25 +25,69 @@
 
 @if (datos(); as d) {
   @if (hayGraficas()) {
+    <!-- lo importante, en grande y de un vistazo -->
+    <div class="panel-numeros" [class.recargando]="cargando()">
+      @if (d.ingresos; as i) {
+        <div class="card panel-numero">
+          <span>Cobrado</span>
+          <strong>{{ i.total_cobrado | dinero }}</strong>
+          <small>{{ i.total_cobrado - i.total_salidas | dinero }} quitando salidas</small>
+        </div>
+        <div class="card panel-numero">
+          <span>Salidas</span>
+          <strong>{{ i.total_salidas | dinero }}</strong>
+          <small>en {{ d.dias }} días</small>
+        </div>
+      }
+      @if (d.ventas; as v) {
+        <div class="card panel-numero">
+          <span>Vendido en mostrador</span>
+          <strong>{{ v.total | dinero }}</strong>
+          <small>{{ v.numero }} {{ v.numero === 1 ? 'venta' : 'ventas' }}</small>
+        </div>
+      }
+      @if (d.telefonos; as t) {
+        <div class="card panel-numero">
+          <span>Teléfonos en taller</span>
+          <strong>{{ t.en_taller }}</strong>
+          <small>{{ t.no_quedaron }} no {{ t.no_quedaron === 1 ? 'quedó' : 'quedaron' }}, por regresar</small>
+        </div>
+        <div class="card panel-numero">
+          <span>Listos por entregar</span>
+          <strong>{{ t.listos }}</strong>
+          <small>hoy</small>
+        </div>
+      }
+      @if (d.reparaciones; as r) {
+        <div class="card panel-numero">
+          <span>Reparaciones abiertas</span>
+          <strong>{{ r.abiertas }}</strong>
+          <small>{{ r.recibidas }} recibidas · {{ r.entregadas }} entregadas</small>
+        </div>
+      }
+      @if (d.cobranza; as c) {
+        <div class="card panel-numero">
+          <span>Por cobrar a locatarios</span>
+          <strong>{{ c.total | dinero }}</strong>
+          <small>{{ c.deudores }} {{ c.deudores === 1 ? 'locatario debe' : 'locatarios deben' }}</small>
+        </div>
+      }
+    </div>
+
     <div class="panel-rejilla" [class.recargando]="cargando()" [attr.aria-busy]="cargando()">
       @if (d.ingresos; as i) {
-        <section class="card panel-tarjeta ancha">
+        <section class="card panel-tarjeta">
           <h2>Cobros y salidas</h2>
-          <p class="panel-subtitulo">Dinero por día en el periodo, con todos los métodos de pago.</p>
-          <div class="panel-cifras">
-            <div class="panel-cifra"><span>Cobrado</span><strong>{{ i.total_cobrado | dinero }}</strong></div>
-            <div class="panel-cifra"><span>Salidas</span><strong>{{ i.total_salidas | dinero }}</strong></div>
-            <div class="panel-cifra"><span>Cobrado menos salidas</span><strong>{{ i.total_cobrado - i.total_salidas | dinero }}</strong></div>
-          </div>
+          <p class="panel-subtitulo">{{ d.dias > 31 ? 'Por semana' : 'Por día' }}, con todos los métodos de pago.</p>
           @if (i.total_cobrado || i.total_salidas) {
-            <app-grafica-lineas
+            <app-grafica-columnas
               [fechas]="d.fechas"
               [series]="[
                 { nombre: 'Cobrado', color: 1, valores: i.cobrado },
                 { nombre: 'Salidas', color: 2, valores: i.salidas }
               ]"
               [moneda]="true"
-              [descripcion]="'Cobros y salidas por día. Cobrado ' + (i.total_cobrado | dinero) + ', salidas ' + (i.total_salidas | dinero) + '.'"
+              [descripcion]="'Cobros y salidas. Cobrado ' + (i.total_cobrado | dinero) + ', salidas ' + (i.total_salidas | dinero) + '.'"
             />
             @if (i.metodos.length > 1) {
               <h3>Cobrado por método de pago</h3>
@@ -56,19 +100,15 @@
       }
 
       @if (d.ventas; as v) {
-        <section class="card panel-tarjeta ancha">
+        <section class="card panel-tarjeta">
           <h2>Ventas de mostrador</h2>
-          <p class="panel-subtitulo">Importe vendido por día, sin canceladas ni devoluciones.</p>
-          <div class="panel-cifras">
-            <div class="panel-cifra"><span>Vendido</span><strong>{{ v.total | dinero }}</strong></div>
-            <div class="panel-cifra"><span>Ventas</span><strong>{{ v.numero }}</strong></div>
-          </div>
+          <p class="panel-subtitulo">Importe vendido {{ d.dias > 31 ? 'por semana' : 'por día' }}, sin canceladas ni devoluciones.</p>
           @if (v.numero) {
-            <app-grafica-lineas
+            <app-grafica-columnas
               [fechas]="d.fechas"
               [series]="[{ nombre: 'Vendido', color: 1, valores: v.importes }]"
               [moneda]="true"
-              [descripcion]="'Ventas por día. Total ' + (v.total | dinero) + ' en ' + v.numero + ' ventas.'"
+              [descripcion]="'Ventas. Total ' + (v.total | dinero) + ' en ' + v.numero + ' ventas.'"
             />
             @if (v.productos.length) {
               <h3>Productos más vendidos (piezas)</h3>
@@ -81,22 +121,17 @@
       }
 
       @if (d.telefonos; as t) {
-        <section class="card panel-tarjeta ancha">
+        <section class="card panel-tarjeta">
           <h2>Teléfonos de locatarios</h2>
-          <p class="panel-subtitulo">Recibidos y entregados por día en el periodo. Las cifras son de hoy.</p>
-          <div class="panel-cifras">
-            <div class="panel-cifra"><span>En taller</span><strong>{{ t.en_taller }}</strong></div>
-            <div class="panel-cifra"><span>Listos por entregar</span><strong>{{ t.listos }}</strong></div>
-            <div class="panel-cifra"><span>No quedaron, por regresar</span><strong>{{ t.no_quedaron }}</strong></div>
-          </div>
+          <p class="panel-subtitulo">Recibidos y entregados {{ d.dias > 31 ? 'por semana' : 'por día' }}.</p>
           @if (hayValores(t.recibidos) || hayValores(t.entregados)) {
-            <app-grafica-lineas
+            <app-grafica-columnas
               [fechas]="d.fechas"
               [series]="[
                 { nombre: 'Recibidos', color: 1, valores: t.recibidos },
                 { nombre: 'Entregados', color: 2, valores: t.entregados }
               ]"
-              descripcion="Teléfonos recibidos y entregados por día."
+              descripcion="Teléfonos recibidos y entregados."
             />
           } @else {
             <p class="panel-vacio">No se recibieron ni entregaron teléfonos en este periodo.</p>
@@ -106,13 +141,8 @@
 
       @if (d.reparaciones; as r) {
         <section class="card panel-tarjeta">
-          <h2>Reparaciones</h2>
-          <p class="panel-subtitulo">Abiertas hoy por estado. Recibidas y entregadas, en el periodo.</p>
-          <div class="panel-cifras">
-            <div class="panel-cifra"><span>Abiertas</span><strong>{{ r.abiertas }}</strong></div>
-            <div class="panel-cifra"><span>Recibidas</span><strong>{{ r.recibidas }}</strong></div>
-            <div class="panel-cifra"><span>Entregadas</span><strong>{{ r.entregadas }}</strong></div>
-          </div>
+          <h2>Reparaciones abiertas por estado</h2>
+          <p class="panel-subtitulo">Cómo están hoy.</p>
           @if (r.estados.length) {
             <app-grafica-barras [filas]="filasEstados(r.estados)" />
           } @else {
@@ -125,9 +155,6 @@
         <section class="card panel-tarjeta">
           <h2>Por cobrar a locatarios</h2>
           <p class="panel-subtitulo">Lo que deben hoy, de mayor a menor. No depende del periodo.</p>
-          <div class="panel-cifras">
-            <div class="panel-cifra"><span>Total por cobrar</span><strong>{{ c.total | dinero }}</strong></div>
-          </div>
           @if (c.locatarios.length) {
             <app-grafica-barras [filas]="c.locatarios" [moneda]="true" />
           } @else {

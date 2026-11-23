@@ -220,6 +220,225 @@ export class GraficaLineas implements OnDestroy {
   }
 }
 
+const ALTO_COLUMNAS = 170;
+const MARGEN_COLUMNAS = { arriba: 10, derecha: 8, abajo: 24 };
+const COLUMNA_MAX = 24;   // nunca más gruesa: lo que sobra de la banda es aire
+const SEPARACION = 2;     // espacio del color del fondo entre columnas que se tocan
+
+/** Un día, o una semana cuando el periodo es largo. */
+interface GrupoColumnas {
+  desde: string;
+  hasta: string;
+  valores: number[];
+}
+
+/**
+ * Columnas por día (o por semana si el periodo pasa de 31 días), con una o dos series lado a lado.
+ * Se lee mejor que una línea cuando hay días sin movimiento. Globo al pasar el puntero, flechas del teclado y tabla.
+ */
+@Component({
+  selector: 'app-grafica-columnas',
+  template: `
+    <div
+      class="grafica-columnas"
+      tabindex="0"
+      role="img"
+      [attr.aria-label]="descripcion()"
+      (pointermove)="seguir($event)"
+      (pointerdown)="seguir($event)"
+      (pointerleave)="indice.set(null)"
+      (focus)="indice.set(grupos().length - 1)"
+      (blur)="indice.set(null)"
+      (keydown)="tecla($event)"
+    >
+      @if (dibujo(); as g) {
+        <svg [attr.width]="g.ancho" [attr.height]="alto" aria-hidden="true">
+          @for (m of g.marcas; track m.valor) {
+            <line class="rejilla" [class.base]="m.valor === 0" [attr.x1]="g.izquierda" [attr.x2]="g.ancho - margen.derecha" [attr.y1]="m.y" [attr.y2]="m.y" />
+            <text class="eje" [attr.x]="g.izquierda - 8" [attr.y]="m.y + 4" text-anchor="end">{{ m.texto }}</text>
+          }
+          @if (indice() !== null) {
+            <rect class="banda" [attr.x]="g.izquierda + indice()! * g.banda" [attr.y]="margen.arriba" [attr.width]="g.banda" [attr.height]="alto - margen.arriba - margen.abajo" rx="4" />
+          }
+          @for (c of g.columnas; track c.clave) {
+            <path class="columna" [attr.d]="c.d" [attr.fill]="'var(--serie-' + c.color + ')'" />
+          }
+          @for (e of g.etiquetas; track e.x) {
+            <text class="eje" [attr.x]="e.x" [attr.y]="alto - 6" [attr.text-anchor]="e.ancla">{{ e.texto }}</text>
+          }
+        </svg>
+        @if (indice() !== null) {
+          @let grupo = grupos()[indice()!];
+          @let centro = g.izquierda + (indice()! + 0.5) * g.banda;
+          <div class="grafica-globo" [class.al-reves]="centro > g.ancho / 2" [style.left.px]="centro">
+            <div class="grafica-globo-fecha">{{ textoGrupo(grupo) }}</div>
+            @for (s of series(); track s.nombre; let i = $index) {
+              <div class="grafica-globo-fila">
+                <span class="clave cuadro" [style.background]="'var(--serie-' + s.color + ')'"></span>
+                <strong>{{ texto(grupo.valores[i]) }}</strong>
+                <span>{{ s.nombre }}</span>
+              </div>
+            }
+          </div>
+        }
+      }
+    </div>
+
+    @if (series().length > 1) {
+      <ul class="grafica-leyenda">
+        @for (s of series(); track s.nombre) {
+          <li><span class="clave cuadro" [style.background]="'var(--serie-' + s.color + ')'"></span>{{ s.nombre }}</li>
+        }
+      </ul>
+    }
+
+    <details class="grafica-tabla">
+      <summary>Ver como tabla</summary>
+      <div class="grafica-tabla-marco">
+        <table>
+          <thead>
+            <tr>
+              <th>{{ porSemana() ? 'Semana' : 'Día' }}</th>
+              @for (s of series(); track s.nombre) {
+                <th class="der">{{ s.nombre }}</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (gr of grupos(); track gr.desde) {
+              <tr>
+                <td>{{ textoGrupo(gr) }}</td>
+                @for (v of gr.valores; track $index) {
+                  <td class="der">{{ texto(v) }}</td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </details>
+  `,
+})
+export class GraficaColumnas implements OnDestroy {
+  readonly fechas = input.required<string[]>();
+  readonly series = input.required<SerieGrafica[]>();
+  readonly descripcion = input.required<string>();
+  readonly moneda = input(false);
+
+  readonly alto = ALTO_COLUMNAS;
+  readonly margen = MARGEN_COLUMNAS;
+  readonly indice = signal<number | null>(null);
+
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly ancho = signal(0);
+  private observador?: ResizeObserver;
+
+  constructor() {
+    afterNextRender(() => {
+      this.observador = new ResizeObserver((e) => this.ancho.set(Math.floor(e[0].contentRect.width)));
+      this.observador.observe(this.host.nativeElement);
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.observador?.disconnect();
+  }
+
+  /** Más de 31 días: se suman por semana para que las columnas no queden como rayitas. */
+  readonly porSemana = computed(() => this.fechas().length > 31);
+
+  readonly grupos = computed<GrupoColumnas[]>(() => {
+    const fechas = this.fechas();
+    const series = this.series();
+    const tam = this.porSemana() ? 7 : 1;
+    const grupos: GrupoColumnas[] = [];
+    for (let i = 0; i < fechas.length; i += tam) {
+      const fin = Math.min(i + tam, fechas.length) - 1;
+      grupos.push({
+        desde: fechas[i],
+        hasta: fechas[fin],
+        valores: series.map((s) => s.valores.slice(i, fin + 1).reduce((a, b) => a + b, 0)),
+      });
+    }
+    return grupos;
+  });
+
+  readonly dibujo = computed(() => {
+    const ancho = this.ancho();
+    const grupos = this.grupos();
+    const k = this.series().length;
+    if (ancho < 80 || !grupos.length || !k) return null;
+
+    const { desde, hasta, marcas } = escala(grupos.flatMap((g) => g.valores), !this.moneda());
+    const textos = marcas.map((m) => textoEje(m, hasta, this.moneda()));
+    const izquierda = Math.max(...textos.map((t) => t.length)) * 7 + 12;
+    const util = ancho - izquierda - MARGEN_COLUMNAS.derecha;
+    const banda = util / grupos.length;
+    const y = (v: number) => MARGEN_COLUMNAS.arriba + ((hasta - v) * (ALTO_COLUMNAS - MARGEN_COLUMNAS.arriba - MARGEN_COLUMNAS.abajo)) / (hasta - desde);
+    const base = y(0);
+
+    // grosor: hasta 24 px por columna, y siempre aire entre un día y otro
+    const grueso = Math.max(1, Math.min(COLUMNA_MAX, (banda * 0.7 - SEPARACION * (k - 1)) / k));
+    const grupoAncho = grueso * k + SEPARACION * (k - 1);
+
+    const columnas: { clave: string; color: number; d: string }[] = [];
+    grupos.forEach((g, i) => {
+      const inicio = izquierda + i * banda + (banda - grupoAncho) / 2;
+      g.valores.forEach((v, j) => {
+        if (!v) return;
+        const x = inicio + j * (grueso + SEPARACION);
+        const tope = y(v);
+        const alto = Math.abs(base - tope);
+        const r = Math.min(4, grueso / 2, alto);
+        // esquina redondeada en la punta del dato, cuadrada en la base
+        const d = v > 0
+          ? `M${x} ${base}V${tope + r}Q${x} ${tope} ${x + r} ${tope}H${x + grueso - r}Q${x + grueso} ${tope} ${x + grueso} ${tope + r}V${base}Z`
+          : `M${x} ${base}V${tope - r}Q${x} ${tope} ${x + r} ${tope}H${x + grueso - r}Q${x + grueso} ${tope} ${x + grueso} ${tope - r}V${base}Z`;
+        columnas.push({ clave: `${i}-${j}`, color: this.series()[j].color, d });
+      });
+    });
+
+    const centro = (i: number) => izquierda + (i + 0.5) * banda;
+    const ultimo = grupos.length - 1;
+    const medio = Math.floor(ultimo / 2);
+    const etiquetas = (ultimo === 0 ? [0] : ultimo === 1 ? [0, 1] : [0, medio, ultimo]).map((i, n, todos) => ({
+      x: n === 0 ? Math.max(izquierda, centro(i) - 14) : n === todos.length - 1 && todos.length > 1 ? Math.min(ancho - MARGEN_COLUMNAS.derecha, centro(i) + 14) : centro(i),
+      texto: this.diaCorto(grupos[i].desde),
+      ancla: n === 0 ? 'start' : n === todos.length - 1 && todos.length > 1 ? 'end' : 'middle',
+    }));
+
+    return { ancho, izquierda, banda, columnas, etiquetas, marcas: marcas.map((valor, i) => ({ valor, y: y(valor), texto: textos[i] })) };
+  });
+
+  seguir(evento: PointerEvent): void {
+    const g = this.dibujo();
+    if (!g) return;
+    const x = evento.clientX - (evento.currentTarget as HTMLElement).getBoundingClientRect().left;
+    const i = Math.floor((x - g.izquierda) / g.banda);
+    this.indice.set(i >= 0 && i < this.grupos().length ? i : null);
+  }
+
+  tecla(evento: KeyboardEvent): void {
+    const cambio = evento.key === 'ArrowRight' ? 1 : evento.key === 'ArrowLeft' ? -1 : 0;
+    if (!cambio) return;
+    evento.preventDefault();
+    const ultimo = this.grupos().length - 1;
+    this.indice.set(Math.max(0, Math.min(ultimo, (this.indice() ?? ultimo) + cambio)));
+  }
+
+  texto(valor: number): string {
+    return this.moneda() ? dinero(valor) : valor.toLocaleString('es-MX');
+  }
+
+  textoGrupo(g: GrupoColumnas): string {
+    return g.desde === g.hasta ? fecha(g.desde) : `Semana del ${this.diaCorto(g.desde)} al ${fecha(g.hasta)}`;
+  }
+
+  private diaCorto(valor: string): string {
+    return fecha(valor).slice(0, 5);
+  }
+}
+
 /** Comparar y ordenar: nombre y valor siempre a la vista, y la barra para ver la proporción. */
 @Component({
   selector: 'app-grafica-barras',

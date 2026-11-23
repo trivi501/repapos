@@ -148,7 +148,8 @@ class PanelController extends Controller
             $filas->push(['nombre' => "Otros ({$resto->count()})", 'valor' => round((float) $resto->sum(), 2)]);
         }
 
-        return ['total' => round((float) $porLocatario->sum(), 2), 'locatarios' => $filas];
+        // la lista se corta en MAXIMO_FILAS (+ "Otros"): "deudores" es cuántos deben en realidad
+        return ['total' => round((float) $porLocatario->sum(), 2), 'deudores' => $porLocatario->count(), 'locatarios' => $filas];
     }
 
     /** Un valor por cada día del periodo, con cero en los días sin movimientos. */

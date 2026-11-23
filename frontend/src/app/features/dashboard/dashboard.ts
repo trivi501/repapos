@@ -6,7 +6,7 @@ import { ESTADOS_ORDEN } from '../../core/models/taller.model';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { AvisosService } from '../../core/services/avisos.service';
-import { FilaGrafica, GraficaBarras, GraficaLineas } from '../../shared/graficas';
+import { FilaGrafica, GraficaBarras, GraficaColumnas } from '../../shared/graficas';
 import { DineroPipe } from '../../shared/ui';
 
 /** Cada sección llega solo si el usuario tiene su permiso. */
@@ -17,13 +17,13 @@ interface DatosPanel {
   ventas?: { importes: number[]; total: number; numero: number; productos: FilaGrafica[] };
   reparaciones?: { estados: { estado: string; valor: number }[]; abiertas: number; recibidas: number; entregadas: number };
   telefonos?: { recibidos: number[]; entregados: number[]; en_taller: number; listos: number; no_quedaron: number };
-  cobranza?: { total: number; locatarios: FilaGrafica[] };
+  cobranza?: { total: number; deudores: number; locatarios: FilaGrafica[] };
 }
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [RouterLink, DineroPipe, GraficaLineas, GraficaBarras],
+  imports: [RouterLink, DineroPipe, GraficaColumnas, GraficaBarras],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
 })

@@ -27,10 +27,53 @@
   }
 }
 
+/* tarjetas con los números del periodo */
+.panel-numeros {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 175px), 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  transition: opacity 0.15s ease;
+
+  &.recargando {
+    opacity: 0.55;
+  }
+}
+
+.panel-numero {
+  min-width: 0;
+  padding: 0.85rem 1rem;
+
+  span {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--color-text-muted);
+  }
+
+  strong {
+    display: block;
+    margin: 0.15rem 0 0.1rem;
+    font-size: 1.55rem;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  small {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+}
+
+/* dos gráficas por renglón (una en pantallas angostas) */
 .panel-rejilla {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
   gap: 1rem;
+  align-items: start;
   transition: opacity 0.15s ease;
 
   &.recargando {
