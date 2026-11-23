@@ -84,6 +84,19 @@
   </div>
 }
 
+<!-- el locatario elegido debe teléfonos entregados: se le manda su saldo por WhatsApp -->
+@if (cuenta(); as c) {
+  <div class="alert alert-error acciones-fila">
+    <span>
+      <b>{{ c.nombre }}</b> debe <b>{{ c.debe | dinero }}</b> de {{ c.telefonos }} {{ c.telefonos === 1 ? 'teléfono entregado' : 'teléfonos entregados' }}{{ c.a_pagar < c.debe ? ' (' + (c.a_pagar | dinero) + ' quitando su saldo a favor)' : '' }}.
+    </span>
+    <a class="btn btn-whatsapp btn-sm" [href]="c.url" target="_blank" rel="noopener">📲 Enviar saldo por WhatsApp</a>
+    @if (!c.tiene_whatsapp) {
+      <small class="tenue">No tiene WhatsApp guardado: elegirás el contacto al abrir WhatsApp.</small>
+    }
+  </div>
+}
+
 <!-- el locatario elegido tiene saldo a favor: se puede pagar con él -->
 @if (saldoFavor(); as s) {
   <div class="alert alert-success acciones-fila">

@@ -100,7 +100,32 @@ class TelefonoController extends Controller
         return response()->json($pagina->toArray() + [
             'resumen' => $resumen,
             'locatarios' => Locatario::orderBy('nombre')->get(['id', 'nombre', 'whatsapp']),
+            'cuenta' => $r->filled('locatario') ? $this->cuenta($r->integer('locatario')) : null,
         ]);
+    }
+
+    /**
+     * Saldo pendiente del locatario elegido en el filtro, para mandárselo por WhatsApp:
+     * sus teléfonos entregados que deben (menos su saldo a favor). Null si no debe nada.
+     */
+    private function cuenta(int $locatarioId): ?array
+    {
+        $l = Locatario::find($locatarioId);
+        $deben = $l ? WhatsApp::entregadosQueDebe($l) : collect();
+        if ($deben->isEmpty()) {
+            return null;
+        }
+        $aFavor = max(0, $l->saldoAFavor());
+        $debe = round($deben->sum(fn (Telefono $t) => $t->saldo), 2);
+
+        return [
+            'nombre' => $l->nombre,
+            'telefonos' => $deben->count(),
+            'debe' => $debe,
+            'a_pagar' => round(max(0, $debe - $aFavor), 2),
+            'tiene_whatsapp' => (bool) $l->whatsapp,
+            'url' => WhatsApp::link($l->whatsapp, WhatsApp::cuenta($l, $deben, $aFavor)),
+        ];
     }
 
     public function show(Telefono $telefono)

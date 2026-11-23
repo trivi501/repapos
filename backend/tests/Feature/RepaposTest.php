@@ -676,6 +676,29 @@ class RepaposTest extends TestCase
         $this->assertEquals(360.0, $loc->deuda());   // 200 del teléfono + 160 de la venta
     }
 
+    public function test_al_filtrar_un_locatario_que_debe_se_puede_enviar_su_saldo_por_whatsapp(): void
+    {
+        // en taller con saldo: todavía no se cobra, no cuenta
+        $this->telefonoDe($this->adminA, ['whatsapp' => '5512345678']);
+        $loc = Locatario::first();
+        $this->assertNull($this->getJson("/api/telefonos?locatario={$loc->id}")->json('cuenta'));
+
+        // entregado y debe: aparece la cuenta, con su saldo a favor restado
+        $this->telefonoDe($this->adminA, ['modelo' => 'A15', 'total' => 300, 'pagado' => 0, 'entregado' => true, 'whatsapp' => '5512345678']);
+        $this->postJson('/api/saldos/deposito', ['locatario' => 'Don Pepe', 'monto' => 50])->assertCreated();
+        $c = $this->getJson("/api/telefonos?locatario={$loc->id}")->assertOk()->json('cuenta');
+        $this->assertSame(1, $c['telefonos']);
+        $this->assertEquals(300, $c['debe']);
+        $this->assertEquals(250, $c['a_pagar']);
+        $this->assertStringStartsWith('https://wa.me/525512345678?text=', $c['url']);
+        $texto = rawurldecode($c['url']);
+        $this->assertStringContainsString('A15', $texto);
+        $this->assertStringContainsString('Total a pagar: $250.00', $texto);
+
+        // sin filtro de locatario no se manda
+        $this->assertNull($this->getJson('/api/telefonos')->json('cuenta'));
+    }
+
     public function test_telefono_con_serie_imei_y_pin_y_busqueda_por_usb(): void
     {
         $t = $this->telefonoDe($this->adminA, ['serie' => ' rzcy3221lgt ', 'imei' => '35660 5223232618', 'pin' => '1234']);

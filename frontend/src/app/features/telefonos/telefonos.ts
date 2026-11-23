@@ -51,6 +51,17 @@ interface Respuesta {
     gasto?: string; ganancia?: number;
   };
   locatarios: { id: number; nombre: string; whatsapp: string | null }[];
+  /** Saldo pendiente del locatario filtrado (teléfonos entregados que debe), listo para mandar por WhatsApp. */
+  cuenta: Cuenta | null;
+}
+
+interface Cuenta {
+  nombre: string;
+  telefonos: number;
+  debe: number;
+  a_pagar: number;
+  tiene_whatsapp: boolean;
+  url: string;
 }
 
 @Component({
@@ -167,6 +178,7 @@ export class Telefonos implements OnInit {
         this.telefonos.set(r.data);
         this.resumen.set(r.resumen);
         this.locatarios.set(r.locatarios);
+        this.cuenta.set(r.cuenta ?? null);
         this.paginaActual.set(r.current_page);
         this.ultimaPagina.set(r.last_page);
         this.cargando.set(false);
@@ -180,6 +192,9 @@ export class Telefonos implements OnInit {
   }
 
   // ---- saldo a favor del locatario elegido en el filtro: botón para pagar con él
+
+  /** Lo que debe el locatario filtrado en teléfonos entregados: botón para mandarle su saldo por WhatsApp. */
+  readonly cuenta = signal<Cuenta | null>(null);
 
   /** Saldo a favor y plan de pago del locatario que se eligió en el filtro (null si no hay o no tiene). */
   readonly saldoFavor = signal<Elegido | null>(null);
