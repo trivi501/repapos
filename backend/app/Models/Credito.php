@@ -14,7 +14,7 @@ class Credito extends Model
     public const APLICADO = 'APLICADO';
     public const DEVUELTO = 'DEVUELTO';
 
-    protected $fillable = ['fecha', 'locatario_id', 'tipo', 'concepto', 'monto', 'telefono_id', 'pago_id', 'salida_id', 'user_id'];
+    protected $fillable = ['fecha', 'locatario_id', 'tipo', 'concepto', 'monto', 'telefono_id', 'venta_id', 'pago_id', 'salida_id', 'user_id'];
 
     protected function casts(): array
     {
@@ -29,5 +29,10 @@ class Credito extends Model
     public function telefono(): BelongsTo
     {
         return $this->belongsTo(Telefono::class);
+    }
+
+    public function venta(): BelongsTo
+    {
+        return $this->belongsTo(Venta::class);
     }
 }

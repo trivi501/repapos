@@ -58,7 +58,7 @@
         <div class="acciones-fila">
           @if (auth.tienePermiso('saldos.gestionar')) {
             @if (e.plan.length) {
-              <button class="btn btn-primary" (click)="aplicar(e)">Usar para pagar sus deudas ({{ sumaPlan(e) | dinero }})</button>
+              <button class="btn btn-primary" (click)="aplicar(e)">💲 Pagar con saldo a favor ({{ sumaPlan(e) | dinero }})</button>
             }
             @if (e.a_favor > 0) {
               <span class="grupo-en-linea">
@@ -71,6 +71,21 @@
             <a class="btn btn-whatsapp" [href]="e.whatsapp" target="_blank" rel="noopener">Avisar por WhatsApp</a>
           }
         </div>
+        @if (e.plan.length) {
+          <p class="ayuda separado">Se descuenta del más antiguo al más nuevo:</p>
+          <table>
+            <tbody>
+              @for (p of e.plan; track p.tipo + p.id) {
+                <tr>
+                  <td class="sin-salto tenue">{{ p.fecha | fecha }}</td>
+                  <td>{{ p.descripcion }}</td>
+                  <td class="der sin-salto">{{ p.monto | dinero }}</td>
+                  <td><app-estatus [valor]="p.parcial ? 'ABONO' : 'LIQUIDA'" /></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
       </div>
 
       <div class="card tabla-scroll">

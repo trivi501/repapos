@@ -11,6 +11,7 @@ import { TelefonoDetalle } from './telefono-detalle';
 import { MOTIVOS_NO_QUEDO } from '../../shared/motivos-no-quedo';
 import { DetectarUsb, TelefonoUsb, nombreTelefonoUsb } from '../../shared/detectar-usb/detectar-usb';
 import { DialogoService } from '../../core/services/dialogo.service';
+import { textoPlan, type Elegido } from '../saldos/saldo-plan';
 
 export interface Telefono {
   id: number;
@@ -174,6 +175,49 @@ export class Telefonos implements OnInit {
         this.cargando.set(false);
         this.avisos.fallo(e);
       },
+    });
+    this.cargarSaldo();
+  }
+
+  // ---- saldo a favor del locatario elegido en el filtro: botón para pagar con él
+
+  /** Saldo a favor y plan de pago del locatario que se eligió en el filtro (null si no hay o no tiene). */
+  readonly saldoFavor = signal<Elegido | null>(null);
+
+  private cargarSaldo(): void {
+    if (!this.filtros.locatario || !this.auth.tienePermiso('saldos.ver')) {
+      this.saldoFavor.set(null);
+      return;
+    }
+    this.api.get<{ elegido: Elegido | null }>('saldos', { locatario: this.filtros.locatario }).subscribe({
+      next: (r) => this.saldoFavor.set(r.elegido && r.elegido.a_favor > 0 ? r.elegido : null),
+      error: () => this.saldoFavor.set(null),
+    });
+  }
+
+  sumaPlan(e: Elegido): number {
+    return e.plan.reduce((s, p) => s + p.monto, 0);
+  }
+
+  /** "liquida 2 y abona $140.00 al siguiente", "abona $250.00 al más antiguo" o "liquida 3". */
+  resumenPlan(e: Elegido): string {
+    const liquidados = e.plan.filter((p) => !p.parcial).length;
+    const abono = e.plan.find((p) => p.parcial)?.monto;
+    if (!liquidados) return `abona ${dinero(abono ?? 0)} al más antiguo`;
+    const liq = `liquida ${liquidados} ${liquidados === 1 ? 'adeudo' : 'adeudos'}`;
+    return abono ? `${liq} y abona ${dinero(abono)} al siguiente` : liq;
+  }
+
+  /** Paga con el saldo a favor, del más antiguo al más nuevo: liquida lo que alcance y abona lo que sobre. */
+  async pagarConSaldo(e: Elegido): Promise<void> {
+    const texto = `${e.nombre} tiene ${dinero(e.a_favor)} a favor. Se pagará así, del más antiguo al más nuevo:\n\n${textoPlan(e.plan)}\n\n¿Continuar?`;
+    if (!await this.dialogo.confirmar(texto)) return;
+    this.api.post<{ message: string }>(`saldos/${e.id}/aplicar`).subscribe({
+      next: (r) => {
+        this.avisos.ok(r.message);
+        this.cargar();
+      },
+      error: (er: HttpErrorResponse) => this.avisos.fallo(er),
     });
   }
 

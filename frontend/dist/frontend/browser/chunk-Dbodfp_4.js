@@ -1,0 +1,2 @@
+import{n as F}from"./chunk-DuuSzKfy.js";function r(e){return e.map(n=>`\u2022 ${n.descripcion}: ${F(n.monto)} ${n.parcial?`(abono, sigue debiendo ${F(n.debe-n.monto)})`:`(queda liquidado)`}`).join(`
+`)}export{r as t};

@@ -7,23 +7,7 @@ import { AvisosService } from '../../core/services/avisos.service';
 import { DineroPipe, Estatus, FechaPipe, dinero } from '../../shared/ui';
 import { DialogoService } from '../../core/services/dialogo.service';
 
-interface Movimiento {
-  id: number;
-  fecha: string;
-  tipo: string;
-  concepto: string;
-  monto: string;
-}
-
-interface Elegido {
-  id: number;
-  nombre: string;
-  a_favor: number;
-  deuda: number;
-  movimientos: Movimiento[];
-  plan: { id: number; modelo: string; monto: number; parcial: boolean }[];
-  whatsapp: string | null;
-}
+import { Elegido, Movimiento, textoPlan } from './saldo-plan';
 
 interface Datos {
   lista: { id: number; nombre: string; a_favor: number }[];
@@ -99,8 +83,8 @@ export class Saldos implements OnInit {
   }
 
   async aplicar(e: Elegido): Promise<void> {
-    const detalle = e.plan.map((p) => `#${p.id} ${p.modelo}: ${dinero(p.monto)} ${p.parcial ? '(abono parcial)' : '(queda pagado)'}`).join('\n');
-    if (!await this.dialogo.confirmar(`Se usará el saldo a favor así:\n\n${detalle}\n\n¿Continuar?`)) return;
+    const texto = `Se pagará con ${dinero(this.sumaPlan(e))} del saldo a favor, del más antiguo al más nuevo:\n\n${textoPlan(e.plan)}\n\n¿Continuar?`;
+    if (!await this.dialogo.confirmar(texto)) return;
     this.ejecutar(this.api.post<{ message: string }>(`saldos/${e.id}/aplicar`));
   }
 

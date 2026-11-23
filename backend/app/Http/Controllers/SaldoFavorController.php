@@ -6,6 +6,8 @@ use App\Models\Credito;
 use App\Models\Locatario;
 use App\Models\Pago;
 use App\Models\Salida;
+use App\Models\Telefono;
+use App\Models\Venta;
 use App\Support\WhatsApp;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -40,7 +42,8 @@ class SaldoFavorController extends Controller
                 'deuda' => $elegido->deuda(),
                 'movimientos' => $elegido->creditos()->orderByDesc('fecha')->get(),
                 'plan' => array_map(fn ($p) => [
-                    'id' => $p['telefono']->id, 'modelo' => $p['telefono']->modelo, 'monto' => $p['monto'], 'parcial' => $p['parcial'],
+                    'tipo' => $p['tipo'], 'id' => $p['deuda']->id, 'descripcion' => $p['descripcion'],
+                    'fecha' => $p['fecha']->toDateString(), 'debe' => $p['debe'], 'monto' => $p['monto'], 'parcial' => $p['parcial'],
                 ], $plan),
                 'whatsapp' => $elegido->saldoAFavor() > 0 ? WhatsApp::link($elegido->whatsapp,
                     "Hola {$elegido->nombre}\nTe aviso que tienes un saldo a favor de *".dinero($elegido->saldoAFavor())
@@ -49,18 +52,31 @@ class SaldoFavorController extends Controller
         ]);
     }
 
-    /** Reparte el saldo a favor entre sus teléfonos que deben: primero los entregados, luego por fecha. */
+    /**
+     * Reparte el saldo a favor entre todo lo que debe (teléfonos y ventas a crédito), del más antiguo al más nuevo:
+     * liquida los que alcance y al último le abona lo que sobre.
+     */
     protected function plan(Locatario $l): array
     {
+        $deudas = $l->telefonos()->conSaldo()->get()->map(fn (Telefono $t) => [
+            'tipo' => 'telefono', 'deuda' => $t, 'fecha' => $t->fecha_recibido, 'debe' => $t->saldo,
+            'descripcion' => "Teléfono #{$t->id} {$t->modelo}".($t->trabajo ? " ({$t->trabajo})" : ''),
+        ])->concat($l->ventas()->conSaldo()->with('detalles')->get()->map(fn (Venta $v) => [
+            'tipo' => 'venta', 'deuda' => $v, 'fecha' => $v->created_at, 'debe' => $v->saldo,
+            'descripcion' => "Venta N° {$v->folio}: ".$v->detalles->pluck('nombre')->take(3)->implode(', '),
+        ]))
+            ->filter(fn ($d) => $d['debe'] > 0)
+            ->sortBy([fn ($a, $b) => $a['fecha'] <=> $b['fecha'], fn ($a, $b) => $a['deuda']->id <=> $b['deuda']->id])
+            ->values();
+
         $disponible = $l->saldoAFavor();
         $plan = [];
-        $deben = $l->telefonos()->conSaldo()->orderByDesc('entregado')->orderBy('fecha_recibido')->orderBy('id')->get();
-        foreach ($deben as $t) {
+        foreach ($deudas as $d) {
             if ($disponible <= 0) {
                 break;
             }
-            $usar = round(min($disponible, $t->saldo), 2);
-            $plan[] = ['telefono' => $t, 'monto' => $usar, 'parcial' => $usar < $t->saldo];
+            $usar = round(min($disponible, $d['debe']), 2);
+            $plan[] = $d + ['monto' => $usar, 'parcial' => $usar < $d['debe']];
             $disponible = round($disponible - $usar, 2);
         }
 
@@ -101,18 +117,34 @@ class SaldoFavorController extends Controller
         }
         DB::transaction(function () use ($plan, $locatario) {
             foreach ($plan as $p) {
-                $t = $p['telefono'];
-                $t->update(['pagado' => round((float) $t->pagado + $p['monto'], 2)]); // sin cobro en caja: ya entró como depósito
+                // sin cobro en caja: el dinero ya entró cuando se depositó el saldo a favor
+                $deuda = $p['deuda'];
+                $deuda->pagado = round((float) $deuda->pagado + $p['monto'], 2);
+                if ($p['tipo'] === 'venta' && $deuda->saldo <= 0) {
+                    $deuda->estatus = Venta::PAGADA;
+                }
+                $deuda->save();
                 Credito::create([
                     'fecha' => now(), 'locatario_id' => $locatario->id, 'tipo' => Credito::APLICADO,
-                    'concepto' => "Aplicado a #{$t->id} {$t->modelo}", 'monto' => -$p['monto'],
-                    'telefono_id' => $t->id, 'user_id' => auth()->id(),
+                    'concepto' => 'Aplicado a '.($p['tipo'] === 'venta' ? "venta N° {$deuda->folio}" : "#{$deuda->id} {$deuda->modelo}")
+                        .($p['parcial'] ? ' (abono)' : ''),
+                    'monto' => -$p['monto'],
+                    'telefono_id' => $p['tipo'] === 'telefono' ? $deuda->id : null,
+                    'venta_id' => $p['tipo'] === 'venta' ? $deuda->id : null,
+                    'user_id' => auth()->id(),
                 ]);
             }
         });
         $suma = array_sum(array_column($plan, 'monto'));
+        $liquidados = count(array_filter($plan, fn ($p) => ! $p['parcial']));
+        $abono = collect($plan)->firstWhere('parcial', true);
 
-        return response()->json(['message' => 'Se usaron '.dinero($suma).' del saldo a favor en '.count($plan).' teléfono(s).']);
+        $partes = array_filter([
+            $liquidados ? ($liquidados === 1 ? '1 adeudo liquidado' : "{$liquidados} adeudos liquidados") : null,
+            $abono ? 'abono de '.dinero($abono['monto']).' a '.$abono['descripcion'] : null,
+        ]);
+
+        return response()->json(['message' => 'Se usaron '.dinero($suma).' del saldo a favor: '.implode(' y ', $partes).'.']);
     }
 
     public function devolver(Request $r, Locatario $locatario)
@@ -148,6 +180,14 @@ class SaldoFavorController extends Controller
             } elseif ($credito->tipo === Credito::APLICADO && $credito->telefono) {
                 $t = $credito->telefono;
                 $t->update(['pagado' => max(0, round((float) $t->pagado + (float) $credito->monto, 2))]);
+            } elseif ($credito->tipo === Credito::APLICADO && $credito->venta) {
+                // la venta vuelve a deber lo que se le había aplicado
+                $v = $credito->venta;
+                $v->pagado = max(0, round((float) $v->pagado + (float) $credito->monto, 2));
+                if ($v->estatus === Venta::PAGADA && $v->saldo > 0) {
+                    $v->estatus = Venta::PENDIENTE;
+                }
+                $v->save();
             }
             $credito->delete();
         });

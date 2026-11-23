@@ -644,6 +644,40 @@ class RepaposTest extends TestCase
         $this->assertEquals(100.0, (float) Salida::sum('monto'));
     }
 
+    public function test_saldo_a_favor_paga_del_mas_antiguo_al_mas_nuevo_incluyendo_ventas_a_credito(): void
+    {
+        // lo más antiguo: un teléfono del 1 de noviembre que debe 400 (ya está entregado o no, da igual)
+        $viejo = $this->telefonoDe($this->adminA, ['fecha_recibido' => '2026-11-01', 'pagado' => 100]);   // debe 400
+        // después: una venta a crédito de hoy por 160
+        $p = $this->productoDe($this->adminA);
+        $venta = Venta::findOrFail($this->postJson('/api/ventas', [
+            'lineas' => [['producto_id' => $p->id, 'cantidad' => 2, 'precio' => 80]], 'metodo' => 'CRÉDITO', 'tipo' => 'LOCATARIO', 'locatario' => 'Don Pepe',
+        ])->assertCreated()->json('venta.id'));
+        // lo más nuevo: un teléfono recibido mañana que debe 300
+        $nuevo = $this->telefonoDe($this->adminA, ['modelo' => 'A15', 'fecha_recibido' => today()->addDay()->toDateString(), 'total' => 300, 'pagado' => 0]);
+        $loc = Locatario::first();
+
+        // 700 a favor: liquida el teléfono viejo (400) y la venta (160), y abona 140 al nuevo
+        $this->postJson('/api/saldos/deposito', ['locatario' => 'Don Pepe', 'monto' => 700])->assertCreated();
+        $plan = $this->getJson("/api/saldos?locatario={$loc->id}")->assertOk()->json('elegido.plan');
+        $this->assertSame(['telefono', 'venta', 'telefono'], array_column($plan, 'tipo'));
+        $this->assertSame([false, false, true], array_column($plan, 'parcial'));
+        $this->assertEquals([400, 160, 140], array_column($plan, 'monto'));
+
+        $this->postJson("/api/saldos/{$loc->id}/aplicar")->assertOk();
+        $this->assertEquals(0.0, $viejo->fresh()->saldo);
+        $this->assertSame(Venta::PAGADA, $venta->fresh()->estatus);
+        $this->assertEquals(160.0, $nuevo->fresh()->saldo);
+        $this->assertEquals(0.0, $loc->saldoAFavor());
+        $this->assertEquals(160.0, $loc->deuda());
+
+        // deshacer lo aplicado a la venta: vuelve a deber
+        $aplicadoVenta = Credito::where('venta_id', $venta->id)->firstOrFail();
+        $this->deleteJson("/api/saldos/movimiento/{$aplicadoVenta->id}")->assertOk();
+        $this->assertSame(Venta::PENDIENTE, $venta->fresh()->estatus);
+        $this->assertEquals(160.0, $loc->saldoAFavor());
+    }
+
     public function test_telefono_con_serie_imei_y_pin_y_busqueda_por_usb(): void
     {
         $t = $this->telefonoDe($this->adminA, ['serie' => ' rzcy3221lgt ', 'imei' => '35660 5223232618', 'pin' => '1234']);

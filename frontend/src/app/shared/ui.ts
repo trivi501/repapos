@@ -99,6 +99,9 @@ const COLORES: Record<string, string> = {
   DEPÓSITO: 'badge-success',
   APLICADO: 'badge-primary',
   DEVUELTO: 'badge-warning',
+  // pagar con saldo a favor
+  LIQUIDA: 'badge-success',
+  ABONO: 'badge-warning',
 };
 
 /** Etiqueta de color para un estatus. */
