@@ -83,7 +83,7 @@ export class Saldos implements OnInit {
   }
 
   async aplicar(e: Elegido): Promise<void> {
-    const texto = `Se pagará con ${dinero(this.sumaPlan(e))} del saldo a favor, del más antiguo al más nuevo:\n\n${textoPlan(e.plan)}\n\n¿Continuar?`;
+    const texto = `Se pagará con ${dinero(this.sumaPlan(e))} del saldo a favor (primero lo entregado que debe, luego lo demás, del más antiguo al más nuevo):\n\n${textoPlan(e.plan)}\n\n¿Continuar?`;
     if (!await this.dialogo.confirmar(texto)) return;
     this.ejecutar(this.api.post<{ message: string }>(`saldos/${e.id}/aplicar`));
   }

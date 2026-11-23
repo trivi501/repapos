@@ -199,18 +199,18 @@ export class Telefonos implements OnInit {
     return e.plan.reduce((s, p) => s + p.monto, 0);
   }
 
-  /** "liquida 2 y abona $140.00 al siguiente", "abona $250.00 al más antiguo" o "liquida 3". */
+  /** "liquida 2 y abona $140.00 al siguiente", "abona $250.00 al primero" o "liquida 3". */
   resumenPlan(e: Elegido): string {
     const liquidados = e.plan.filter((p) => !p.parcial).length;
     const abono = e.plan.find((p) => p.parcial)?.monto;
-    if (!liquidados) return `abona ${dinero(abono ?? 0)} al más antiguo`;
+    if (!liquidados) return `abona ${dinero(abono ?? 0)} al primero`;
     const liq = `liquida ${liquidados} ${liquidados === 1 ? 'adeudo' : 'adeudos'}`;
     return abono ? `${liq} y abona ${dinero(abono)} al siguiente` : liq;
   }
 
-  /** Paga con el saldo a favor, del más antiguo al más nuevo: liquida lo que alcance y abona lo que sobre. */
+  /** Paga con el saldo a favor: primero lo entregado que debe, luego lo demás (del más antiguo al más nuevo). */
   async pagarConSaldo(e: Elegido): Promise<void> {
-    const texto = `${e.nombre} tiene ${dinero(e.a_favor)} a favor. Se pagará así, del más antiguo al más nuevo:\n\n${textoPlan(e.plan)}\n\n¿Continuar?`;
+    const texto = `${e.nombre} tiene ${dinero(e.a_favor)} a favor. Se pagará así (primero lo entregado que debe, luego lo demás, del más antiguo al más nuevo):\n\n${textoPlan(e.plan)}\n\n¿Continuar?`;
     if (!await this.dialogo.confirmar(texto)) return;
     this.api.post<{ message: string }>(`saldos/${e.id}/aplicar`).subscribe({
       next: (r) => {

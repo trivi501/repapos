@@ -72,7 +72,7 @@
           }
         </div>
         @if (e.plan.length) {
-          <p class="ayuda separado">Se descuenta del más antiguo al más nuevo:</p>
+          <p class="ayuda separado">Se paga primero lo entregado que debe y luego lo demás, del más antiguo al más nuevo:</p>
           <table>
             <tbody>
               @for (p of e.plan; track p.tipo + p.id) {

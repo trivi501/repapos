@@ -42,7 +42,7 @@ class SaldoFavorController extends Controller
                 'deuda' => $elegido->deuda(),
                 'movimientos' => $elegido->creditos()->orderByDesc('fecha')->get(),
                 'plan' => array_map(fn ($p) => [
-                    'tipo' => $p['tipo'], 'id' => $p['deuda']->id, 'descripcion' => $p['descripcion'],
+                    'tipo' => $p['tipo'], 'id' => $p['deuda']->id, 'descripcion' => $p['descripcion'], 'entregado' => $p['entregado'],
                     'fecha' => $p['fecha']->toDateString(), 'debe' => $p['debe'], 'monto' => $p['monto'], 'parcial' => $p['parcial'],
                 ], $plan),
                 'whatsapp' => $elegido->saldoAFavor() > 0 ? WhatsApp::link($elegido->whatsapp,
@@ -53,20 +53,26 @@ class SaldoFavorController extends Controller
     }
 
     /**
-     * Reparte el saldo a favor entre todo lo que debe (teléfonos y ventas a crédito), del más antiguo al más nuevo:
-     * liquida los que alcance y al último le abona lo que sobre.
+     * Reparte el saldo a favor entre todo lo que debe: primero lo que ya se llevó y debe (teléfonos entregados y
+     * ventas a crédito), luego los teléfonos que siguen en el taller; cada grupo del más antiguo al más nuevo.
+     * Liquida los que alcance y al último le abona lo que sobre.
      */
     protected function plan(Locatario $l): array
     {
         $deudas = $l->telefonos()->conSaldo()->get()->map(fn (Telefono $t) => [
-            'tipo' => 'telefono', 'deuda' => $t, 'fecha' => $t->fecha_recibido, 'debe' => $t->saldo,
-            'descripcion' => "Teléfono #{$t->id} {$t->modelo}".($t->trabajo ? " ({$t->trabajo})" : ''),
+            'tipo' => 'telefono', 'deuda' => $t, 'fecha' => $t->fecha_recibido, 'debe' => $t->saldo, 'entregado' => (bool) $t->entregado,
+            'descripcion' => "Teléfono #{$t->id} {$t->modelo}".($t->trabajo ? " ({$t->trabajo})" : '').($t->entregado ? ' · entregado' : ''),
         ])->concat($l->ventas()->conSaldo()->with('detalles')->get()->map(fn (Venta $v) => [
-            'tipo' => 'venta', 'deuda' => $v, 'fecha' => $v->created_at, 'debe' => $v->saldo,
+            // los productos ya se los llevó: cuenta como entregado
+            'tipo' => 'venta', 'deuda' => $v, 'fecha' => $v->created_at, 'debe' => $v->saldo, 'entregado' => true,
             'descripcion' => "Venta N° {$v->folio}: ".$v->detalles->pluck('nombre')->take(3)->implode(', '),
         ]))
             ->filter(fn ($d) => $d['debe'] > 0)
-            ->sortBy([fn ($a, $b) => $a['fecha'] <=> $b['fecha'], fn ($a, $b) => $a['deuda']->id <=> $b['deuda']->id])
+            ->sortBy([
+                fn ($a, $b) => $b['entregado'] <=> $a['entregado'],   // entregados que deben, primero
+                fn ($a, $b) => $a['fecha'] <=> $b['fecha'],
+                fn ($a, $b) => $a['deuda']->id <=> $b['deuda']->id,
+            ])
             ->values();
 
         $disponible = $l->saldoAFavor();

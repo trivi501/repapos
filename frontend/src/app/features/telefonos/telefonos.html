@@ -90,7 +90,7 @@
     <span><b>{{ s.nombre }}</b> tiene <b>{{ s.a_favor | dinero }}</b> a favor{{ s.plan.length ? '' : ' y no debe nada' }}.</span>
     @if (s.plan.length && auth.tienePermiso('saldos.gestionar')) {
       <button class="btn btn-primary btn-sm" (click)="pagarConSaldo(s)">💲 Pagar con saldo a favor ({{ sumaPlan(s) | dinero }})</button>
-      <small class="tenue">Del más antiguo al más nuevo: {{ resumenPlan(s) }}.</small>
+      <small class="tenue">Primero lo entregado que debe: {{ resumenPlan(s) }}.</small>
     }
   </div>
 }

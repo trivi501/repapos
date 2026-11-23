@@ -1,12 +1,14 @@
 import { dinero } from '../../shared/ui';
 
-/** Cómo se reparte el saldo a favor: del más antiguo al más nuevo, liquidando y abonando al último. */
+/** Cómo se reparte el saldo a favor: primero lo entregado que debe, luego lo demás; cada grupo del más antiguo al más nuevo. */
 export interface PlanSaldo {
   tipo: 'telefono' | 'venta';
   id: number;
   descripcion: string;
   fecha: string;
   debe: number;
+  /** Teléfono entregado o venta a crédito: se paga primero. */
+  entregado: boolean;
   monto: number;
   parcial: boolean;
 }

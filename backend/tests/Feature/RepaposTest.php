@@ -644,30 +644,33 @@ class RepaposTest extends TestCase
         $this->assertEquals(100.0, (float) Salida::sum('monto'));
     }
 
-    public function test_saldo_a_favor_paga_del_mas_antiguo_al_mas_nuevo_incluyendo_ventas_a_credito(): void
+    public function test_saldo_a_favor_paga_primero_lo_entregado_y_luego_del_mas_antiguo_al_mas_nuevo(): void
     {
-        // lo más antiguo: un teléfono del 1 de noviembre que debe 400 (ya está entregado o no, da igual)
-        $viejo = $this->telefonoDe($this->adminA, ['fecha_recibido' => '2026-11-01', 'pagado' => 100]);   // debe 400
-        // después: una venta a crédito de hoy por 160
+        // el más antiguo, pero sigue en el taller: debe 400
+        $enTaller = $this->telefonoDe($this->adminA, ['fecha_recibido' => '2026-11-01', 'pagado' => 100]);
+        // una venta a crédito de hoy por 160 (los productos ya se los llevó: cuenta como entregado)
         $p = $this->productoDe($this->adminA);
         $venta = Venta::findOrFail($this->postJson('/api/ventas', [
             'lineas' => [['producto_id' => $p->id, 'cantidad' => 2, 'precio' => 80]], 'metodo' => 'CRÉDITO', 'tipo' => 'LOCATARIO', 'locatario' => 'Don Pepe',
         ])->assertCreated()->json('venta.id'));
-        // lo más nuevo: un teléfono recibido mañana que debe 300
-        $nuevo = $this->telefonoDe($this->adminA, ['modelo' => 'A15', 'fecha_recibido' => today()->addDay()->toDateString(), 'total' => 300, 'pagado' => 0]);
+        // el más nuevo, ya entregado: debe 300
+        $entregado = $this->telefonoDe($this->adminA, [
+            'modelo' => 'A15', 'fecha_recibido' => today()->addDay()->toDateString(), 'total' => 300, 'pagado' => 0, 'entregado' => true,
+        ]);
         $loc = Locatario::first();
 
-        // 700 a favor: liquida el teléfono viejo (400) y la venta (160), y abona 140 al nuevo
+        // 700 a favor: primero lo entregado (venta 160 y teléfono entregado 300) y lo que sobra (240) al que sigue en taller
         $this->postJson('/api/saldos/deposito', ['locatario' => 'Don Pepe', 'monto' => 700])->assertCreated();
         $plan = $this->getJson("/api/saldos?locatario={$loc->id}")->assertOk()->json('elegido.plan');
-        $this->assertSame(['telefono', 'venta', 'telefono'], array_column($plan, 'tipo'));
+        $this->assertSame(['venta', 'telefono', 'telefono'], array_column($plan, 'tipo'));
+        $this->assertSame([$venta->id, $entregado->id, $enTaller->id], array_column($plan, 'id'));
         $this->assertSame([false, false, true], array_column($plan, 'parcial'));
-        $this->assertEquals([400, 160, 140], array_column($plan, 'monto'));
+        $this->assertEquals([160, 300, 240], array_column($plan, 'monto'));
 
         $this->postJson("/api/saldos/{$loc->id}/aplicar")->assertOk();
-        $this->assertEquals(0.0, $viejo->fresh()->saldo);
         $this->assertSame(Venta::PAGADA, $venta->fresh()->estatus);
-        $this->assertEquals(160.0, $nuevo->fresh()->saldo);
+        $this->assertEquals(0.0, $entregado->fresh()->saldo);
+        $this->assertEquals(160.0, $enTaller->fresh()->saldo);
         $this->assertEquals(0.0, $loc->saldoAFavor());
         $this->assertEquals(160.0, $loc->deuda());
 
