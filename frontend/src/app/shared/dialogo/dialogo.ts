@@ -8,7 +8,7 @@ import { WhatsAppService } from '../../core/services/whatsapp.service';
   selector: 'app-dialogo',
   template: `
     @if (dialogo.abierto(); as d) {
-      <div class="modal-backdrop dialogo-fondo no-imprimir" (click)="$event.target === $event.currentTarget && d.responder(false)">
+      <div class="modal-backdrop dialogo-fondo no-imprimir" (click)="$event.target === $event.currentTarget ? d.responder(false) : null">
         <div class="modal modal-dialogo" role="alertdialog" aria-modal="true" aria-labelledby="dialogo-titulo" aria-describedby="dialogo-texto"
              (keydown.escape)="d.responder(false)">
           <div class="modal-header">
@@ -25,7 +25,7 @@ import { WhatsAppService } from '../../core/services/whatsapp.service';
         </div>
       </div>
     } @else if (avisos.whatsapp(); as w) {
-      <div class="modal-backdrop dialogo-fondo no-imprimir" (click)="$event.target === $event.currentTarget && avisos.whatsapp.set(null)">
+      <div class="modal-backdrop dialogo-fondo no-imprimir" (click)="$event.target === $event.currentTarget ? avisos.whatsapp.set(null) : null">
         <div class="modal modal-dialogo" role="dialog" aria-modal="true" aria-labelledby="whatsapp-titulo" (keydown.escape)="avisos.whatsapp.set(null)">
           <div class="modal-header">
             <h2 id="whatsapp-titulo">¿Avisar por WhatsApp?</h2>

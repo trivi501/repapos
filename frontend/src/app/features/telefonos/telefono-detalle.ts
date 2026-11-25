@@ -15,8 +15,7 @@ type Detalle = Telefono & { pagos?: { id: number; fecha: string; concepto: strin
   imports: [DineroPipe, FechaPipe, Estatus],
   host: { '(document:keydown.escape)': 'cerrar.emit()' },
   template: `
-    <div class="modal-backdrop" (mousedown)="presiono = $event.target === $event.currentTarget"
-         (click)="presiono && $event.target === $event.currentTarget && cerrar.emit()">
+    <div class="modal-backdrop" (mousedown)="alPresionar($event)" (click)="alSoltar($event)">
       <div class="modal modal-detalle" role="dialog" aria-modal="true" aria-labelledby="titulo-detalle">
         <div class="modal-header">
           <h2 id="titulo-detalle">Teléfono #{{ telefonoId() }}</h2>
@@ -123,6 +122,17 @@ export class TelefonoDetalle implements OnInit {
   readonly verPin = signal(false);
   readonly metodoTexto = metodoTexto;
   presiono = false;
+
+  // métodos void a propósito: si el manejador en la plantilla da `false`, Angular cancela el evento
+  // (un mousedown cancelado no deja seleccionar ni copiar el texto)
+  alPresionar(e: MouseEvent): void {
+    this.presiono = e.target === e.currentTarget;
+  }
+
+  alSoltar(e: MouseEvent): void {
+    if (this.presiono && e.target === e.currentTarget) this.cerrar.emit();
+    this.presiono = false;
+  }
 
   ngOnInit(): void {
     this.api.get<Detalle>(`telefonos/${this.telefonoId()}`).subscribe({
