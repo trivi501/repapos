@@ -19,7 +19,7 @@ namespace RepaPOS.Conector
         static readonly Dictionary<string, string> Marcas = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             { "04E8", "Samsung" }, { "05AC", "Apple" }, { "18D1", "Google" }, { "2717", "Xiaomi" }, { "22B8", "Motorola" },
-            { "12D1", "Huawei" }, { "2A70", "OnePlus" }, { "0BB4", "HTC" }, { "1004", "LG" }, { "0FCE", "Sony" },
+            { "12D1", "Huawei" }, { "339B", "Honor" },{ "2A70", "OnePlus" }, { "0BB4", "HTC" }, { "1004", "LG" }, { "0FCE", "Sony" },
             { "2D95", "Vivo" }, { "19D2", "ZTE" }, { "1BBB", "Alcatel / TCL" }, { "22D9", "Oppo" }, { "2A45", "Meizu" },
             { "17EF", "Lenovo" }, { "2E04", "Nokia" }, { "0E8D", "MediaTek (genérico)" }, { "1EBF", "Infinix / Tecno" },
             { "29A9", "Realme" }, { "05C6", "Qualcomm (genérico)" }, { "1782", "Spreadtrum (genérico)" },
