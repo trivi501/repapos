@@ -168,7 +168,8 @@
                   </div>
                   <div class="form-field">
                     <label [for]="'ot_falla' + i">Problema reportado <span class="req">*</span></label>
-                    <textarea [id]="'ot_falla' + i" rows="2" formControlName="falla_reportada" placeholder="Qué falla tiene este teléfono…"></textarea>                  </div>
+                    <textarea [id]="'ot_falla' + i" rows="2" formControlName="falla_reportada" placeholder="Qué falla tiene este teléfono…"></textarea>
+                  </div>
                   <div class="grid-3">
                     <div class="form-field">
                       <label [for]="'ot_costo' + i">Costo estimado</label>
@@ -345,7 +346,8 @@
             rows="3"
             formControlName="falla_reportada"
             placeholder="Describe la falla o motivo de recepción que reporta el cliente…"
-          ></textarea>        </div>
+          ></textarea>
+        </div>
         <div class="form-field">
           <label for="observaciones">Observación</label>
           <textarea id="observaciones" rows="2" formControlName="observaciones" placeholder="Rayones, detalles que ya traía…"></textarea>
