@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Ajuste;
 use App\Models\Cliente;
+use App\Models\Corte;
 use App\Models\Equipo;
 use App\Models\FotoOrden;
 use App\Models\OrdenRefaccion;
@@ -421,6 +422,24 @@ class OrdenReparacionController extends Controller
                 }
                 $orden->cambiarPagado((float) $orden->pagado + (float) $d['monto'], 'Abono', $d['metodo'] ?? Venta::EFECTIVO);
                 $mensaje = 'Abono de '.dinero($d['monto']).'. Saldo: '.dinero($orden->saldo).'.';
+                break;
+            case 'quitar_cobro':
+                // un abono mal capturado: se borra el cobro y lo pagado baja, mientras su turno siga abierto
+                abort_unless($usuario->can('ordenes.cobrar'), 403);
+                $d = $request->validate(['pago_id' => ['required', 'integer']]);
+                $pago = $orden->pagos()->whereKey($d['pago_id'])->firstOrFail();
+                $corte = Corte::whereDate('fecha', $pago->fecha)->get()
+                    ->first(fn (Corte $c) => $pago->fecha->gte($c->inicio()) && $pago->fecha->lt($c->fin()));
+                if ($corte) {
+                    return response()->json(['message' => "Ese cobro ya entró en el corte del turno {$corte->turno} del "
+                        .$corte->fecha->format('d/m/Y').': ya no se puede quitar.'], 422);
+                }
+                DB::transaction(function () use ($orden, $pago) {
+                    $orden->pagado = round((float) $orden->pagado - (float) $pago->monto, 2);
+                    $orden->save();
+                    $pago->delete();
+                });
+                $mensaje = 'Se quitó el cobro de '.dinero($pago->monto).'. Resta: '.dinero($orden->saldo).'.';
                 break;
             case 'liquidar':
                 abort_unless($usuario->can('ordenes.cobrar'), 403);

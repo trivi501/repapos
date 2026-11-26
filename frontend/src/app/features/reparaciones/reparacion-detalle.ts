@@ -8,7 +8,7 @@ import { OrdenReparacion, ProductoRefaccion, REVISION_ORDEN, RefaccionOrden, est
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { AvisosService, AvisoWhatsapp } from '../../core/services/avisos.service';
-import { DineroPipe, Estatus, FechaPipe, PatronVista, dinero } from '../../shared/ui';
+import { DineroPipe, Estatus, FechaPipe, PatronVista, dinero, fecha } from '../../shared/ui';
 import { metodoTexto } from '../ventas/ventas';
 import { MOTIVOS_NO_QUEDO } from '../../shared/motivos-no-quedo';
 import { DialogoService } from '../../core/services/dialogo.service';
@@ -237,6 +237,15 @@ export class ReparacionDetalle implements OnInit {
     if (await this.dialogo.confirmar(`¿Quitar la marca de entregado del folio ${x.folio}? Úsalo solo si se marcó por error.`, { titulo: 'Quitar entregado', aceptar: 'Quitar', peligro: true })) {
       this.accion({ accion: 'quitar_entrega' });
     }
+  }
+
+  /** Abono mal capturado: se borra de la caja y lo pagado baja (solo mientras su turno no tenga corte). */
+  async quitarCobro(p: { id: number; fecha: string; concepto: string; monto: string }): Promise<void> {
+    const ok = await this.dialogo.confirmar(
+      `¿Quitar el cobro "${p.concepto}" de ${dinero(p.monto)} del ${fecha(p.fecha, true)}?\nSe borra de la caja y lo pagado baja.`,
+      { titulo: 'Quitar cobro', aceptar: 'Quitar', peligro: true },
+    );
+    if (ok) this.accion({ accion: 'quitar_cobro', pago_id: p.id });
   }
 
   abonarGrupo(): void {

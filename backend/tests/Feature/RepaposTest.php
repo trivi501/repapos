@@ -979,6 +979,31 @@ class RepaposTest extends TestCase
         $this->postJson("/api/ordenes/{$normal['id']}/accion", ['accion' => 'estatus', 'estado' => 'rechazado', 'motivo' => 'x'])->assertUnprocessable();
     }
 
+    public function test_quitar_un_abono_mal_capturado_mientras_su_turno_no_tenga_corte(): void
+    {
+        $this->travelTo(today()->setTime(10, 0));
+        $o = $this->ordenNueva();
+        $this->postJson("/api/ordenes/{$o['id']}/accion", ['accion' => 'abono', 'monto' => 500])->assertOk();
+        $pago = Pago::where('orden_id', $o['id'])->firstOrFail();
+
+        $this->postJson("/api/ordenes/{$o['id']}/accion", ['accion' => 'quitar_cobro', 'pago_id' => $pago->id])->assertOk()
+            ->assertJsonPath('orden.saldo', 1000);
+        $this->assertSame(0, Pago::where('orden_id', $o['id'])->count());
+        $this->assertEquals(0.0, (float) OrdenReparacion::find($o['id'])->pagado);
+
+        // un cobro que ya entró en un corte cerrado no se puede quitar
+        $this->postJson("/api/ordenes/{$o['id']}/accion", ['accion' => 'abono', 'monto' => 200])->assertOk();
+        $pago = Pago::where('orden_id', $o['id'])->firstOrFail();
+        $this->travelTo(today()->setTime(15, 0));
+        $this->postJson('/api/cortes', ['fecha' => today()->toDateString(), 'turno' => 1, 'fondo' => 0, 'contado' => 200])->assertOk();
+        $this->postJson("/api/ordenes/{$o['id']}/accion", ['accion' => 'quitar_cobro', 'pago_id' => $pago->id])->assertUnprocessable();
+        $this->assertEquals(200.0, (float) OrdenReparacion::find($o['id'])->pagado);
+
+        // y no se puede quitar el cobro de otra orden
+        $otra = $this->ordenNueva();
+        $this->postJson("/api/ordenes/{$otra['id']}/accion", ['accion' => 'quitar_cobro', 'pago_id' => $pago->id])->assertNotFound();
+    }
+
     public function test_varios_telefonos_en_una_orden_un_ticket_y_un_cobro(): void
     {
         $o = $this->ordenNueva(['otros' => [

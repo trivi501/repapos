@@ -42,7 +42,7 @@
     </thead>
     <tbody>
       @for (orden of ordenes(); track orden.id) {
-        <tr>
+        <tr (contextmenu)="abrirMenu($event, orden)" (dblclick)="abrir(orden)" [class.fila-activa]="menu()?.o?.id === orden.id">
           <td>
             <strong>{{ orden.folio }}</strong>
             @if ((orden.grupo_total ?? 1) > 1) {
@@ -63,7 +63,10 @@
           </td>
           <td class="sin-salto">{{ orden.fecha_entrega_estimada | fecha }}</td>
           <td>{{ orden.tecnico?.name || '—' }}</td>
-          <td><a class="btn btn-secondary btn-sm" [routerLink]="['/reparaciones', orden.id]">Abrir</a></td>
+          <td class="sin-salto">
+            <a class="btn btn-secondary btn-sm" [routerLink]="['/reparaciones', orden.id]">Abrir</a>
+            <button class="icono-btn" type="button" (click)="abrirMenu($event, orden)" title="Más acciones" aria-label="Más acciones">⋮</button>
+          </td>
         </tr>
       } @empty {
         <tr>
@@ -81,3 +84,65 @@
     <button class="btn btn-secondary" (click)="cambiarPagina(1)" [disabled]="pagina() >= totalPaginas()">Siguiente</button>
   </div>
 </div>
+<p class="ayuda">Tip: clic derecho sobre cualquier reparación para ver sus acciones; doble clic para abrirla.</p>
+
+@if (menu(); as m) {
+  <div class="menu-fondo" (click)="menu.set(null)" (contextmenu)="$event.preventDefault(); menu.set(null)"></div>
+  <div class="menu-flotante" role="menu" [style.top.px]="m.y" [style.left.px]="m.x" (keydown.escape)="menu.set(null)">
+    <div class="menu-titulo">N° {{ m.o.folio }} · {{ m.o.cliente?.nombre }} · {{ m.o.equipo?.marca }} {{ m.o.equipo?.modelo }}</div>
+    <button class="menu-item" (click)="abrir(m.o)">👁️ Abrir</button>
+    @if (authService.tieneAlgunPermiso(['ordenes.editar', 'ordenes.cambiar_estado'])) {
+      <button class="menu-item" (click)="editar(m.o)">✏️ Editar</button>
+    }
+    <button class="menu-item" (click)="imprimir(m.o)">🖨️ Imprimir comprobante</button>
+    @if (authService.tieneAlgunPermiso(['ordenes.cambiar_estado', 'ordenes.editar'])) {
+      <div class="menu-titulo">Cambiar estatus{{ m.o.es_liberacion ? ' (liberación)' : '' }}</div>
+      @for (e of estadosDe(m.o); track e.valor) {
+        <button class="menu-item" (click)="cambiarEstado(m.o, e.valor)">{{ e.etiqueta }}{{ e.valor === 'no_quedo' || e.valor === 'rechazado' ? '…' : '' }}</button>
+      }
+      <button class="menu-item" (click)="entregar(m.o)">{{ m.o.entregado ? '↩️ Quitar entrega' : '📦 Entregar' }}</button>
+    }
+    @if (authService.tienePermiso('ordenes.cobrar')) {
+      <div class="menu-linea">
+        <input type="number" step="0.01" min="0.01" placeholder="Monto" aria-label="Monto del abono" [(ngModel)]="montoAbono" (keyup.enter)="abonar(m.o)" />
+        <select aria-label="Forma de pago" [(ngModel)]="metodoAbono">
+          <option value="EFECTIVO">Efectivo</option>
+          <option value="TARJETA">Tarjeta</option>
+          <option value="TRANSFERENCIA">Transf.</option>
+        </select>
+        <button class="btn btn-secondary" (click)="abonar(m.o)">Abonar</button>
+      </div>
+      @if ((m.o.saldo ?? 0) > 0) {
+        <button class="menu-item" (click)="liquidar(m.o)">💲 Liquidar {{ m.o.saldo | dinero }}</button>
+      }
+    }
+  </div>
+}
+
+@if (pidiendoMotivo(); as p) {
+  <div class="modal-backdrop" (click)="$event.target === $event.currentTarget ? pidiendoMotivo.set(null) : null">
+    <div class="modal modal-dialogo" role="dialog" aria-modal="true" aria-labelledby="motivo-titulo" (keydown.escape)="pidiendoMotivo.set(null)">
+      <div class="modal-header">
+        <h2 id="motivo-titulo">{{ p.estado === 'no_quedo' ? '¿Por qué no quedó?' : '¿Por qué se rechaza?' }}</h2>
+      </div>
+      <p class="tenue">N° {{ p.o.folio }} · {{ p.o.equipo?.marca }} {{ p.o.equipo?.modelo }}</p>
+      @if (p.estado === 'no_quedo') {
+        <div class="motivos-rapidos">
+          @for (mt of motivosNoQuedo; track mt) {
+            <button type="button" class="btn btn-sm" [class.btn-primary]="motivo === mt" [class.btn-secondary]="motivo !== mt" (click)="motivo = mt">{{ mt }}</button>
+          }
+        </div>
+      }
+      <div class="form-field separado">
+        <label for="motivo-lista">Motivo *</label>
+        <textarea id="motivo-lista" rows="2" maxlength="255" [(ngModel)]="motivo"
+                  [placeholder]="p.estado === 'no_quedo' ? 'Escribe o elige uno de arriba' : 'Ej. Reportado por robo, no hay servidor para este modelo…'"></textarea>
+        <span class="ayuda">Va en el WhatsApp de aviso y en la página donde el cliente consulta su orden.</span>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" type="button" (click)="pidiendoMotivo.set(null)">Cancelar</button>
+        <button class="btn btn-danger" type="button" (click)="confirmarMotivo()" [disabled]="!motivo.trim()">{{ p.estado === 'no_quedo' ? 'Marcar No quedó' : 'Rechazar' }}</button>
+      </div>
+    </div>
+  </div>
+}
