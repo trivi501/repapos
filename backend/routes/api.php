@@ -19,6 +19,7 @@ use App\Http\Controllers\ResumenController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SaldoFavorController;
 use App\Http\Controllers\SalidaController;
+use App\Http\Controllers\PlantillaServicioController;
 use App\Http\Controllers\SucursalController;
 use App\Http\Controllers\SuscripcionController;
 use App\Http\Controllers\TelefonoController;
@@ -83,6 +84,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('fotos/{foto}', [FotoOrdenController::class, 'destroy'])->middleware('permission:ordenes.crear|ordenes.editar');
         Route::get('fotos-enlace-movil', [FotoOrdenController::class, 'enlaceMovil'])->middleware('permission:ordenes.crear|ordenes.editar');
 
+        // plantillas de servicios (FRP por ISP $250…) para los teléfonos de locatarios
+        Route::middleware('permission:telefonos.crear|telefonos.editar')->group(function () {
+            Route::get('plantillas-servicio', [PlantillaServicioController::class, 'index']);
+            Route::post('plantillas-servicio', [PlantillaServicioController::class, 'store']);
+            Route::delete('plantillas-servicio/{plantilla}', [PlantillaServicioController::class, 'destroy']);
+        });
         Route::get('ordenes-tecnicos', [OrdenReparacionController::class, 'tecnicos'])->middleware('permission:ordenes.ver');
         Route::get('ordenes', [OrdenReparacionController::class, 'index'])->middleware('permission:ordenes.ver');
         Route::get('ordenes/{orden}', [OrdenReparacionController::class, 'show'])->middleware('permission:ordenes.ver');

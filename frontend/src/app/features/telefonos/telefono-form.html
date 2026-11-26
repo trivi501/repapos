@@ -80,6 +80,7 @@
         <div class="form-field">
           <label for="trabajo">Trabajo a realizar</label>
           <input id="trabajo" name="trabajo" [(ngModel)]="m.trabajo" />
+          <app-plantillas-servicio [nombre]="m.trabajo || ''" [precioActual]="m.total" (elegido)="usarPlantilla($event)" />
         </div>
         <div class="form-field">
           <label for="total">Monto total $</label>

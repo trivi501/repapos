@@ -6,6 +6,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { AvisosService, AvisoWhatsapp } from '../../core/services/avisos.service';
 import { DineroPipe, FechaPipe, fechaISO } from '../../shared/ui';
 import { DetectarUsb, TelefonoUsb, nombreTelefonoUsb } from '../../shared/detectar-usb/detectar-usb';
+import { PlantillaServicio, PlantillasServicio } from '../../shared/plantillas-servicio/plantillas-servicio';
 import type { Telefono } from './telefonos';
 import { MOTIVOS_NO_QUEDO } from '../../shared/motivos-no-quedo';
 import { DialogoService } from '../../core/services/dialogo.service';
@@ -22,7 +23,7 @@ function vacio(locatario = '') {
 /** Alta y edición de un teléfono de locatario, en una ventana sobre la lista. */
 @Component({
   selector: 'app-telefono-form',
-  imports: [FormsModule, DineroPipe, FechaPipe, DetectarUsb],
+  imports: [FormsModule, DineroPipe, FechaPipe, DetectarUsb, PlantillasServicio],
   templateUrl: './telefono-form.html',
   host: { '(document:keydown.escape)': 'alEscape($event)' },
   styles: `
@@ -80,6 +81,13 @@ export class TelefonoForm implements OnInit, AfterViewInit {
 
   /** Veces que este mismo equipo (por serie o IMEI) ya pasó por el taller: para ver si entra en garantía. */
   readonly yaVino = signal<Telefono[]>([]);
+
+  /** Plantilla de servicio (FRP por ISP $250…): llena el trabajo y el monto. */
+  usarPlantilla(p: PlantillaServicio): void {
+    this.m.trabajo = p.nombre;
+    this.m.total = p.precio;
+    this.cdr.markForCheck();
+  }
 
   /** Teléfono detectado por USB: modelo con su marca, serie e IMEI; y se busca si ya vino antes. */
   usarTelefono(t: TelefonoUsb): void {

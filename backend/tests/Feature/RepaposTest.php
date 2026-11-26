@@ -9,6 +9,7 @@ use App\Models\Equipo;
 use App\Models\Locatario;
 use App\Models\OrdenReparacion;
 use App\Models\Pago;
+use App\Models\PlantillaServicio;
 use App\Models\Producto;
 use App\Models\Salida;
 use App\Models\Sucursal;
@@ -977,6 +978,29 @@ class RepaposTest extends TestCase
         $normal = $this->ordenNueva();
         $this->postJson("/api/ordenes/{$normal['id']}/accion", ['accion' => 'estatus', 'estado' => 'en_proceso'])->assertUnprocessable();
         $this->postJson("/api/ordenes/{$normal['id']}/accion", ['accion' => 'estatus', 'estado' => 'rechazado', 'motivo' => 'x'])->assertUnprocessable();
+    }
+
+    public function test_plantillas_de_servicio_por_taller(): void
+    {
+        $this->comoTaller($this->adminA);
+        $this->postJson('/api/plantillas-servicio', ['nombre' => ' FRP  por ISP ', 'precio' => 250])->assertCreated()
+            ->assertJsonPath('plantilla.nombre', 'FRP por ISP');
+        $this->postJson('/api/plantillas-servicio', ['nombre' => 'FRP normal', 'precio' => 100])->assertCreated();
+        // mismo nombre: actualiza el precio en vez de duplicar
+        $this->postJson('/api/plantillas-servicio', ['nombre' => 'FRP por ISP', 'precio' => 280])->assertOk();
+        $this->getJson('/api/plantillas-servicio')->assertOk()->assertJsonCount(2)
+            ->assertJsonPath('0.nombre', 'FRP normal')->assertJsonPath('1.precio', 280);
+        $this->postJson('/api/plantillas-servicio', ['nombre' => '', 'precio' => 1])->assertUnprocessable();
+
+        // otro taller no las ve ni las puede borrar
+        $id = PlantillaServicio::withoutGlobalScopes()->where('nombre', 'FRP normal')->value('id');
+        $this->comoTaller($this->adminB);
+        $this->getJson('/api/plantillas-servicio')->assertOk()->assertJsonCount(0);
+        $this->deleteJson("/api/plantillas-servicio/{$id}")->assertNotFound();
+
+        $this->comoTaller($this->adminA);
+        $this->deleteJson("/api/plantillas-servicio/{$id}")->assertOk();
+        $this->getJson('/api/plantillas-servicio')->assertJsonCount(1);
     }
 
     public function test_quitar_un_abono_mal_capturado_mientras_su_turno_no_tenga_corte(): void
