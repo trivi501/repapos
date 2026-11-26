@@ -191,8 +191,6 @@ export class ReparacionForm implements OnInit {
     sucursal_id: [null as number | null],
     estimado_listo_at: [estimadoPorDefecto()],
     costo_estimado: [null as number | null],
-    anticipo: [0 as number | null],
-    metodo_pago: ['efectivo'],
     estado: ['recibido'],
     motivo_rechazo: [''],
     diagnostico: [''],
@@ -206,7 +204,59 @@ export class ReparacionForm implements OnInit {
     notas_cliente: [''],
     visible_cliente: [true],
     visibilidad: this.fb.control<string[]>(SECCIONES_VISIBLES.map((s) => s.clave)),
+    /** Más teléfonos del mismo cliente en esta orden (solo al crear): cada uno con su falla y precio. */
+    otros: this.fb.array([this.nuevoOtro()].slice(1)),
   });
+
+  get otros() {
+    return this.formulario.controls.otros;
+  }
+
+  /** Lo que ya pagó (solo al editar; cambia con abonos desde la ficha, no aquí). */
+  readonly pagado = signal(0);
+
+  private nuevoOtro() {
+    return this.fb.group({
+      tipo: ['celular'],
+      marca: [''],
+      modelo: [''],
+      imei: [''],
+      falla_reportada: [''],
+      costo_estimado: [null as number | null],
+      bloqueos: this.fb.control<string[]>([]),
+      bloqueo_tipo: ['pin'],
+      bloqueo_valor: [''],
+    });
+  }
+
+  agregarOtro(): void {
+    this.otros.push(this.nuevoOtro());
+  }
+
+  quitarOtro(i: number): void {
+    this.otros.removeAt(i);
+  }
+
+  /** Teléfono detectado por USB para uno de los teléfonos agregados. */
+  usarTelefonoEnOtro(i: number, t: TelefonoUsb): void {
+    const identificador = t.imei || t.serial || '';
+    const modelo = nombreTelefonoUsb(t, false);
+    this.otros.at(i).patchValue({
+      tipo: t.tipo === 'ipad' ? 'tablet' : 'celular',
+      ...(t.marca ? { marca: t.marca } : {}),
+      ...(modelo ? { modelo } : {}),
+      ...(identificador ? { imei: identificador } : {}),
+    });
+  }
+
+  alternarBloqueoOtro(i: number, clave: string, activo: boolean): void {
+    const control = this.otros.at(i).controls.bloqueos;
+    const actuales = control.value ?? [];
+    control.setValue(activo ? [...actuales, clave] : actuales.filter((b) => b !== clave));
+  }
+
+  /** Suma de lo estimado de los teléfonos agregados. */
+  readonly totalOtros = computed(() => (this.valores().otros ?? []).reduce((s, o) => s + Number(o?.costo_estimado ?? 0), 0));
 
   readonly valores = toSignal(this.formulario.valueChanges, { initialValue: this.formulario.getRawValue() });
 
@@ -217,7 +267,7 @@ export class ReparacionForm implements OnInit {
   readonly saldo = computed(() => {
     const v = this.valores();
     // lo que se cobra es el costo final si ya se fijó (igual que en el backend)
-    return Math.max(0, Number(v.costo_final ?? v.costo_estimado ?? 0) - Number(v.anticipo ?? 0));
+    return Math.max(0, Number(v.costo_final ?? v.costo_estimado ?? 0) - this.pagado()) + this.totalOtros();
   });
 
   /** Costo de refacción, mano de obra y ganancia: solo para el dueño. */
@@ -252,7 +302,7 @@ export class ReparacionForm implements OnInit {
         imei: resumen.imei,
         falla: v.falla_reportada || 'Por diagnosticar en taller',
         costo: Number(v.costo_final ?? v.costo_estimado ?? 0),
-        anticipo: Number(v.anticipo ?? 0),
+        otros: [] as { equipo: string; falla: string; costo: number }[],
       };
     }
 
@@ -283,7 +333,11 @@ export class ReparacionForm implements OnInit {
       imei: imei || 'Sin registrar',
       falla: v.falla_reportada || 'Por diagnosticar en taller',
       costo: Number(v.costo_estimado ?? 0),
-      anticipo: Number(v.anticipo ?? 0),
+      otros: (v.otros ?? []).map((o) => ({
+        equipo: [o?.marca, o?.modelo].filter(Boolean).join(' ') || 'Otro teléfono',
+        falla: o?.falla_reportada || 'Por diagnosticar',
+        costo: Number(o?.costo_estimado ?? 0),
+      })),
     };
   });
 
@@ -320,6 +374,7 @@ export class ReparacionForm implements OnInit {
         equipo: `${orden.equipo?.marca ?? ''} ${orden.equipo?.modelo ?? ''}`.trim(),
         imei: orden.equipo?.imei ?? 'Sin registrar',
       });
+      this.pagado.set(Number(orden.pagado ?? 0));
       this.estadoFisico.set(orden.estado_fisico ?? {});
       this.revision.set(orden.revision ?? {});
       this.fotos.set(orden.fotos ?? []);
@@ -337,9 +392,6 @@ export class ReparacionForm implements OnInit {
           sucursal_id: orden.sucursal_id ?? null,
           estimado_listo_at: orden.estimado_listo_at ? aLocalInput(new Date(orden.estimado_listo_at)) : '',
           costo_estimado: orden.costo_estimado ? Number(orden.costo_estimado) : null,
-          // al editar se muestra lo ya pagado; solo cambia con abonos desde la ficha
-          anticipo: Number(orden.pagado ?? 0),
-          metodo_pago: orden.metodo_pago ?? 'efectivo',
           estado: orden.estado,
           motivo_rechazo: orden.motivo_rechazo ?? '',
           diagnostico: orden.diagnostico ?? '',
@@ -470,6 +522,10 @@ export class ReparacionForm implements OnInit {
       if (this.modoEquipo() === 'nuevo' && (!v.equipo_nuevo.marca || !v.equipo_nuevo.modelo)) {
         errores.push('La marca y el modelo del dispositivo son obligatorios.');
       }
+      v.otros.forEach((o, i) => {
+        if (!o.marca?.trim() || !o.modelo?.trim()) errores.push(`Teléfono ${i + 2}: escribe la marca y el modelo.`);
+        if (!o.falla_reportada?.trim()) errores.push(`Teléfono ${i + 2}: escribe la falla.`);
+      });
     }
     if (!v.falla_reportada?.trim()) errores.push('Describe el problema reportado.');
     if (this.esEdicion() && v.estado === 'rechazado' && !v.motivo_rechazo?.trim()) {
@@ -495,8 +551,6 @@ export class ReparacionForm implements OnInit {
       revision: this.revision(),
       observaciones: v.observaciones || null,
       costo_estimado: v.costo_estimado,
-      anticipo: v.anticipo ?? 0,
-      metodo_pago: v.metodo_pago,
       // El input datetime-local no lleva zona horaria; se envía en ISO (UTC) para que el backend guarde la hora correcta.
       estimado_listo_at: v.estimado_listo_at ? new Date(v.estimado_listo_at).toISOString() : null,
       notas: v.notas || null,
@@ -530,6 +584,23 @@ export class ReparacionForm implements OnInit {
     else payload['cliente_nuevo'] = v.cliente_nuevo;
     if (this.modoEquipo() === 'previo') payload['equipo_id'] = v.equipo_id;
     else payload['equipo_nuevo'] = v.equipo_nuevo;
+    if (v.otros.length) {
+      payload['otros'] = v.otros.map((o) => ({
+        tipo: o.tipo,
+        marca: o.marca?.trim(),
+        modelo: o.modelo?.trim(),
+        imei: o.imei?.trim() || null,
+        falla_reportada: o.falla_reportada?.trim(),
+        costo_estimado: o.costo_estimado,
+        bloqueos: o.bloqueos ?? [],
+        bloqueo_tipo: o.bloqueo_valor?.trim() ? o.bloqueo_tipo : 'ninguno',
+        // el patrón se guarda como el del dibujo: "1-5-9"
+        bloqueo_valor:
+          o.bloqueo_tipo === 'patron'
+            ? (o.bloqueo_valor ?? '').replace(/[^1-9]/g, '').split('').join('-') || null
+            : o.bloqueo_valor?.trim() || null,
+      }));
+    }
     return payload;
   }
 
@@ -570,8 +641,6 @@ export class ReparacionForm implements OnInit {
       tipo_servicio: 'reparacion',
       bloqueo_tipo: 'patron',
       bloqueos: [],
-      metodo_pago: 'efectivo',
-      anticipo: 0,
       estado: 'recibido',
       estimado_listo_at: estimadoPorDefecto(),
       sucursal_id: this.sucursales()[0]?.id ?? null,
@@ -580,6 +649,7 @@ export class ReparacionForm implements OnInit {
       visible_cliente: true,
       visibilidad: SECCIONES_VISIBLES.map((s) => s.clave),
     });
+    this.otros.clear();
     this.estadoFisico.set({});
     this.revision.set({});
     this.lote.set(nuevoLote());

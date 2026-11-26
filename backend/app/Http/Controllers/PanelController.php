@@ -95,7 +95,7 @@ class PanelController extends Controller
 
     private function reparaciones(CarbonInterface $desde, CarbonInterface $hasta): array
     {
-        $abiertas = OrdenReparacion::whereNotIn('estado', [OrdenReparacion::ENTREGADO, OrdenReparacion::CANCELADO])
+        $abiertas = OrdenReparacion::abiertas()
             ->selectRaw('estado, COUNT(*) as n')->groupBy('estado')->pluck('n', 'estado');
 
         return [
@@ -105,8 +105,7 @@ class PanelController extends Controller
                 ->values(),
             'abiertas' => (int) $abiertas->sum(),
             'recibidas' => OrdenReparacion::where('fecha_recepcion', '>=', $desde)->where('fecha_recepcion', '<', $hasta)->count(),
-            'entregadas' => OrdenReparacion::where('estado', OrdenReparacion::ENTREGADO)
-                ->where('fecha_entrega_real', '>=', $desde)->where('fecha_entrega_real', '<', $hasta)->count(),
+            'entregadas' => OrdenReparacion::where('fecha_entrega_real', '>=', $desde)->where('fecha_entrega_real', '<', $hasta)->count(),
         ];
     }
 

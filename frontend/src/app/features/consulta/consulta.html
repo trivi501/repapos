@@ -33,7 +33,12 @@
             <span class="etiqueta">Folio</span>
             <strong>{{ r.folio }}</strong>
           </div>
-          <span class="badge" [class]="claseEstado(r.estado)">{{ etiquetaEstado(r.estado) }}</span>
+          <span>
+            <span class="badge" [class]="claseEstado(r.estado)">{{ etiquetaEstado(r.estado) }}</span>
+            @if (r.entregado) {
+              <span class="badge badge-success">Entregado</span>
+            }
+          </span>
         </div>
 
         @if (!r.verificado) {

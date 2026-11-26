@@ -8,6 +8,7 @@ interface EstadoPublico {
   estado: string;
   estado_texto: string;
   es_liberacion?: boolean;
+  entregado?: boolean;
   motivo_rechazo?: string | null;
   taller: string;
   logo_url: string | null;
@@ -31,7 +32,6 @@ const PASOS = [
   { estados: ['diagnostico'], texto: 'Diagnóstico' },
   { estados: ['en_reparacion', 'esperando_repuesto'], texto: 'En reparación' },
   { estados: ['reparado', 'no_quedo'], texto: 'Listo' },
-  { estados: ['entregado'], texto: 'Entregado' },
 ];
 
 /** Una liberación (bloqueo de operador, FRP, iCloud, MDM o Knox) solo tiene estos pasos. */
@@ -62,8 +62,9 @@ export class OrdenEstado implements OnInit {
   }
 
   pasos(o: EstadoPublico) {
-    const lista = o.es_liberacion ? PASOS_LIBERACION : PASOS;
-    const actual = lista.findIndex((p) => p.estados.includes(o.estado));
+    // "Entregado" es el último paso de las dos: se marca aparte del estatus
+    const lista = [...(o.es_liberacion ? PASOS_LIBERACION : PASOS), { estados: [] as string[], texto: 'Entregado' }];
+    const actual = o.entregado ? lista.length - 1 : lista.findIndex((p) => p.estados.includes(o.estado));
     return lista.map((p, i) => ({
       texto: p.texto !== 'Listo' ? p.texto : o.estado === 'no_quedo' ? 'No se pudo reparar' : o.estado === 'rechazado' ? 'Rechazado' : p.texto,
       hecho: actual >= 0 && i <= actual,

@@ -32,6 +32,7 @@ class Documentos
 
         return Pdf::loadView('pdf.orden', [
             'orden' => $o,
+            'grupo' => $o->delGrupo(),
             'logo' => $o->taller->logoDataUri(),
             'qr' => Qr::dataUri($enlace, 200),
             'enlace' => $enlace,

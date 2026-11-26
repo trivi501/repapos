@@ -423,7 +423,8 @@ class RepaposTest extends TestCase
     {
         $this->travelTo(today()->setTime(10, 0));
         $this->telefonoDe($this->adminA);   // 100 en efectivo (teléfonos)
-        $o = $this->ordenNueva(['costo_refaccion' => 300, 'costo_mano_obra' => 100]);   // anticipo 300 con tarjeta
+        $o = $this->ordenNueva(['costo_refaccion' => 300, 'costo_mano_obra' => 100]);
+        $this->postJson("/api/ordenes/{$o['id']}/accion", ['accion' => 'abono', 'monto' => 300, 'metodo' => 'TARJETA'])->assertOk();   // 300 con tarjeta
         $hoy = today()->toDateString();
 
         $r = $this->getJson('/api/cortes?fecha='.$hoy)->assertOk();
@@ -874,26 +875,21 @@ class RepaposTest extends TestCase
             'equipo_nuevo' => ['tipo' => 'celular', 'marca' => 'Apple', 'modelo' => 'iPhone 13', 'imei' => '353912110000001'],
             'falla_reportada' => 'Pantalla rota',
             'costo_estimado' => 1000,
-            'anticipo' => 300,
-            'metodo_pago' => 'tarjeta',
             'bloqueo_tipo' => 'pin',
             'bloqueo_valor' => '1234',
             'revision' => ['bateria' => 'si', 'golpes' => 'no', 'inventado' => 'si'],
         ])->assertCreated()->json();
     }
 
-    public function test_orden_nueva_asigna_folio_cobra_anticipo_y_cifra_el_pin(): void
+    public function test_orden_nueva_asigna_folio_sin_anticipo_y_cifra_el_pin(): void
     {
         $o = $this->ordenNueva();
         $this->assertSame(1, $o['folio']);
         $this->assertSame(32, strlen($o['token']));
-        $this->assertEquals(700.0, $o['saldo']);
+        $this->assertEquals(1000.0, $o['saldo'], 'Ya no hay anticipo: se cobra con abonos desde la ficha');
         $this->assertSame(['bateria' => 'si', 'golpes' => 'no'], $o['revision'], 'Solo se guardan los puntos válidos');
 
-        $pago = Pago::where('orden_id', $o['id'])->first();
-        $this->assertEquals(300.0, (float) $pago->monto);
-        $this->assertSame('TARJETA', $pago->metodo);
-        $this->assertSame('Anticipo', $pago->concepto);
+        $this->assertSame(0, Pago::where('orden_id', $o['id'])->count());
 
         // en la base va cifrado; la ficha lo muestra y el listado no
         $crudo = DB::table('ordenes_reparacion')->where('id', $o['id'])->value('bloqueo_valor');
@@ -918,13 +914,20 @@ class RepaposTest extends TestCase
         $this->assertStringContainsString('/orden/'.$o['token'], rawurldecode($r->json('aviso.url')));
 
         $this->postJson("/api/ordenes/{$id}/accion", ['accion' => 'abono', 'monto' => 200])->assertOk();
-        $this->assertEquals(500.0, (float) OrdenReparacion::find($id)->pagado);
+        $this->assertEquals(200.0, (float) OrdenReparacion::find($id)->pagado);
         $this->postJson("/api/ordenes/{$id}/accion", ['accion' => 'liquidar'])->assertOk();
         $this->assertEquals(1000.0, (float) OrdenReparacion::find($id)->pagado);
         $this->postJson("/api/ordenes/{$id}/accion", ['accion' => 'liquidar'])->assertUnprocessable();
 
-        $this->postJson("/api/ordenes/{$id}/accion", ['accion' => 'estatus', 'estado' => 'entregado'])->assertOk();
+        // entregado ya no es estatus: se marca aparte y el estatus (Listo) se queda
+        $this->postJson("/api/ordenes/{$id}/accion", ['accion' => 'estatus', 'estado' => 'entregado'])->assertUnprocessable();
+        $this->postJson("/api/ordenes/{$id}/accion", ['accion' => 'entregar'])->assertOk()
+            ->assertJsonPath('orden.entregado', true)->assertJsonPath('orden.estado', 'reparado');
         $this->assertNotNull(OrdenReparacion::find($id)->fecha_entrega_real);
+        $this->postJson("/api/ordenes/{$id}/accion", ['accion' => 'entregar'])->assertUnprocessable();
+        $this->getJson('/api/ordenes?estado=abiertas')->assertJsonPath('total', 0);
+        $this->getJson('/api/ordenes?estado=entregadas')->assertJsonPath('total', 1);
+        $this->postJson("/api/ordenes/{$id}/accion", ['accion' => 'quitar_entrega'])->assertOk()->assertJsonPath('orden.entregado', false);
 
         $o2 = $this->ordenNueva(['bloqueo_tipo' => 'ninguno', 'bloqueo_valor' => null]);
         // "No quedó" pide el motivo; va en el aviso y en la página pública
@@ -974,6 +977,58 @@ class RepaposTest extends TestCase
         $normal = $this->ordenNueva();
         $this->postJson("/api/ordenes/{$normal['id']}/accion", ['accion' => 'estatus', 'estado' => 'en_proceso'])->assertUnprocessable();
         $this->postJson("/api/ordenes/{$normal['id']}/accion", ['accion' => 'estatus', 'estado' => 'rechazado', 'motivo' => 'x'])->assertUnprocessable();
+    }
+
+    public function test_varios_telefonos_en_una_orden_un_ticket_y_un_cobro(): void
+    {
+        $o = $this->ordenNueva(['otros' => [
+            ['marca' => 'Samsung', 'modelo' => 'A15', 'falla_reportada' => 'No carga', 'costo_estimado' => 400],
+            ['marca' => 'Motorola', 'modelo' => 'G24', 'falla_reportada' => 'Cuenta Google', 'costo_estimado' => 600,
+                'bloqueos' => ['frp'], 'bloqueo_tipo' => 'pin', 'bloqueo_valor' => '0000'],
+        ]]);
+
+        // cada teléfono es su propia orden (folio, falla, precio, estatus), del mismo cliente y del mismo grupo
+        $this->assertCount(3, $o['grupo_ordenes']);
+        $this->assertSame([1, 2, 3], array_column($o['grupo_ordenes'], 'folio'));
+        $this->assertSame([false, false, true], array_column($o['grupo_ordenes'], 'es_liberacion'));
+        $this->assertSame(1, OrdenReparacion::distinct()->count('cliente_id'));
+        $this->assertSame(1, OrdenReparacion::distinct()->count('grupo'));
+        $this->getJson('/api/ordenes')->assertJsonPath('data.0.grupo_total', 3);
+
+        // el ticket lleva los 3 y el total es de todos (1000 + 400 + 600)
+        $ticket = rawurldecode($o['enlaces']['whatsapp_ticket']);
+        $this->assertStringContainsString('Samsung A15', $ticket);
+        $this->assertStringContainsString('Motorola G24', $ticket);
+        $this->assertStringContainsString('$2,000.00', $ticket);
+        $this->getJson("/api/ordenes/{$o['id']}/recibo")->assertOk()->assertJsonCount(3, 'grupo');
+
+        // un abono a toda la orden va llenando lo de cada teléfono; liquidar "todo" cierra los 3
+        $this->postJson("/api/ordenes/{$o['id']}/accion", ['accion' => 'abono', 'monto' => 1200, 'todo' => true])->assertOk();
+        $this->assertEquals([1000.0, 200.0, 0.0], OrdenReparacion::orderBy('folio')->pluck('pagado')->map(fn ($p) => (float) $p)->all());
+        $this->postJson("/api/ordenes/{$o['id']}/accion", ['accion' => 'liquidar', 'todo' => true])->assertOk();
+        $this->assertSame(0.0, (float) OrdenReparacion::get()->sum('saldo'));
+
+        // entregar uno solo, o todos los que falten
+        $segundo = $o['grupo_ordenes'][1]['id'];
+        $this->postJson("/api/ordenes/{$segundo}/accion", ['accion' => 'entregar'])->assertOk();
+        $this->assertSame(1, OrdenReparacion::whereNotNull('fecha_entrega_real')->count());
+        $this->postJson("/api/ordenes/{$o['id']}/accion", ['accion' => 'entregar', 'todo' => true])->assertOk()
+            ->assertJsonPath('message', 'Folios 1, 3: entregados.');
+        $this->assertSame(3, OrdenReparacion::whereNotNull('fecha_entrega_real')->count());
+
+        // la liberación también se entrega, y su estatus (Rechazado) se queda
+        $tercero = $o['grupo_ordenes'][2]['id'];
+        $this->postJson("/api/ordenes/{$tercero}/accion", ['accion' => 'estatus', 'estado' => 'rechazado', 'motivo' => 'Sin servidor'])
+            ->assertOk()->assertJsonPath('orden.entregado', true)->assertJsonPath('orden.estado', 'rechazado');
+
+        // si falta la falla de un teléfono agregado, no se guarda nada
+        $this->postJson('/api/ordenes', [
+            'cliente_nuevo' => ['nombre' => 'Ana', 'telefono' => '5511112222'],
+            'equipo_nuevo' => ['tipo' => 'celular', 'marca' => 'Apple', 'modelo' => 'iPhone 11'],
+            'falla_reportada' => 'Pantalla',
+            'otros' => [['marca' => 'Xiaomi', 'modelo' => 'Redmi 13']],
+        ])->assertUnprocessable()->assertJsonValidationErrors('otros.0.falla_reportada');
+        $this->assertSame(3, OrdenReparacion::count());
     }
 
     public function test_costos_internos_y_ganancia_solo_los_ve_el_dueno(): void
@@ -1131,8 +1186,8 @@ class RepaposTest extends TestCase
             'estado' => 'diagnostico', 'falla_reportada' => 'Otra', 'anticipo' => 999, 'costo_final' => 1200, 'bloqueo_tipo' => 'pin', 'bloqueo_valor' => '1234',
         ])->assertOk();
         $orden = OrdenReparacion::find($o['id']);
-        $this->assertEquals(300.0, (float) $orden->pagado);
-        $this->assertEquals(900.0, $orden->saldo);
+        $this->assertEquals(0.0, (float) $orden->pagado, 'Ni el anticipo ni editar cambian lo pagado');
+        $this->assertEquals(1200.0, $orden->saldo);
     }
 
     public function test_consulta_publica_respeta_la_visibilidad_y_nunca_expone_secretos(): void

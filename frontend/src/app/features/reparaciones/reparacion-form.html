@@ -143,6 +143,76 @@
               </div>
             </div>
           }
+
+          <!-- más teléfonos del mismo cliente: misma orden, un ticket y un cobro -->
+          @if (authService.tienePermiso('equipos.crear')) {
+            <div formArrayName="otros" class="otros-telefonos">
+              @for (otro of otros.controls; track otro; let i = $index) {
+                <fieldset class="otro-telefono" [formGroupName]="i">
+                  <legend>Teléfono {{ i + 2 }}</legend>
+                  <button type="button" class="btn btn-secondary btn-sm quitar-otro" (click)="quitarOtro(i)" [attr.aria-label]="'Quitar teléfono ' + (i + 2)">✕ Quitar</button>
+                  <app-detectar-usb (elegido)="usarTelefonoEnOtro(i, $event)" />
+                  <div class="grid-3">
+                    <div class="form-field">
+                      <label [for]="'ot_marca' + i">Marca <span class="req">*</span></label>
+                      <input [id]="'ot_marca' + i" formControlName="marca" />
+                    </div>
+                    <div class="form-field">
+                      <label [for]="'ot_modelo' + i">Modelo <span class="req">*</span></label>
+                      <input [id]="'ot_modelo' + i" formControlName="modelo" />
+                    </div>
+                    <div class="form-field">
+                      <label [for]="'ot_imei' + i">IMEI / Serie</label>
+                      <input [id]="'ot_imei' + i" formControlName="imei" />
+                    </div>
+                  </div>
+                  <div class="form-field">
+                    <label [for]="'ot_falla' + i">Problema reportado <span class="req">*</span></label>
+                    <textarea [id]="'ot_falla' + i" rows="2" formControlName="falla_reportada" placeholder="Qué falla tiene este teléfono…"></textarea>
+                  </div>
+                  <div class="grid-3">
+                    <div class="form-field">
+                      <label [for]="'ot_costo' + i">Costo estimado</label>
+                      <div class="input-moneda">
+                        <span>$</span>
+                        <input [id]="'ot_costo' + i" type="number" min="0" step="0.01" formControlName="costo_estimado" />
+                      </div>
+                    </div>
+                    <div class="form-field">
+                      <label [for]="'ot_btipo' + i">Desbloqueo</label>
+                      <select [id]="'ot_btipo' + i" formControlName="bloqueo_tipo">
+                        <option value="pin">PIN</option>
+                        <option value="patron">Patrón (números 1-9)</option>
+                        <option value="clave">Contraseña</option>
+                      </select>
+                    </div>
+                    <div class="form-field">
+                      <label [for]="'ot_bvalor' + i">PIN / patrón / contraseña</label>
+                      <input [id]="'ot_bvalor' + i" formControlName="bloqueo_valor" autocomplete="off" placeholder="Vacío si no tiene" />
+                    </div>
+                  </div>
+                  <div class="bloqueos-cuenta">
+                    @for (bloqueo of bloqueosCuenta; track bloqueo.clave) {
+                      <label class="switch">
+                        <input type="checkbox" role="switch"
+                               [checked]="otro.controls.bloqueos.value?.includes(bloqueo.clave)"
+                               (change)="alternarBloqueoOtro(i, bloqueo.clave, $any($event.target).checked)" />
+                        <span class="switch-pista"></span>
+                        {{ bloqueo.etiqueta }}
+                      </label>
+                    }
+                  </div>
+                  @if (otro.controls.bloqueos.value?.length) {
+                    <p class="sub">Con bloqueo marcado este teléfono es una liberación.</p>
+                  }
+                </fieldset>
+              }
+              <button type="button" class="btn btn-secondary" (click)="agregarOtro()">➕ Agregar otro teléfono a esta orden</button>
+              @if (otros.length) {
+                <p class="sub">Cada teléfono queda con su folio, su falla, su precio y su estatus, pero van en el mismo ticket y se cobran juntos.</p>
+              }
+            </div>
+          }
         }
       </div>
     </section>
@@ -500,7 +570,7 @@
 
     <!-- Presupuesto y anticipo -->
     <section class="card seccion">
-      <header class="seccion-header"><h2 class="marcador">Presupuesto y anticipo inicial</h2></header>
+      <header class="seccion-header"><h2 class="marcador">Presupuesto</h2></header>
       <div class="seccion-body">
         <div class="form-field">
           <label for="costo_estimado">Costo estimado</label>
@@ -509,27 +579,8 @@
             <input id="costo_estimado" type="number" min="0" step="0.01" formControlName="costo_estimado" />
           </div>
         </div>
-        <div class="grid-2">
-          <div class="form-field">
-            <label for="anticipo">{{ esEdicion() ? 'Ya pagado' : 'Anticipo (pago inicial)' }}</label>
-            <div class="input-moneda">
-              <span>$</span>
-              <input id="anticipo" type="number" min="0" step="0.01" formControlName="anticipo" [readonly]="esEdicion()" />
-            </div>
-            @if (esEdicion()) {
-              <span class="sub">Los abonos se registran en la ficha de la orden, para que entren a la caja.</span>
-            }
-          </div>
-          <div class="form-field">
-            <label for="metodo_pago">Método de pago</label>
-            <select id="metodo_pago" formControlName="metodo_pago">
-              <option value="efectivo">Efectivo</option>
-              <option value="tarjeta">Tarjeta</option>
-              <option value="transferencia">Transferencia</option>
-            </select>
-          </div>
-        </div>
         @if (esEdicion()) {
+          <p class="sub">Ya pagado: <strong>$ {{ pagado().toFixed(2) }}</strong>. Los cobros se hacen en la ficha de la orden, para que entren a la caja.</p>
           <div class="form-field">
             <label for="costo_final">Costo final</label>
             <div class="input-moneda">
@@ -557,7 +608,12 @@
           <p class="ticket-falla">{{ comprobante().falla }}</p>
           <hr />
           <div class="ticket-fila"><span>COSTO ESTIMADO:</span><span>$ {{ comprobante().costo.toFixed(2) }}</span></div>
-          <div class="ticket-fila"><span>ANTICIPO RECIBIDO:</span><span>$ {{ comprobante().anticipo.toFixed(2) }}</span></div>
+          @for (otro of comprobante().otros; track $index) {
+            <hr />
+            <div class="ticket-fila"><span>EQUIPO {{ $index + 2 }}:</span><span>{{ otro.equipo }}</span></div>
+            <p class="ticket-falla">{{ otro.falla }}</p>
+            <div class="ticket-fila"><span>COSTO ESTIMADO:</span><span>$ {{ otro.costo.toFixed(2) }}</span></div>
+          }
           <hr />
           <div class="ticket-fila ticket-total"><span>SALDO RESTANTE:</span><span>$ {{ saldo().toFixed(2) }}</span></div>
         </div>

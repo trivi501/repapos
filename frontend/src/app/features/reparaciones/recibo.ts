@@ -1,7 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import QRCode from 'qrcode';
-import { OrdenReparacion } from '../../core/models/taller.model';
+import { OrdenReparacion, TelefonoDeOrden } from '../../core/models/taller.model';
 import { ApiService } from '../../core/services/api.service';
 import { DineroPipe, FechaPipe } from '../../shared/ui';
 
@@ -19,6 +19,21 @@ export interface DatosRecibo {
   terminos: string;
   aviso: string;
   enlace: string;
+  /** Todos los teléfonos de la orden si trae varios (vacío si va sola). */
+  grupo: TelefonoDeOrden[];
+}
+
+/** Total, pagado y resta del comprobante: de toda la orden si trae varios teléfonos. */
+export function totalesRecibo(r: DatosRecibo): { total: number; pagado: number; resta: number; equipos: number } {
+  if (!r.grupo?.length) {
+    return { total: r.orden.total, pagado: Number(r.orden.pagado ?? 0), resta: Math.max(0, r.orden.saldo), equipos: 1 };
+  }
+  return {
+    total: r.grupo.reduce((s, g) => s + g.total, 0),
+    pagado: r.grupo.reduce((s, g) => s + g.pagado, 0),
+    resta: r.grupo.reduce((s, g) => s + Math.max(0, g.saldo), 0),
+    equipos: r.grupo.length,
+  };
 }
 
 /** Comprobante de recepción para imprimir (sin PIN ni patrón). */
@@ -34,6 +49,7 @@ export class Recibo implements OnInit {
 
   readonly d = signal<DatosRecibo | null>(null);
   readonly qr = signal<string | null>(null);
+  readonly totales = totalesRecibo;
 
   ngOnInit(): void {
     this.api.get<DatosRecibo>(`ordenes/${this.route.snapshot.paramMap.get('id')}/recibo`).subscribe(async (d) => {

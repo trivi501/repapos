@@ -10,6 +10,7 @@ import { AppLogo } from '../../shared/ui';
 interface ResultadoConsulta {
   folio: string;
   estado: string;
+  entregado?: boolean;
   verificado: boolean;
   equipo?: string;
   motivo?: string;
@@ -102,7 +103,7 @@ export class Consulta implements OnInit {
   }
 
   claseEstado(estado: string): string {
-    if (estado === 'entregado' || estado === 'reparado') return 'badge-success';
+    if (estado === 'reparado') return 'badge-success';
     if (estado === 'cancelado' || estado === 'no_quedo' || estado === 'rechazado') return 'badge-danger';
     if (estado === 'esperando_repuesto') return 'badge-warning';
     return 'badge-primary';

@@ -449,6 +449,11 @@ tbody tr:hover {
   background: #15803d;
 }
 
+/* el teléfono que se está viendo, dentro de la lista de su orden */
+tr.fila-actual td {
+  background: var(--tint-primary);
+}
+
 .btn.activo {
   background: var(--tint-primary);
   border-color: var(--color-accent);

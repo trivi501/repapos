@@ -43,6 +43,8 @@ export class ReparacionDetalle implements OnInit {
   readonly motivosNoQuedo = MOTIVOS_NO_QUEDO;
 
   monto: number | null = null;
+  /** Abono para toda la orden cuando trae varios teléfonos. */
+  montoGrupo: number | null = null;
   motivo = '';
   metodo = 'EFECTIVO';
   destinoCobros = '';
@@ -70,9 +72,13 @@ export class ReparacionDetalle implements OnInit {
   }
 
   ngOnInit(): void {
-    this.api.get<Ficha>(`ordenes/${this.id}`).subscribe({
-      next: (o) => this.mostrar(o),
-      error: (e: HttpErrorResponse) => this.avisos.fallo(e),
+    // al pasar a otro teléfono de la misma orden Angular reutiliza esta pantalla: se recarga con cada id
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      this.agregandoRefaccion.set(false);
+      this.api.get<Ficha>(`ordenes/${this.id}`).subscribe({
+        next: (o) => this.mostrar(o),
+        error: (e: HttpErrorResponse) => this.avisos.fallo(e),
+      });
     });
     this.busqueda
       .pipe(
@@ -151,6 +157,8 @@ export class ReparacionDetalle implements OnInit {
 
   private mostrar(o: Ficha): void {
     this.monto = o.saldo > 0 ? o.saldo : null;
+    const saldoGrupo = this.saldoGrupo(o);
+    this.montoGrupo = saldoGrupo > 0 ? Math.round(saldoGrupo * 100) / 100 : null;
     this.pidiendoMotivo.set(null);
     this.motivo = '';
     this.o.set(o);
@@ -197,8 +205,51 @@ export class ReparacionDetalle implements OnInit {
     if (await this.dialogo.confirmar(`¿Liquidar ${dinero(x.saldo)}?`)) this.accion({ accion: 'liquidar', metodo: this.metodo });
   }
 
+  /** Teléfonos de la orden que todavía no se entregan (contando este). */
+  pendientesDeEntregar(x: Ficha) {
+    return (x.grupo_ordenes ?? []).filter((g) => !g.entregado);
+  }
+
+  /** Lo que debe toda la orden (todos sus teléfonos). */
+  saldoGrupo(x: Ficha): number {
+    return (x.grupo_ordenes ?? []).reduce((s, g) => s + Math.max(0, g.saldo), 0);
+  }
+
+  totalGrupo(x: Ficha): number {
+    return (x.grupo_ordenes ?? []).reduce((s, g) => s + g.total, 0);
+  }
+
+  /** Entrega este teléfono, o todos los de la orden que falten (todo = true). El estatus no cambia. */
+  async entregar(x: Ficha, todo = false): Promise<void> {
+    const cuales = todo ? this.pendientesDeEntregar(x) : [x];
+    const debe = todo ? cuales.reduce((s, g) => s + Math.max(0, g.saldo), 0) : x.saldo;
+    const sinTerminar = cuales.filter((g) => ['recibido', 'diagnostico', 'en_reparacion', 'esperando_repuesto', 'en_proceso'].includes(g.estado));
+    const que = todo ? `los ${cuales.length} teléfonos de esta orden` : `el folio ${x.folio}`;
+    const avisos = [
+      sinTerminar.length ? `${sinTerminar.length > 1 ? 'Hay teléfonos que siguen' : 'Sigue'} en trabajo (no está Listo, No quedó ni Rechazado).` : '',
+      debe > 0 ? `Aún debe ${dinero(debe)}.` : '',
+    ].filter(Boolean).join('\n');
+    const ok = await this.dialogo.confirmar(`${avisos ? avisos + '\n\n' : ''}¿Entregar ${que}?`, { titulo: 'Entregar', aceptar: 'Entregar' });
+    if (ok) this.accion({ accion: 'entregar', todo });
+  }
+
+  async quitarEntrega(x: Ficha): Promise<void> {
+    if (await this.dialogo.confirmar(`¿Quitar la marca de entregado del folio ${x.folio}? Úsalo solo si se marcó por error.`, { titulo: 'Quitar entregado', aceptar: 'Quitar', peligro: true })) {
+      this.accion({ accion: 'quitar_entrega' });
+    }
+  }
+
+  abonarGrupo(): void {
+    if (this.montoGrupo && this.montoGrupo > 0) this.accion({ accion: 'abono', monto: this.montoGrupo, metodo: this.metodo, todo: true });
+  }
+
+  async liquidarGrupo(x: Ficha): Promise<void> {
+    if (await this.dialogo.confirmar(`¿Liquidar ${dinero(this.saldoGrupo(x))} de los ${x.grupo_ordenes?.length} teléfonos de la orden?`)) {
+      this.accion({ accion: 'liquidar', metodo: this.metodo, todo: true });
+    }
+  }
+
   async cambiarEstado(x: Ficha, estado: string): Promise<void> {
-    if (estado === 'entregado' && x.saldo > 0 && !await this.dialogo.confirmar(`Aún debe ${dinero(x.saldo)}. ¿Entregar de todos modos?`)) return;
     // rechazar y "no quedó" siempre llevan el motivo: primero se escribe
     if (estado === 'rechazado' || estado === 'no_quedo') {
       this.motivo = '';

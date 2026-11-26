@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\DelTaller;
 use App\Models\Concerns\DeSucursal;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -23,6 +24,7 @@ class OrdenReparacion extends Model
     public const REFACCION = 'esperando_repuesto';
     public const LISTO = 'reparado';
     public const NO_QUEDO = 'no_quedo';
+    // ya no es estatus (se marca aparte con fecha_entrega_real); queda para leer datos viejos
     public const ENTREGADO = 'entregado';
     public const CANCELADO = 'cancelado';
     // solo para liberaciones
@@ -30,8 +32,8 @@ class OrdenReparacion extends Model
     public const RECHAZADO = 'rechazado';
 
     /** Estatus de una reparación normal. */
-    public const ESTADOS_REPARACION = [self::RECIBIDO, self::DIAGNOSTICO, self::REPARACION, self::REFACCION, self::LISTO, self::NO_QUEDO, self::ENTREGADO, self::CANCELADO];
-    /** Una liberación (la orden trae bloqueo de operador, FRP, iCloud, MDM o Knox) solo tiene estos 4. */
+    public const ESTADOS_REPARACION = [self::RECIBIDO, self::DIAGNOSTICO, self::REPARACION, self::REFACCION, self::LISTO, self::NO_QUEDO, self::CANCELADO];
+    /** Una liberación (la orden trae bloqueo de operador, FRP, iCloud, MDM o Knox) solo tiene estos 4. Entregado va aparte, para las dos. */
     public const ESTADOS_LIBERACION = [self::RECIBIDO, self::EN_PROCESO, self::LISTO, self::RECHAZADO];
 
     public const ESTADOS = [...self::ESTADOS_REPARACION, self::EN_PROCESO, self::RECHAZADO];
@@ -68,6 +70,7 @@ class OrdenReparacion extends Model
 
     protected $fillable = [
         'numero_orden',
+        'grupo',
         'cliente_id',
         'equipo_id',
         'tecnico_id',
@@ -84,8 +87,6 @@ class OrdenReparacion extends Model
         'estado_fisico',
         'revision',
         'observaciones',
-        'anticipo',
-        'metodo_pago',
         'estimado_listo_at',
         'falla_reportada',
         'diagnostico',
@@ -111,7 +112,7 @@ class OrdenReparacion extends Model
     // el PIN, el patrón y los costos internos solo se exponen al abrir la orden (makeVisible en el controlador)
     protected $hidden = ['bloqueo_valor', 'bloqueo_pin', 'costo_refaccion', 'costo_mano_obra', 'costo_mano_externa', 'mano_externa_detalle'];
 
-    protected $appends = ['total', 'saldo', 'es_liberacion'];
+    protected $appends = ['total', 'saldo', 'es_liberacion', 'entregado'];
 
     protected function casts(): array
     {
@@ -125,7 +126,6 @@ class OrdenReparacion extends Model
             'costo_mano_externa' => 'decimal:2',
             'consultas_cliente' => 'integer',
             'ultima_consulta_at' => 'datetime',
-            'anticipo' => 'decimal:2',
             'pagado' => 'decimal:2',
             'estado_fisico' => 'array',
             'revision' => 'array',
@@ -141,7 +141,7 @@ class OrdenReparacion extends Model
     }
 
     /** Estatus en que el trabajo ya se terminó (bien o mal): su ganancia cuenta en el corte de ese día. */
-    public const TERMINADOS = [self::LISTO, self::NO_QUEDO, self::RECHAZADO, self::ENTREGADO, self::CANCELADO];
+    public const TERMINADOS = [self::LISTO, self::NO_QUEDO, self::RECHAZADO, self::CANCELADO];
 
     protected static function booted(): void
     {
@@ -228,6 +228,24 @@ class OrdenReparacion extends Model
         return self::esLiberacion($this->bloqueos);
     }
 
+    /** Ya se le entregó al cliente (aparte del estatus: puede estar Listo, No quedó o Rechazado). */
+    public function getEntregadoAttribute(): bool
+    {
+        return $this->fecha_entrega_real !== null;
+    }
+
+    /** Todos los teléfonos de la misma orden (un ticket, un cobro), empezando por el primero. Solo ella si va sola. */
+    public function delGrupo(): Collection
+    {
+        if (! $this->grupo) {
+            return new Collection([$this]);
+        }
+
+        // sin los filtros de taller/sucursal: también se usa en el PDF público (sin sesión); el uuid ya es único
+        return static::withoutGlobalScopes()->where('taller_id', $this->taller_id)->where('grupo', $this->grupo)
+            ->with(['equipo' => fn ($q) => $q->withoutGlobalScopes()])->orderBy('folio')->get();
+    }
+
     /** Estatus que se le pueden poner, según sea liberación o reparación. */
     public static function estadosPara(?array $bloqueos): array
     {
@@ -263,7 +281,7 @@ class OrdenReparacion extends Model
 
     public function scopeAbiertas(Builder $q): Builder
     {
-        return $q->whereNotIn('estado', [self::ENTREGADO, self::CANCELADO]);
+        return $q->whereNull('fecha_entrega_real')->where('estado', '!=', self::CANCELADO);
     }
 
     /** Cambia lo pagado y registra la diferencia como cobro en la caja de hoy. */

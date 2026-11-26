@@ -114,18 +114,28 @@ class WhatsApp
             ->map(fn ($texto, $clave) => $texto.' '.($o->revision[$clave] === 'si' ? 'Sí' : 'No'))
             ->implode(', ');
 
+        // varios teléfonos en la misma orden: van todos en el ticket y el total es de todos
+        $grupo = $o->delGrupo();
+        $varios = $grupo->count() > 1;
+        $equipo = trim(($o->equipo?->nombre ?? '').' '.($o->equipo?->color ?? ''));
+        if ($varios) {
+            $equipo = $grupo->values()->map(fn (OrdenReparacion $g, $i) => "\n".($i + 1).') '
+                .trim(($g->equipo?->nombre ?? '').' '.($g->equipo?->color ?? ''))
+                ." (folio {$g->folio}) — {$g->falla_reportada} — ".dinero($g->total))->implode('');
+        }
+
         return strtr($plantilla, [
             '{taller}' => $o->taller?->nombre ?? '',
             '{sucursal}' => $o->sucursal?->nombre ?? '',
             '{folio}' => (string) $o->folio,
             '{fecha}' => $o->created_at?->format('d/m/Y H:i') ?? '',
             '{cliente}' => $o->cliente->nombre_completo,
-            '{equipo}' => trim(($o->equipo?->nombre ?? '').' '.($o->equipo?->color ?? '')),
-            '{falla}' => $o->falla_reportada,
+            '{equipo}' => $equipo,
+            '{falla}' => $varios ? 'la de cada teléfono, arriba' : $o->falla_reportada,
             '{revision}' => $revision !== '' ? $revision : '—',
-            '{total}' => dinero($o->total),
-            '{anticipo}' => dinero($o->pagado),
-            '{resta}' => dinero($o->saldo),
+            '{total}' => dinero($grupo->sum('total')),
+            '{anticipo}' => dinero($grupo->sum(fn ($g) => (float) $g->pagado)),
+            '{resta}' => dinero(max(0, $grupo->sum('saldo'))),
             '{estatus}' => $o->estado_texto,
             '{enlace}' => static::enlaceOrden($o),
             '{pdf}' => route('orden.pdf', $o->token),

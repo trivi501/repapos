@@ -16,6 +16,7 @@ use App\Support\WhatsApp;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -52,8 +53,6 @@ class OrdenReparacionController extends Controller
             'costo_mano_obra' => ['nullable', 'numeric', 'min:0'],
             'costo_mano_externa' => ['nullable', 'numeric', 'min:0'],
             'mano_externa_detalle' => ['nullable', 'string', 'max:255'],
-            'anticipo' => ['nullable', 'numeric', 'min:0'],
-            'metodo_pago' => ['nullable', 'in:efectivo,tarjeta,transferencia'],
             'estimado_listo_at' => ['nullable', 'date'],
             'notas' => ['nullable', 'string'],
             'notas_cliente' => ['nullable', 'string'],
@@ -68,7 +67,7 @@ class OrdenReparacionController extends Controller
     /** Campos que se guardan tal cual, normalizando fecha y revisión. */
     private function camposOrden(array $datos): array
     {
-        $campos = collect($datos)->except(['cliente_id', 'equipo_id', 'cliente_nuevo', 'equipo_nuevo', 'numero_orden', 'lote', 'anticipo'])->all();
+        $campos = collect($datos)->except(['cliente_id', 'equipo_id', 'cliente_nuevo', 'equipo_nuevo', 'numero_orden', 'lote', 'anticipo', 'metodo_pago', 'otros'])->all();
         // sin permiso, los costos internos ni se leen ni se tocan (se quedan como estaban)
         if (! auth()->user()?->can('ordenes.ver_costos')) {
             $campos = array_diff_key($campos, array_flip(OrdenReparacion::COSTOS_INTERNOS));
@@ -104,6 +103,7 @@ class OrdenReparacionController extends Controller
         $ordenes = OrdenReparacion::query()
             ->with(['cliente', 'equipo', 'tecnico'])
             ->when($request->query('estado') === 'abiertas', fn ($q) => $q->abiertas())
+            ->when(in_array($request->query('estado'), ['entregadas', OrdenReparacion::ENTREGADO], true), fn ($q) => $q->whereNotNull('fecha_entrega_real'))
             ->when(in_array($request->query('estado'), OrdenReparacion::ESTADOS, true), fn ($q) => $q->where('estado', $request->query('estado')))
             ->when($request->query('cliente_id'), fn ($q, $clienteId) => $q->where('cliente_id', $clienteId))
             ->when($request->query('tecnico_id'), fn ($q, $tecnicoId) => $q->where('tecnico_id', $tecnicoId))
@@ -116,6 +116,15 @@ class OrdenReparacionController extends Controller
             })
             ->orderByDesc('folio')
             ->paginate($request->integer('por_pagina', 50));
+
+        // cuántos teléfonos trae cada orden, para marcar en la lista los que van juntos
+        $grupos = collect($ordenes->items())->pluck('grupo')->filter()->unique();
+        if ($grupos->isNotEmpty()) {
+            $cuantos = OrdenReparacion::whereIn('grupo', $grupos)->selectRaw('grupo, COUNT(*) as n')->groupBy('grupo')->pluck('n', 'grupo');
+            foreach ($ordenes->items() as $o) {
+                $o->setAttribute('grupo_total', $o->grupo ? (int) ($cuantos[$o->grupo] ?? 1) : 1);
+            }
+        }
 
         return response()->json($ordenes);
     }
@@ -143,15 +152,31 @@ class OrdenReparacionController extends Controller
             'equipo_nuevo.color' => ['nullable', 'string', 'max:50'],
             'equipo_nuevo.accesorios' => ['nullable', 'string', 'max:255'],
             'equipo_nuevo.condicion_inicial' => ['nullable', 'string'],
+            // más teléfonos del mismo cliente en esta orden: cada uno con su falla, precio y bloqueos
+            'otros' => ['nullable', 'array', 'max:20'],
+            'otros.*.tipo' => ['nullable', 'string', 'max:50'],
+            'otros.*.marca' => ['required', 'string', 'max:100'],
+            'otros.*.modelo' => ['required', 'string', 'max:100'],
+            'otros.*.imei' => ['nullable', 'string', 'max:100'],
+            'otros.*.color' => ['nullable', 'string', 'max:50'],
+            'otros.*.falla_reportada' => ['required', 'string', 'max:2000'],
+            'otros.*.costo_estimado' => ['nullable', 'numeric', 'min:0'],
+            'otros.*.bloqueo_tipo' => ['nullable', 'in:ninguno,pin,patron,clave'],
+            'otros.*.bloqueo_valor' => ['nullable', 'string', 'max:100'],
+            'otros.*.bloqueos' => ['nullable', 'array'],
+            'otros.*.bloqueos.*' => ['string', 'distinct', 'in:operador,frp,icloud,mdm,knox'],
         ], [
             'cliente_nuevo.telefono.regex' => 'El teléfono del cliente debe tener al menos 10 dígitos.',
             'falla_reportada.required' => 'Escribe qué falla reporta el cliente.',
+            'otros.*.marca.required' => 'Escribe la marca de cada teléfono que agregaste.',
+            'otros.*.modelo.required' => 'Escribe el modelo de cada teléfono que agregaste.',
+            'otros.*.falla_reportada.required' => 'Escribe la falla de cada teléfono que agregaste.',
         ]);
 
         if (! empty($datos['cliente_nuevo']) && ! $usuario->can('clientes.crear')) {
             abort(403, 'No tienes permiso para registrar clientes nuevos.');
         }
-        if (! empty($datos['equipo_nuevo']) && ! $usuario->can('equipos.crear')) {
+        if ((! empty($datos['equipo_nuevo']) || ! empty($datos['otros'])) && ! $usuario->can('equipos.crear')) {
             abort(403, 'No tienes permiso para registrar equipos nuevos.');
         }
 
@@ -174,15 +199,16 @@ class OrdenReparacionController extends Controller
                 'estado' => OrdenReparacion::RECIBIDO,
                 'fecha_recepcion' => now(),
                 'prioridad' => $datos['prioridad'] ?? 'media',
-                'anticipo' => $datos['anticipo'] ?? 0,
                 'user_id' => $usuario->id,
             ]);
+            $orden->grupo = empty($datos['otros']) ? null : (string) Str::uuid();
             $orden->sucursal_id = $datos['sucursal_id'] ?? Sucursal::actualId();
             $orden->save();
 
             $this->asociarFotos($orden, $datos['lote'] ?? null);
-            // el anticipo entra a la caja de hoy con su forma de pago
-            $orden->cambiarPagado((float) ($datos['anticipo'] ?? 0), 'Anticipo', $this->metodo($datos['metodo_pago'] ?? null));
+            foreach ($datos['otros'] ?? [] as $otro) {
+                $this->otroTelefono($orden, $otro);
+            }
 
             return $orden;
         });
@@ -206,9 +232,39 @@ class OrdenReparacionController extends Controller
         return Cliente::create($nuevo);
     }
 
-    private function metodo(?string $metodo): string
+    /** Otro teléfono que el cliente deja en la misma orden: comparte cliente, técnico, sucursal y fecha prometida. */
+    private function otroTelefono(OrdenReparacion $principal, array $otro): OrdenReparacion
     {
-        return in_array(strtoupper((string) $metodo), Venta::METODOS, true) ? strtoupper($metodo) : Venta::EFECTIVO;
+        $equipo = Equipo::create([
+            'cliente_id' => $principal->cliente_id,
+            'tipo' => $otro['tipo'] ?? 'celular',
+            'marca' => $otro['marca'],
+            'modelo' => $otro['modelo'],
+            'imei' => $otro['imei'] ?? null,
+            'color' => $otro['color'] ?? null,
+        ]);
+        $tipo = $otro['bloqueo_tipo'] ?? 'ninguno';
+
+        // los vacíos no se copian: así toman el valor por defecto de la tabla
+        $comunes = array_filter($principal->only([
+            'cliente_id', 'tecnico_id', 'prioridad', 'tipo_servicio', 'estimado_listo_at', 'fecha_entrega_estimada',
+            'notas_cliente', 'visible_cliente', 'visibilidad', 'user_id',
+        ]), fn ($v) => $v !== null);
+        $orden = new OrdenReparacion($comunes + [
+            'equipo_id' => $equipo->id,
+            'grupo' => $principal->grupo,
+            'estado' => OrdenReparacion::RECIBIDO,
+            'fecha_recepcion' => $principal->fecha_recepcion,
+            'falla_reportada' => $otro['falla_reportada'],
+            'costo_estimado' => $otro['costo_estimado'] ?? null,
+            'bloqueos' => array_values($otro['bloqueos'] ?? []),
+            'bloqueo_tipo' => $tipo,
+            'bloqueo_valor' => $tipo === 'ninguno' ? null : ($otro['bloqueo_valor'] ?? null),
+        ]);
+        $orden->sucursal_id = $principal->sucursal_id;
+        $orden->save();
+
+        return $orden;
     }
 
     public function show(OrdenReparacion $orden)
@@ -230,6 +286,7 @@ class OrdenReparacionController extends Controller
 
         return $orden->toArray() + $costos + [
             'estado_texto' => $orden->estado_texto,
+            'grupo_ordenes' => $this->resumenGrupo($orden),
             'enlaces' => [
                 'publico' => WhatsApp::enlaceOrden($orden),
                 'pdf_publico' => route('orden.pdf', $orden->token),
@@ -237,6 +294,29 @@ class OrdenReparacionController extends Controller
                 'whatsapp_estatus' => WhatsApp::avisoOrden($orden),
             ],
         ];
+    }
+
+    /** Los teléfonos de la misma orden (vacío si va sola), para la ficha y el comprobante. */
+    private function resumenGrupo(OrdenReparacion $orden): array
+    {
+        if (! $orden->grupo) {
+            return [];
+        }
+
+        return $orden->delGrupo()->map(fn (OrdenReparacion $o) => [
+            'id' => $o->id,
+            'folio' => $o->folio,
+            'equipo' => trim(($o->equipo?->nombre ?? '').' '.($o->equipo?->color ?? '')),
+            'imei' => $o->equipo?->imei,
+            'falla_reportada' => $o->falla_reportada,
+            'estado' => $o->estado,
+            'estado_texto' => $o->estado_texto,
+            'es_liberacion' => $o->es_liberacion,
+            'total' => $o->total,
+            'pagado' => (float) $o->pagado,
+            'saldo' => $o->saldo,
+            'entregado' => $o->entregado,
+        ])->values()->all();
     }
 
     public function update(Request $request, OrdenReparacion $orden)
@@ -268,7 +348,6 @@ class OrdenReparacionController extends Controller
             }
             $campos['motivo_rechazo'] = in_array($datos['estado'], [OrdenReparacion::RECHAZADO, OrdenReparacion::NO_QUEDO], true)
                 ? (trim((string) $datos['motivo_rechazo']) ?: null) : null;
-            $campos['fecha_entrega_real'] = $datos['estado'] === OrdenReparacion::ENTREGADO ? ($orden->fecha_entrega_real ?? now()) : null;
             $orden->update($campos);
             $this->asociarFotos($orden, $datos['lote'] ?? null);
         });
@@ -295,26 +374,64 @@ class OrdenReparacionController extends Controller
                 $orden->update([
                     'estado' => $nuevo,
                     'motivo_rechazo' => in_array($nuevo, [OrdenReparacion::RECHAZADO, OrdenReparacion::NO_QUEDO], true) ? trim($d['motivo']) : null,
-                    'fecha_entrega_real' => $nuevo === OrdenReparacion::ENTREGADO ? now() : null,
                 ]);
                 $aviso = $this->aviso($orden, $antes);
-                $mensaje = "Folio {$orden->folio}: ahora está {$orden->estado_texto}."
-                    .($nuevo === OrdenReparacion::ENTREGADO && $orden->saldo > 0 ? ' Ojo: aún debe '.dinero($orden->saldo).'.' : '');
+                $mensaje = "Folio {$orden->folio}: ahora está {$orden->estado_texto}.";
+                break;
+            case 'entregar':
+            case 'quitar_entrega':
+                abort_unless($usuario->can('ordenes.cambiar_estado') || $usuario->can('ordenes.editar'), 403);
+                $entregar = $request->input('accion') === 'entregar';
+                // "todo": todos los teléfonos de la orden que falten; si no, solo este
+                $cuales = $request->boolean('todo') ? $orden->delGrupo() : collect([$orden]);
+                $cuales = $cuales->filter(fn (OrdenReparacion $o) => $o->entregado !== $entregar);
+                if ($cuales->isEmpty()) {
+                    return response()->json(['message' => $entregar ? 'Ya estaba entregado.' : 'No estaba marcado como entregado.'], 422);
+                }
+                DB::transaction(fn () => $cuales->each(fn (OrdenReparacion $o) => $o->update(['fecha_entrega_real' => $entregar ? now() : null])));
+                $folios = $cuales->pluck('folio')->implode(', ');
+                $debe = $cuales->sum(fn (OrdenReparacion $o) => max(0, $o->saldo));
+                $mensaje = $entregar
+                    ? ($cuales->count() > 1 ? "Folios {$folios}: entregados." : "Folio {$folios}: entregado.")
+                        .($debe > 0 ? ' Ojo: aún debe '.dinero($debe).'.' : '')
+                    : "Folio {$folios}: ya no está marcado como entregado.";
+                $orden->refresh();
                 break;
             case 'abono':
                 abort_unless($usuario->can('ordenes.cobrar'), 403);
                 $d = $request->validate(['monto' => ['required', 'numeric', 'gt:0'], 'metodo' => ['nullable', Rule::in(Venta::METODOS)]]);
+                if ($request->boolean('todo') && $orden->grupo) {
+                    // un abono para toda la orden: va llenando lo que debe cada teléfono; lo que sobre, a este
+                    $resta = (float) $d['monto'];
+                    DB::transaction(function () use ($orden, &$resta, $d) {
+                        foreach ($orden->delGrupo() as $o) {
+                            $parte = min($resta, max(0, $o->saldo));
+                            if ($parte > 0) {
+                                $o->cambiarPagado((float) $o->pagado + $parte, 'Abono', $d['metodo'] ?? Venta::EFECTIVO);
+                                $resta = round($resta - $parte, 2);
+                            }
+                        }
+                        if ($resta > 0) {
+                            $orden->refresh()->cambiarPagado((float) $orden->pagado + $resta, 'Abono', $d['metodo'] ?? Venta::EFECTIVO);
+                        }
+                    });
+                    $orden->refresh();
+                    $mensaje = 'Abono de '.dinero($d['monto']).' a toda la orden. Resta: '.dinero(max(0, $orden->delGrupo()->sum('saldo'))).'.';
+                    break;
+                }
                 $orden->cambiarPagado((float) $orden->pagado + (float) $d['monto'], 'Abono', $d['metodo'] ?? Venta::EFECTIVO);
                 $mensaje = 'Abono de '.dinero($d['monto']).'. Saldo: '.dinero($orden->saldo).'.';
                 break;
             case 'liquidar':
                 abort_unless($usuario->can('ordenes.cobrar'), 403);
-                if ($orden->saldo <= 0) {
+                $d = $request->validate(['metodo' => ['nullable', Rule::in(Venta::METODOS)]]);
+                $cuales = ($request->boolean('todo') ? $orden->delGrupo() : collect([$orden]))->filter(fn (OrdenReparacion $o) => $o->saldo > 0);
+                if ($cuales->isEmpty()) {
                     return response()->json(['message' => 'Esta orden no tiene saldo pendiente.'], 422);
                 }
-                $d = $request->validate(['metodo' => ['nullable', Rule::in(Venta::METODOS)]]);
-                $saldo = $orden->saldo;
-                $orden->cambiarPagado($orden->total, 'Liquidación', $d['metodo'] ?? Venta::EFECTIVO);
+                $saldo = $cuales->sum('saldo');
+                DB::transaction(fn () => $cuales->each(fn (OrdenReparacion $o) => $o->cambiarPagado($o->total, 'Liquidación', $d['metodo'] ?? Venta::EFECTIVO)));
+                $orden->refresh();
                 $mensaje = 'Orden liquidada ('.dinero($saldo).').';
                 break;
             default:
@@ -380,6 +497,7 @@ class OrdenReparacionController extends Controller
 
         return response()->json([
             'orden' => $orden->toArray() + ['estado_texto' => $orden->estado_texto, 'tiene_password' => (bool) ($orden->bloqueo_valor || $orden->bloqueo_pin)],
+            'grupo' => $this->resumenGrupo($orden),
             'taller' => $orden->taller->only(['nombre', 'whatsapp']) + ['logo_url' => $orden->taller->logoUrl()],
             'revision_campos' => OrdenReparacion::REVISION,
             'terminos' => Ajuste::valor('terminos_orden', Ajuste::TERMINOS_ORDEN),

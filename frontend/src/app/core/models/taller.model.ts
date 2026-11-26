@@ -39,7 +39,6 @@ export type EstadoOrden =
   | 'esperando_repuesto'
   | 'reparado'
   | 'no_quedo'
-  | 'entregado'
   | 'cancelado'
   // solo liberaciones
   | 'en_proceso'
@@ -86,8 +85,6 @@ export interface OrdenReparacion {
   saldo?: number;
   pagado?: string;
   pagos?: { id: number; fecha: string; concepto: string; metodo: string; monto: string }[];
-  anticipo?: string | number | null;
-  metodo_pago?: string;
   estimado_listo_at?: string | null;
   falla_reportada: string;
   diagnostico?: string | null;
@@ -102,6 +99,29 @@ export interface OrdenReparacion {
   visible_cliente?: boolean;
   visibilidad?: string[] | null;
   fotos?: FotoOrden[];
+  /** Ya se le entregó (aparte del estatus: puede estar Listo, No quedó o Rechazado). */
+  entregado?: boolean;
+  /** Teléfonos que el cliente dejó juntos en la misma orden (un ticket, un cobro). */
+  grupo?: string | null;
+  /** En la lista: cuántos teléfonos trae su orden. */
+  grupo_total?: number;
+  /** En la ficha: todos los teléfonos de la orden (vacío si va sola). */
+  grupo_ordenes?: TelefonoDeOrden[];
+}
+
+export interface TelefonoDeOrden {
+  id: number;
+  folio: number;
+  equipo: string;
+  imei?: string | null;
+  falla_reportada: string;
+  estado: EstadoOrden;
+  estado_texto: string;
+  es_liberacion: boolean;
+  total: number;
+  pagado: number;
+  saldo: number;
+  entregado: boolean;
 }
 
 export interface RefaccionOrden {
@@ -197,7 +217,6 @@ export const ESTADOS_REPARACION: { valor: EstadoOrden; etiqueta: string }[] = [
   { valor: 'esperando_repuesto', etiqueta: 'Esperando repuesto' },
   { valor: 'reparado', etiqueta: 'Listo' },
   { valor: 'no_quedo', etiqueta: 'No quedó' },
-  { valor: 'entregado', etiqueta: 'Entregado' },
   { valor: 'cancelado', etiqueta: 'Cancelado' },
 ];
 

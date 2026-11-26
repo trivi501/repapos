@@ -69,6 +69,7 @@ class ConsultaController extends Controller
             'estado_texto' => $orden->estado_texto,
             // la liberación tiene sus propios pasos: recibido, en proceso, listo o rechazado
             'es_liberacion' => $orden->es_liberacion,
+            'entregado' => $orden->entregado,
             'taller' => $orden->taller?->nombre,
             'logo_url' => $orden->taller?->logoUrl(),
             'sucursal' => $orden->sucursal?->nombre,

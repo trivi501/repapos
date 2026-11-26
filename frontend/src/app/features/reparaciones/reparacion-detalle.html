@@ -1,6 +1,6 @@
 @if (o(); as x) {
   <div class="encabezado">
-    <h1>Orden N° {{ x.folio }} <app-estatus [valor]="x.estado_texto" /></h1>
+    <h1>Orden N° {{ x.folio }} <app-estatus [valor]="x.estado_texto" /> @if (x.entregado) { <app-estatus valor="ENTREGADO" /> }</h1>
     <div class="acciones-fila">
       <a class="btn btn-secondary" [routerLink]="['/reparaciones', x.id, 'recibo']" target="_blank">Imprimir comprobante</a>
       <button class="btn btn-secondary" (click)="api.abrirPdf('ordenes/' + x.id + '/pdf')">PDF</button>
@@ -42,6 +42,34 @@
           </div>
         </div>
       </div>
+
+      @if (x.grupo_ordenes?.length) {
+        <div class="card tabla-scroll">
+          <div class="titulo-tarjeta"><h2>Teléfonos de esta orden ({{ x.grupo_ordenes?.length }})</h2></div>
+          <table>
+            <thead><tr><th>N°</th><th>Equipo</th><th>Falla</th><th>Estatus</th><th class="der">Total</th><th class="der">Resta</th><th></th></tr></thead>
+            <tbody>
+              @for (g of x.grupo_ordenes; track g.id) {
+                <tr [class.fila-actual]="g.id === x.id">
+                  <td><strong>{{ g.folio }}</strong></td>
+                  <td>{{ g.equipo }}@if (g.imei) { <div class="tenue"><small>{{ g.imei }}</small></div> }</td>
+                  <td class="recortado" [title]="g.falla_reportada">{{ g.falla_reportada }}</td>
+                  <td class="sin-salto"><app-estatus [valor]="g.estado_texto" /> @if (g.entregado) { <app-estatus valor="ENTREGADO" /> }</td>
+                  <td class="der">{{ g.total | dinero }}</td>
+                  <td class="der" [class.debe]="g.saldo > 0">{{ g.saldo | dinero }}</td>
+                  <td class="der">
+                    @if (g.id === x.id) {
+                      <small class="tenue">viendo</small>
+                    } @else {
+                      <a class="btn btn-secondary btn-sm" [routerLink]="['/reparaciones', g.id]">Abrir</a>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
 
       <div class="card contenido">
         <h2>Revisión al recibir</h2>
@@ -216,10 +244,13 @@
     <div class="pila">
       <div class="card contenido">
         <div class="linea-monto"><span>Total</span><b>{{ x.total | dinero }}</b></div>
-        <div class="linea-monto"><span>Anticipo / pagado</span><b>{{ x.pagado | dinero }}</b></div>
+        @if (x.grupo_ordenes?.length) {
+          <p class="ayuda">Este teléfono (folio {{ x.folio }}):</p>
+        }
+        <div class="linea-monto"><span>Pagado</span><b>{{ x.pagado | dinero }}</b></div>
         <div class="linea-monto total"><span>Resta</span><b [class.debe]="x.saldo > 0" [class.a-favor]="x.saldo <= 0">{{ x.saldo | dinero }}</b></div>
         @if (auth.tienePermiso('ordenes.cobrar')) {
-          <div class="grupo-en-linea separado">
+          <div class="grupo-en-linea envuelve separado">
             <input class="input-corto" type="number" step="0.01" min="0.01" aria-label="Monto del abono" [(ngModel)]="monto" />
             <select aria-label="Forma de pago" [(ngModel)]="metodo">
               <option value="EFECTIVO">Efectivo</option>
@@ -233,6 +264,40 @@
           }
         }
       </div>
+
+      @if (x.grupo_ordenes?.length) {
+        <div class="card contenido">
+          <h2>Toda la orden ({{ x.grupo_ordenes?.length }} teléfonos)</h2>
+          <div class="linea-monto"><span>Total</span><b>{{ totalGrupo(x) | dinero }}</b></div>
+          <div class="linea-monto total"><span>Resta</span><b [class.debe]="saldoGrupo(x) > 0" [class.a-favor]="saldoGrupo(x) <= 0">{{ saldoGrupo(x) | dinero }}</b></div>
+          @if (auth.tienePermiso('ordenes.cobrar') && saldoGrupo(x) > 0) {
+            <div class="grupo-en-linea envuelve separado">
+              <input class="input-corto" type="number" step="0.01" min="0.01" aria-label="Abono a toda la orden" [(ngModel)]="montoGrupo" />
+              <button class="btn btn-secondary" (click)="abonarGrupo()">Abonar a la orden</button>
+            </div>
+            <p class="ayuda">El abono va pagando un teléfono tras otro, en orden de folio. La forma de pago es la de arriba.</p>
+            <button class="btn btn-primary bloque separado" (click)="liquidarGrupo(x)">Liquidar toda la orden {{ saldoGrupo(x) | dinero }}</button>
+          }
+        </div>
+      }
+
+      @if (auth.tieneAlgunPermiso(['ordenes.cambiar_estado', 'ordenes.editar'])) {
+        <div class="card contenido">
+          <h2>Entrega</h2>
+          @if (x.entregado) {
+            <p>✅ Entregado el <b>{{ x.fecha_entrega_real | fecha: true }}</b>.</p>
+          } @else {
+            <p class="ayuda">El estatus (Listo, No quedó{{ x.es_liberacion ? ', Rechazado' : '' }}) se queda; esto solo marca que el cliente ya se lo llevó.</p>
+            <button class="btn btn-primary bloque" (click)="entregar(x)">📦 Entregar{{ x.grupo_ordenes?.length ? ' este teléfono' : '' }}</button>
+          }
+          @if (pendientesDeEntregar(x).length > 1) {
+            <button class="btn btn-secondary bloque separado" (click)="entregar(x, true)">📦 Entregar los {{ pendientesDeEntregar(x).length }} que faltan de la orden</button>
+          }
+          @if (x.entregado) {
+            <button class="btn btn-secondary btn-sm separado" (click)="quitarEntrega(x)">Quitar entregado</button>
+          }
+        </div>
+      }
 
       @if (x.ganancia !== undefined) {
         <div class="card contenido">

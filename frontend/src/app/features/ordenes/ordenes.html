@@ -10,6 +10,7 @@
     <label for="f_estado">Ver</label>
     <select id="f_estado" (change)="filtrarPorEstado($any($event.target).value)">
       <option value="abiertas" [selected]="filtroEstado() === 'abiertas'">Pendientes de entregar</option>
+      <option value="entregadas" [selected]="filtroEstado() === 'entregadas'">Ya entregadas</option>
       <option value="">Todas</option>
       @for (estado of estados; track estado.valor) {
         <option [value]="estado.valor">{{ estado.etiqueta }}</option>
@@ -42,14 +43,24 @@
     <tbody>
       @for (orden of ordenes(); track orden.id) {
         <tr>
-          <td><strong>{{ orden.folio }}</strong></td>
+          <td>
+            <strong>{{ orden.folio }}</strong>
+            @if ((orden.grupo_total ?? 1) > 1) {
+              <div><small class="tenue" title="Teléfonos que el cliente dejó en la misma orden">📱×{{ orden.grupo_total }}</small></div>
+            }
+          </td>
           <td class="sin-salto">{{ orden.fecha_recepcion | fecha: true }}</td>
           <td>{{ orden.cliente?.nombre }} {{ orden.cliente?.apellido }}<div class="tenue"><small>{{ orden.cliente?.telefono }}</small></div></td>
           <td>{{ orden.equipo?.marca }} {{ orden.equipo?.modelo }}</td>
           <td class="recortado" [title]="orden.falla_reportada">{{ orden.falla_reportada }}</td>
           <td class="der">{{ orden.total | dinero }}</td>
           <td class="der" [class.debe]="(orden.saldo ?? 0) > 0">{{ orden.saldo | dinero }}</td>
-          <td><span class="badge" [class]="claseEstado(orden.estado)">{{ etiquetaEstado(orden.estado) }}</span></td>
+          <td class="sin-salto">
+            <span class="badge" [class]="claseEstado(orden.estado)">{{ etiquetaEstado(orden.estado) }}</span>
+            @if (orden.entregado) {
+              <span class="badge badge-success">Entregado</span>
+            }
+          </td>
           <td class="sin-salto">{{ orden.fecha_entrega_estimada | fecha }}</td>
           <td>{{ orden.tecnico?.name || '—' }}</td>
           <td><a class="btn btn-secondary btn-sm" [routerLink]="['/reparaciones', orden.id]">Abrir</a></td>

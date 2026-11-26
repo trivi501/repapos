@@ -67,7 +67,6 @@ export class Ordenes implements OnInit {
 
   claseEstado(estado: string): string {
     switch (estado) {
-      case 'entregado':
       case 'reparado':
         return 'badge-success';
       case 'cancelado':

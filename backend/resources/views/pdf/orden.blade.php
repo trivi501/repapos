@@ -64,7 +64,21 @@
     <table class="mt">
         <tr><td><span class="etq">Falla</span><div class="grande">{{ $orden->falla_reportada }}</div></td></tr>
         <tr><td><span class="etq">Observación</span><div>{{ $orden->observaciones ?: ' ' }}</div></td></tr>
-        <tr><td style="font-size: 8px;">Password: {{ $orden->bloqueo_valor || $orden->bloqueo_pin ? 'registrado en el sistema (por seguridad no se imprime)' : 'no proporcionado' }} · Estatus: <b>{{ $orden->estado_texto }}</b></td></tr>
+        @if ($grupo->count() > 1)
+            <tr><td>
+                <span class="etq">Equipos en esta orden ({{ $grupo->count() }})</span>
+                <table class="sin-borde">
+                    @foreach ($grupo as $g)
+                        <tr>
+                            <td style="width: 55px;"><b>N° {{ str_pad($g->folio, 4, '0', STR_PAD_LEFT) }}</b></td>
+                            <td>{{ $g->equipo?->nombre }} {{ $g->equipo?->color }}@if ($g->equipo?->imei) · IMEI {{ $g->equipo->imei }}@endif — {{ $g->falla_reportada }}</td>
+                            <td style="width: 70px; text-align: right;">{{ dinero($g->total) }}</td>
+                        </tr>
+                    @endforeach
+                </table>
+            </td></tr>
+        @endif
+        <tr><td style="font-size: 8px;">Password:{{ $orden->bloqueo_valor || $orden->bloqueo_pin ? 'registrado en el sistema (por seguridad no se imprime)' : 'no proporcionado' }} · Estatus: <b>{{ $orden->estado_texto }}</b></td></tr>
     </table>
 
     <table class="mt sin-borde">
@@ -77,9 +91,10 @@
             </td>
             <td style="width: 170px; padding-left: 8px;">
                 <table>
-                    <tr><td><b>TOTAL</b></td><td style="text-align: right;">{{ dinero($orden->total) }}</td></tr>
-                    <tr><td><b>ANTICIPO</b></td><td style="text-align: right;">{{ dinero($orden->pagado) }}</td></tr>
-                    <tr><td><b>RESTA</b></td><td style="text-align: right; font-weight: bold;">{{ dinero($orden->saldo) }}</td></tr>
+                    @php($pagado = $grupo->sum(fn ($g) => (float) $g->pagado))
+                    <tr><td><b>TOTAL{{ $grupo->count() > 1 ? ' (' . $grupo->count() . ' equipos)' : '' }}</b></td><td style="text-align: right;">{{ dinero($grupo->sum('total')) }}</td></tr>
+                    @if ($pagado > 0)<tr><td><b>PAGADO</b></td><td style="text-align: right;">{{ dinero($pagado) }}</td></tr>@endif
+                    <tr><td><b>RESTA</b></td><td style="text-align: right; font-weight: bold;">{{ dinero(max(0, $grupo->sum('saldo'))) }}</td></tr>
                 </table>
                 <div class="firma">ACEPTO TÉRMINOS Y CONDICIONES</div>
                 <div class="firma">FIRMA DE ENTREGA</div>

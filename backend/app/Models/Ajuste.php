@@ -21,7 +21,7 @@ class Ajuste extends Model
     public const MENSAJE_ORDEN_RECHAZADO = "Hola {cliente}\nTe aviso que la liberación de tu equipo *{equipo}* (orden {folio}) fue RECHAZADA.\nMotivo: {motivo}\nNo tiene costo. Puedes pasar a recogerlo con tu nota.\n{taller}";
     public const MENSAJE_ORDEN_ESTATUS = "Hola {cliente}\nTu equipo *{equipo}* (orden {folio}) está: {estatus}.\nConsulta tu orden aquí: {enlace}\n{taller}";
     // ticket de la orden que se manda por WhatsApp (resumen de la nota de recepción)
-    public const TICKET_WHATSAPP = "*{taller}*\nOrden N° {folio} · {fecha}\nCliente: {cliente}\nEquipo: {equipo}\nFalla: {falla}\n\nRevisión: {revision}\n\nTotal: {total}\nAnticipo: {anticipo}\n*Resta: {resta}*\n\nTu nota en PDF: {pdf}\nConsulta el estatus de tu reparación: {enlace}\nPresenta tu nota para recoger tu equipo.";
+    public const TICKET_WHATSAPP = "*{taller}*\nOrden N° {folio} · {fecha}\nCliente: {cliente}\nEquipo: {equipo}\nFalla: {falla}\n\nRevisión: {revision}\n\nTotal: {total}\n*Resta: {resta}*\n\nTu nota en PDF: {pdf}\nConsulta el estatus de tu reparación: {enlace}\nPresenta tu nota para recoger tu equipo.";
     // ventas de mostrador
     public const PIE_TICKET_VENTA = "¡Gracias por tu compra!\nAccesorios sin garantía por mal uso. Cambios solo con este ticket dentro de 7 días.";
     public const TICKET_VENTA_WHATSAPP = "*{taller}*\nTicket de venta N° {folio} · {fecha}\n\n{productos}{descuento}\n*Total: {total}* ({metodo})\n\nTu ticket en PDF: {pdf}\n\n{pie}";

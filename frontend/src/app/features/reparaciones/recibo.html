@@ -60,6 +60,14 @@
     <table>
       <tr><td><span class="etq">FALLA</span><div class="valor">{{ r.orden.falla_reportada }}</div></td></tr>
       <tr><td><span class="etq">OBSERVACIÓN</span><div>{{ r.orden.observaciones || '&nbsp;' }}</div></td></tr>
+      @if (r.grupo.length > 1) {
+        <tr><td>
+          <span class="etq">EQUIPOS EN ESTA ORDEN ({{ r.grupo.length }})</span>
+          @for (g of r.grupo; track g.id) {
+            <div class="grupo-linea"><b>N° {{ folio(g.folio) }}</b> · {{ g.equipo }}@if (g.imei) { · IMEI {{ g.imei }} } — {{ g.falla_reportada }} <span class="der">{{ g.total | dinero }}</span></div>
+          }
+        </td></tr>
+      }
       <tr><td><small>Password: {{ r.orden.tiene_password ? 'registrado en el sistema (por seguridad no se imprime)' : 'no proporcionado' }}</small></td></tr>
     </table>
 
@@ -74,9 +82,12 @@
       </div>
       <div class="montos">
         <table>
-          <tr><td><b>TOTAL</b></td><td class="der">{{ r.orden.total | dinero }}</td></tr>
-          <tr><td><b>ANTICIPO</b></td><td class="der">{{ r.orden.pagado | dinero }}</td></tr>
-          <tr><td><b>RESTA</b></td><td class="der"><b>{{ r.orden.saldo | dinero }}</b></td></tr>
+          @let t = totales(r);
+          <tr><td><b>TOTAL{{ t.equipos > 1 ? ' (' + t.equipos + ' equipos)' : '' }}</b></td><td class="der">{{ t.total | dinero }}</td></tr>
+          @if (t.pagado > 0) {
+            <tr><td><b>PAGADO</b></td><td class="der">{{ t.pagado | dinero }}</td></tr>
+          }
+          <tr><td><b>RESTA</b></td><td class="der"><b>{{ t.resta | dinero }}</b></td></tr>
         </table>
         <div class="firma">ACEPTO TÉRMINOS Y CONDICIONES</div>
         <div class="firma">FIRMA DE ENTREGA{{ r.orden.fecha_entrega_real ? ' · ' + (r.orden.fecha_entrega_real | fecha: true) : '' }}</div>

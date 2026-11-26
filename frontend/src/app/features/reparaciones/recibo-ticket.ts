@@ -3,7 +3,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import QRCode from 'qrcode';
 import { ApiService } from '../../core/services/api.service';
 import { DineroPipe, FechaPipe } from '../../shared/ui';
-import type { DatosRecibo } from './recibo';
+import { type DatosRecibo, totalesRecibo } from './recibo';
 
 /** Comprobante de recepción en ticket para impresora térmica de 80 mm (sin PIN ni patrón). */
 @Component({
@@ -65,10 +65,20 @@ import type { DatosRecibo } from './recibo';
         <div class="chico">Password: {{ r.orden.tiene_password ? 'registrado (no se imprime)' : 'no proporcionado' }}</div>
 
         <div class="linea"></div>
+        @if (r.grupo.length > 1) {
+          <div><b>Equipos en esta orden ({{ r.grupo.length }}):</b></div>
+          @for (g of r.grupo; track g.id) {
+            <div class="chico">N° {{ folio(g.folio) }} · {{ g.equipo }} — {{ g.falla_reportada }} · {{ g.total | dinero }}</div>
+          }
+          <div class="linea"></div>
+        }
+        @let t = totales(r);
         <table>
-          <tr><td>TOTAL</td><td class="der">{{ r.orden.total | dinero }}</td></tr>
-          <tr><td>ANTICIPO</td><td class="der">{{ r.orden.pagado | dinero }}</td></tr>
-          <tr class="grande"><td>RESTA</td><td class="der">{{ r.orden.saldo | dinero }}</td></tr>
+          <tr><td>TOTAL{{ t.equipos > 1 ? ' (' + t.equipos + ' equipos)' : '' }}</td><td class="der">{{ t.total | dinero }}</td></tr>
+          @if (t.pagado > 0) {
+            <tr><td>PAGADO</td><td class="der">{{ t.pagado | dinero }}</td></tr>
+          }
+          <tr class="grande"><td>RESTA</td><td class="der">{{ t.resta | dinero }}</td></tr>
         </table>
 
         @if (qr()) {
@@ -100,6 +110,7 @@ export class ReciboTicket implements OnInit {
 
   readonly d = signal<DatosRecibo | null>(null);
   readonly qr = signal<string | null>(null);
+  readonly totales = totalesRecibo;
 
   ngOnInit(): void {
     this.api.get<DatosRecibo>(`ordenes/${this.route.snapshot.paramMap.get('id')}/recibo`).subscribe(async (d) => {

@@ -43,7 +43,7 @@ class ImportarRepapos extends Command
         'ESPERA REFACCIÓN' => 'esperando_repuesto',
         'LISTO' => 'reparado',
         'NO QUEDÓ' => 'no_quedo',
-        'ENTREGADO' => 'entregado',
+        'ENTREGADO' => 'reparado',   // entregado ya no es estatus: lo marca fecha_entrega_real
     ];
 
     public function handle(): int
